@@ -438,7 +438,6 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
               <span style={{fontSize:12,color:"#505050"}}>{person.language === "PT" ? "🇧🇷 Português" : "🇺🇸 English"}</span>
               <span style={{fontSize:12,color:"#505050"}}>{timeAgo(person.submitted_at)}</span>
             </div>
-          </div>
             </div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer",padding:"4px 8px",lineHeight:1}}>✕</button>

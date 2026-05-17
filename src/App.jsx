@@ -414,7 +414,7 @@ return (
           <button onClick={()=>setShowMinistryInput(true)} style={{fontSize:12,padding:"4px 10px",background:"#1C1C1C",color:"#505050",border:"1px dashed #252525",borderRadius:2,cursor:"pointer"}}>+ Add</button>
         </div>
         {showMinistryInput && (
-          <div style={{display:"flex",gap:8"}}>
+          <div style={{display:"flex",gap:8}}>
             <select value={newMinistry} onChange={e=>setNewMinistry(e.target.value)}
               style={{flex:1,padding:"8px 12px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}>
               <option value="">Select ministry…</option>
@@ -442,7 +442,7 @@ return (
       {/* Languages */}
       <div>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>Languages Spoken</div>
-        <div style={{display:"flex",gap:8"}}>
+        <div style={{display:"flex",gap:8}}>
           {LANGUAGES.map(l=>(
             <button key={l} onClick={()=>toggleLang(l)} disabled={saving}
               style={{padding:"6px 16px",borderRadius:3,border:`1px solid ${langs.includes(l)?"#2ABFBF":"#252525"}`,
@@ -565,8 +565,6 @@ if (!grps.includes(filterGroup)) return false;
 }
 return true;
 });
-
-const sel = filterStage === “All” && “All stages”;
 
 return (
 <div style={{padding:“24px 28px”}}>

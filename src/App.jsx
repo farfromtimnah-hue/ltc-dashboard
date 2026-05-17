@@ -35,28 +35,6 @@ const GIFTING_LABEL_PT = {
   "Discernment & Prophetic":"Discernimento & Profético"
 };
 
-function labelStage(stage, lang) {
-  if (lang === "PT") return (STAGE_LABEL.PT||{})[stage]||stage;
-  return stage;
-}
-function labelGifting(gifting, lang) {
-  if (!gifting || typeof gifting !== "string") return "";
-  if (lang === "PT") return GIFTING_LABEL_PT[gifting]||gifting;
-  return gifting;
-}
-function labelGroup(group, lang) {
-  const idx = ["Youth","Link","Legacy","English Service","Other"].indexOf(group);
-  if (lang === "PT" && idx > -1) return SPECIAL_GROUPS_PT[idx];
-  return group;
-}
-function labelLanguage(lang_value, lang) {
-  if (lang === "PT") {
-    if (lang_value === "Both") return "Ambos";
-    if (lang_value === "English") return "Inglês";
-  }
-  return lang_value;
-}
-
 const STAGE_COLORS = {
   "New":"#505050",
   "Reached Out":"#2563eb",
@@ -69,9 +47,9 @@ const STAGE_COLORS = {
 const PASTOR_SUGGESTIONS = ["Pra Alice","Pr Rafa"];
 
 const MINISTRIES_STARTER = [
-  "Worship Team","Media - ProPresenter","Media - Lights","Media - Sound",
-  "Media - Stream","Media - Camera","Content & Creative","Hospitality - Café",
-  "Hospitality - Welcome","Stage Operations","Intercession","Kids Ministry",
+  "Worship Team","Media — ProPresenter","Media — Lights","Media — Sound",
+  "Media — Stream","Media — Camera","Content & Creative","Hospitality — Café",
+  "Hospitality — Welcome","Stage Operations","Intercession","Kids Ministry",
   "Youth","Legacy","English Service","Link","Parking","Setup & Teardown"
 ];
 
@@ -86,18 +64,18 @@ const L = {
     awaitContact:"Aguardando Contato",inProgress:"Em Andamento",
     pipeline:"Funil de Conexão",topGiftings:"Principais Dons",
     langSplit:"Idiomas",weeklySub:"Respostas Semanais",noData:"Sem dados ainda",
-    searchPlaceholder:"Buscar nome, email, WhatsApp...",
+    searchPlaceholder:"Buscar nome, email, WhatsApp…",
     allStages:"Todos os Estágios",allGiftings:"Todos os Dons",
     allLanguages:"Todos os Idiomas",allGroups:"Todos os Grupos",allPastors:"Todos os Pastores",
     filterPastor:"Pastor",noMatch:"Nenhuma pessoa encontrada.",
     connStage:"Estágio de Conexão",assignedPastor:"Pastor Responsável",
-    orType:"Ou digite outro nome...",currentMin:"Ministérios Atuais",
+    orType:"Ou digite outro nome…",currentMin:"Ministérios Atuais",
     langSpoken:"Idiomas Falados",specialGroups:"Grupos Especiais",
     giftingProfile:"Perfil de Dons",notesAudit:"Notas e Histórico",
-    yourName:"Seu nome (pastor)...",addNote:"Adicionar nota...",saveNote:"Salvar Nota",
-    noNotes:"Sem notas ainda.",loading:"Carregando...",available:"Disponível",
-    selectGifting:"Selecione um dom para ver pessoas disponíveis - ordenado por carga ministerial",
-    noPeople:"Ninguém tem este dom ainda.",noContact:"Sem contato",selectMinistry:"Selecionar ministério...",typeCustom:"Digite o nome...",add:"Adicionar",checking:"Verificando...",incorrectPw:"Senha incorreta.",connError:"Erro de conexão. Tente novamente.",
+    yourName:"Seu nome (pastor)…",addNote:"Adicionar nota…",saveNote:"Salvar Nota",
+    noNotes:"Sem notas ainda.",loading:"Carregando…",available:"Disponível",
+    selectGifting:"Selecione um dom para ver pessoas disponíveis — ordenado por carga ministerial",
+    noPeople:"Ninguém tem este dom ainda.",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -106,18 +84,18 @@ const L = {
     awaitContact:"Awaiting Contact",inProgress:"In Progress",
     pipeline:"Connection Pipeline",topGiftings:"Top Giftings",
     langSplit:"Language Split",weeklySub:"Weekly Submissions",noData:"No data yet",
-    searchPlaceholder:"Search name, email, WhatsApp...",
+    searchPlaceholder:"Search name, email, WhatsApp…",
     allStages:"All Stages",allGiftings:"All Giftings",
     allLanguages:"All Languages",allGroups:"All Groups",allPastors:"All Pastors",
     filterPastor:"Pastor",noMatch:"No people match these filters.",
     connStage:"Connection Stage",assignedPastor:"Assigned Pastor",
-    orType:"Or type another pastor name...",currentMin:"Current Ministries",
+    orType:"Or type another pastor name…",currentMin:"Current Ministries",
     langSpoken:"Languages Spoken",specialGroups:"Special Groups",
     giftingProfile:"Gifting Profile",notesAudit:"Notes & Audit Trail",
-    yourName:"Your name (pastor)...",addNote:"Add a note...",saveNote:"{t.saveNote}",
-    noNotes:"No notes yet.",loading:"Loading...",available:"Available",
-    selectGifting:"Select a gifting to find available people - sorted by ministry load",
-    noPeople:"No one has this gifting yet.",noContact:"No contact",selectMinistry:"Select ministry...",typeCustom:"Type name...",add:"Add",checking:"Checking...",incorrectPw:"Incorrect password.",connError:"Connection error. Try again.",
+    yourName:"Your name (pastor)…",addNote:"Add a note…",saveNote:"Save Note",
+    noNotes:"No notes yet.",loading:"Loading…",available:"Available",
+    selectGifting:"Select a gifting to find available people — sorted by ministry load",
+    noPeople:"No one has this gifting yet.",
   }
 };
 
@@ -155,7 +133,7 @@ function timeAgo(ts) {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────
-function Login({ onLogin, t }) {
+function Login({ onLogin }) {
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -170,8 +148,8 @@ function Login({ onLogin, t }) {
       });
       const d = await r.json();
       if (d.success) { onLogin(pw); }
-      else { setError(t?.incorrectPw || "Incorrect password."); }
-    } catch { setError(t?.connError || "Connection error. Try again."); }
+      else { setError("Incorrect password."); }
+    } catch { setError("Connection error. Try again."); }
     setLoading(false);
   }
 
@@ -180,9 +158,9 @@ function Login({ onLogin, t }) {
       <style>{css}</style>
       <div style={{width:380,padding:"48px 40px",background:"#141414",border:"1px solid #252525",borderTop:"2px solid #2ABFBF",borderRadius:4}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:3,color:"#2ABFBF",textTransform:"uppercase",marginBottom:8}}>LTC Ministry</div>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:32}}>{t?.dashboard || "Pastor Dashboard"}</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:32}}>Pastor Dashboard</div>
         <input
-          type="password" placeholder={t?.password || "Enter dashboard password"}
+          type="password" placeholder="Enter dashboard password"
           value={pw} onChange={e=>setPw(e.target.value)}
           onKeyDown={e=>e.key==="Enter"&&handleLogin()}
           style={{width:"100%",padding:"12px 16px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:15,fontFamily:"'Barlow',sans-serif",outline:"none",marginBottom:12}}
@@ -190,7 +168,7 @@ function Login({ onLogin, t }) {
         {error && <div style={{color:"#ef4444",fontSize:13,marginBottom:12}}>{error}</div>}
         <button onClick={handleLogin} disabled={loading}
           style={{width:"100%",padding:"13px",background:"#2ABFBF",color:"#0A0A0A",fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,letterSpacing:2,textTransform:"uppercase",border:"none",borderRadius:3,cursor:"pointer"}}>
-          {loading ? (t?.checking || "Checking...") : (t?.enter || "Enter")}
+          {loading ? "Checking..." : "Enter"}
         </button>
       </div>
     </div>
@@ -198,7 +176,7 @@ function Login({ onLogin, t }) {
 }
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────
-function AnalyticsTab({ token, t, lang }) {
+function AnalyticsTab({ token, t }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -241,9 +219,9 @@ function AnalyticsTab({ token, t, lang }) {
       <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20,color:"#F0F0F0"}}>{t.pipeline}</div>
         {stageFunnel.map(({stage,count})=>(
-          <div key={labelStage(stage, lang)} style={{marginBottom:12}}>
+          <div key={stage} style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:13,color:"#F0F0F0"}}>{labelStage(stage, lang)}</span>
+              <span style={{fontSize:13,color:"#F0F0F0"}}>{stage}</span>
               <span style={{fontSize:13,fontWeight:600,color:STAGE_COLORS[stage]||"#2ABFBF"}}>{count}</span>
             </div>
             <div style={{height:8,background:"#1C1C1C",borderRadius:4,overflow:"hidden"}}>
@@ -258,9 +236,9 @@ function AnalyticsTab({ token, t, lang }) {
         <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.topGiftings}</div>
           {(data.byGifting||[]).slice(0,8).map(({gifting,count})=>(
-            <div key={labelGifting(gifting, lang)} style={{marginBottom:10}}>
+            <div key={gifting} style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                <span style={{fontSize:12,color:"#F0F0F0"}}>{GIFTING_ICONS[gifting]||"◆"} {labelGifting(gifting, lang)}</span>
+                <span style={{fontSize:12,color:"#F0F0F0"}}>{GIFTING_ICONS[gifting]||"◆"} {gifting}</span>
                 <span style={{fontSize:12,fontWeight:600,color:"#2ABFBF"}}>{count}</span>
               </div>
               <div style={{height:6,background:"#1C1C1C",borderRadius:3}}>
@@ -274,7 +252,7 @@ function AnalyticsTab({ token, t, lang }) {
           {/* Language split */}
           <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px",flex:1}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.langSplit}</div>
-            {[{label:labelLanguage("Português", lang),count:ptCount,color:"#2ABFBF"},{label:labelLanguage("English", lang),count:enCount,color:"#4DD4D4"}].map(({label,count,color})=>(
+            {[{label:"Português",count:ptCount,color:"#2ABFBF"},{label:"English",count:enCount,color:"#4DD4D4"}].map(({label,count,color})=>(
               <div key={label} style={{marginBottom:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                   <span style={{fontSize:13}}>{label}</span>
@@ -311,7 +289,7 @@ function AnalyticsTab({ token, t, lang }) {
 }
 
 // ─── PERSON CARD ──────────────────────────────────────────────────
-function PersonCard({ person, onClick, lang, t }) {
+function PersonCard({ person, onClick }) {
   const ministries = parseJSON(person.current_ministries);
   const groups = parseJSON(person.special_groups);
   const langs = parseJSON(person.languages_spoken);
@@ -323,27 +301,36 @@ function PersonCard({ person, onClick, lang, t }) {
       onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
       onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700}}>{person.name}</div>
-          <div style={{fontSize:12,color:"#999",marginTop:2}}>{person.whatsapp || person.email || t?.noContact || "No contact"}</div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {person.photo_url ? (
+            <img src={person.photo_url} alt={person.name} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
+          ) : (
+            <div style={{width:40,height:40,borderRadius:"50%",background:"#252525",border:"1px solid #333",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#505050"}}>
+              {(person.name||"?")[0].toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700}}>{person.name}</div>
+            <div style={{fontSize:12,color:"#999",marginTop:2}}>{person.whatsapp || person.email || "No contact"}</div>
+          </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-          <span style={{fontSize:11,padding:"3px 8px",background:`${stageColor}22`,color:stageColor,borderRadius:2,fontWeight:600,whiteSpace:"nowrap"}}>{labelStage(person.stage||"New", lang)}</span>
+          <span style={{fontSize:11,padding:"3px 8px",background:`${stageColor}22`,color:stageColor,borderRadius:2,fontWeight:600,whiteSpace:"nowrap"}}>{person.stage||"New"}</span>
           <span style={{fontSize:11,padding:"3px 8px",background:badge.bg,color:badge.color,borderRadius:2,fontWeight:600}}>{badge.label}</span>
         </div>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:person.assigned_pastor?8:0}}>
         {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
           <span key={i} style={{fontSize:11,padding:"2px 8px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
-            {GIFTING_ICONS[g]||"◆"} {labelGifting(g, lang)}
+            {GIFTING_ICONS[g]||"◆"} {g}
           </span>
         ))}
       </div>
       {(langs.length>0||groups.length>0||person.assigned_pastor) && (
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6,paddingTop:6,borderTop:"1px solid #252525"}}>
-          {person.assigned_pastor && <span style={{fontSize:11,color:"#2ABFBF"}}>-> {person.assigned_pastor}</span>}
-          {langs.map(l=><span key={labelLanguage(l, lang)} style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#999",borderRadius:2}}>{labelLanguage(l, lang)}</span>)}
-          {groups.map(g=><span key={labelGroup(g, lang)} style={{fontSize:10,padding:"1px 6px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2}}>{labelGroup(g, lang)}</span>)}
+          {person.assigned_pastor && <span style={{fontSize:11,color:"#2ABFBF"}}>→ {person.assigned_pastor}</span>}
+          {langs.map(l=><span key={l} style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#999",borderRadius:2}}>{l}</span>)}
+          {groups.map(g=><span key={g} style={{fontSize:10,padding:"1px 6px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2}}>{g}</span>)}
         </div>
       )}
     </div>
@@ -430,7 +417,15 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
 
         {/* Header */}
         <div style={{padding:"24px 28px",borderBottom:"1px solid #252525",borderTop:"2px solid #2ABFBF",position:"sticky",top:0,background:"#141414",zIndex:10,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            {person.photo_url ? (
+              <img src={person.photo_url} alt={person.name} style={{width:56,height:56,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
+            ) : (
+              <div style={{width:56,height:56,borderRadius:"50%",background:"#252525",border:"1px solid #333",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:"#505050"}}>
+                {(person.name||"?")[0].toUpperCase()}
+              </div>
+            )}
+            <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800}}>{person.name}</div>
             <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
               {person.whatsapp && (
@@ -442,6 +437,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
               )}
               <span style={{fontSize:12,color:"#505050"}}>{person.language === "PT" ? "🇧🇷 Português" : "🇺🇸 English"}</span>
               <span style={{fontSize:12,color:"#505050"}}>{timeAgo(person.submitted_at)}</span>
+            </div>
+          </div>
             </div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer",padding:"4px 8px",lineHeight:1}}>✕</button>
@@ -459,7 +456,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
                     background:person.stage===s?`${STAGE_COLORS[s]}22`:"transparent",
                     color:person.stage===s?STAGE_COLORS[s]:"#505050",
                     fontSize:12,cursor:"pointer",fontFamily:"'Barlow',sans-serif",transition:"all 0.15s"}}>
-                  {labelStage(s, lang)}
+                  {(STAGE_LABEL[lang||"EN"]||STAGE_LABEL.EN)[s]||s}
                 </button>
               ))}
             </div>
@@ -494,7 +491,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
               {ministries.map(m=>(
                 <span key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,padding:"4px 10px",background:"rgba(42,191,191,0.1)",color:"#4DD4D4",borderRadius:2,border:"1px solid rgba(42,191,191,0.2)"}}>
                   {m}
-                  <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#2ABFBF",cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>x</button>
+                  <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#2ABFBF",cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>×</button>
                 </span>
               ))}
               <button onClick={()=>setShowMinistryInput(true)} style={{fontSize:12,padding:"4px 10px",background:"#1C1C1C",color:"#505050",border:"1px dashed #252525",borderRadius:2,cursor:"pointer"}}>+ Add</button>
@@ -503,24 +500,24 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
               <div style={{display:"flex",gap:8}}>
                 <select value={newMinistry} onChange={e=>setNewMinistry(e.target.value)}
                   style={{flex:1,padding:"8px 12px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}>
-                  <option value="">{t.selectMinistry}</option>
+                  <option value="">Select ministry…</option>
                   {MINISTRIES_STARTER.filter(m=>!ministries.includes(m)).map(m=><option key={m} value={m}>{m}</option>)}
-                  <option value="__custom">{t.typeCustom}</option>
+                  <option value="__custom">Type custom…</option>
                 </select>
                 <button onClick={()=>newMinistry==="__custom"?setShowMinistryInput("custom"):addMinistry(newMinistry)}
-                  style={{padding:"8px 16px",background:"#2ABFBF",color:"#0A0A0A",border:"none",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600}}>{t.add}</button>
+                  style={{padding:"8px 16px",background:"#2ABFBF",color:"#0A0A0A",border:"none",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600}}>Add</button>
                 <button onClick={()=>{setShowMinistryInput(false);setNewMinistry("");}}
                   style={{padding:"8px 12px",background:"#1C1C1C",color:"#999",border:"1px solid #252525",borderRadius:3,cursor:"pointer",fontSize:13}}>✕</button>
               </div>
             )}
             {showMinistryInput === "custom" && (
               <div style={{display:"flex",gap:8,marginTop:8}}>
-                <input placeholder={t.typeCustom} value={newMinistry==="__custom"?"":newMinistry}
+                <input placeholder="Type ministry name…" value={newMinistry==="__custom"?"":newMinistry}
                   onChange={e=>setNewMinistry(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&addMinistry(newMinistry)}
                   style={{flex:1,padding:"8px 12px",background:"#1C1C1C",border:"1px solid #2ABFBF",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}/>
                 <button onClick={()=>addMinistry(newMinistry)}
-                  style={{padding:"8px 16px",background:"#2ABFBF",color:"#0A0A0A",border:"none",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600}}>{t.add}</button>
+                  style={{padding:"8px 16px",background:"#2ABFBF",color:"#0A0A0A",border:"none",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600}}>Add</button>
               </div>
             )}
           </div>
@@ -530,11 +527,11 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
             <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.langSpoken}</div>
             <div style={{display:"flex",gap:8}}>
               {LANGUAGES.map(l=>(
-                <button key={labelLanguage(l, lang)} onClick={()=>toggleLang(l)} disabled={saving}
+                <button key={l} onClick={()=>toggleLang(l)} disabled={saving}
                   style={{padding:"6px 16px",borderRadius:3,border:`1px solid ${langs.includes(l)?"#2ABFBF":"#252525"}`,
                     background:langs.includes(l)?"rgba(42,191,191,0.15)":"transparent",
                     color:langs.includes(l)?"#2ABFBF":"#505050",fontSize:13,cursor:"pointer"}}>
-                  {labelLanguage(l, lang)}
+                  {l}
                 </button>
               ))}
             </div>
@@ -545,11 +542,11 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
             <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.specialGroups}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {SPECIAL_GROUPS.map(g=>(
-                <button key={labelGroup(g, lang)} onClick={()=>toggleGroup(g)} disabled={saving}
+                <button key={g} onClick={()=>toggleGroup(g)} disabled={saving}
                   style={{padding:"6px 16px",borderRadius:3,border:`1px solid ${groups.includes(g)?"#4DD4D4":"#252525"}`,
                     background:groups.includes(g)?"rgba(77,212,212,0.1)":"transparent",
                     color:groups.includes(g)?"#4DD4D4":"#505050",fontSize:13,cursor:"pointer"}}>
-                  {labelGroup(g, lang)}
+                  {g}
                 </button>
               ))}
             </div>
@@ -561,7 +558,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
             <div style={{display:"flex",gap:6,marginBottom:12}}>
               {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
                 <span key={i} style={{fontSize:12,padding:"4px 12px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
-                  {i===0?"#1 ":i===1?"#2 ":"#3 "}{GIFTING_ICONS[g]||""} {labelGroup(g, lang)}
+                  {i===0?"#1 ":i===1?"#2 ":"#3 "}{GIFTING_ICONS[g]||""} {g}
                 </span>
               ))}
             </div>
@@ -570,9 +567,9 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
                 {sortedScores.map(([gifting,score])=>{
                   const pct = Math.min(Math.round(Number(score)),100);
                   return (
-                    <div key={labelGifting(gifting, lang)} style={{marginBottom:8}}>
+                    <div key={gifting} style={{marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                        <span style={{fontSize:11,color:"#999"}}>{GIFTING_ICONS[gifting]||"◆"} {labelGifting(gifting, lang)}</span>
+                        <span style={{fontSize:11,color:"#999"}}>{GIFTING_ICONS[gifting]||"◆"} {gifting}</span>
                         <span style={{fontSize:11,color:"#2ABFBF",fontWeight:600}}>{pct}%</span>
                       </div>
                       <div style={{height:4,background:"#252525",borderRadius:2}}>
@@ -595,7 +592,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
                 style={{width:"100%",padding:"8px 12px",background:"#1C1C1C",border:"1px solid #252525",borderTop:"none",borderRadius:"0 0 3px 3px",color:"#F0F0F0",fontSize:13,outline:"none",resize:"vertical",fontFamily:"'Barlow',sans-serif"}}/>
               <button onClick={addNote} disabled={saving||!noteText.trim()}
                 style={{marginTop:8,padding:"8px 20px",background:noteText.trim()?"#2ABFBF":"#252525",color:noteText.trim()?"#0A0A0A":"#505050",border:"none",borderRadius:3,cursor:noteText.trim()?"pointer":"default",fontSize:13,fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:1,textTransform:"uppercase"}}>
-                {t.saveNote}
+                Save Note
               </button>
             </div>
             {(person.notes||[]).map(note=>(
@@ -603,7 +600,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
                 <div style={{display:"flex",gap:8,marginBottom:4,alignItems:"center"}}>
                   <span style={{fontSize:12,fontWeight:600,color:"#2ABFBF"}}>{note.pastor_name}</span>
                   <span style={{fontSize:11,color:"#505050"}}>{timeAgo(note.created_at)}</span>
-                  {note.stage_at_time && <span style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#505050",borderRadius:2}}>{labelStage(note.stage_at_time, lang)}</span>}
+                  {note.stage_at_time && <span style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#505050",borderRadius:2}}>{note.stage_at_time}</span>}
                 </div>
                 <div style={{fontSize:13,color:"#F0F0F0",lineHeight:1.5}}>{note.note_text}</div>
               </div>
@@ -618,6 +615,47 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
 }
 
 // ─── PEOPLE TAB ───────────────────────────────────────────────────
+async function executeSplit(people, token, reload, setDone, setSaving, ratio, setShowSplit) {
+  setSaving(true);
+  setDone("");
+  const unassigned = people.filter(p => !p.assigned_pastor);
+  const englishSpeakers = unassigned.filter(p => {
+    const langs = JSON.parse(p.languages_spoken || "[]");
+    return langs.includes("English") || langs.includes("Both");
+  });
+  const ptOnly = unassigned.filter(p => {
+    const langs = JSON.parse(p.languages_spoken || "[]");
+    return !langs.includes("English") && !langs.includes("Both");
+  });
+
+  const aliceList = [...englishSpeakers];
+  const rafaList = [];
+  const pct = ratio === "7525" ? 0.75 : 0.5;
+  const aliceCount = Math.round(ptOnly.length * pct);
+  ptOnly.forEach((p, i) => {
+    if (i < aliceCount) aliceList.push(p);
+    else rafaList.push(p);
+  });
+
+  const assigns = [
+    ...aliceList.map(p => ({id: p.id, pastor: "Pra Alice"})),
+    ...rafaList.map(p => ({id: p.id, pastor: "Pr Rafa"}))
+  ];
+
+  await Promise.all(assigns.map(a =>
+    fetch(`${API}/person/${a.id}/connection`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json", Authorization: `Bearer ${token}`},
+      body: JSON.stringify({assigned_pastor: a.pastor})
+    })
+  ));
+
+  reload();
+  setSaving(false);
+  setShowSplit(false);
+  setDone(`✓ ${englishSpeakers.length} English speakers → Pra Alice. ${aliceCount} PT → Pra Alice. ${rafaList.length} PT → Pr Rafa.`);
+}
+
 function PeopleTab({ token, t, lang }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
@@ -627,6 +665,9 @@ function PeopleTab({ token, t, lang }) {
   const [filterGroup, setFilterGroup] = useState("All");
   const [filterPastor, setFilterPastor] = useState("All");
   const [selectedId, setSelectedId] = useState(null);
+  const [showSplit, setShowSplit] = useState(false);
+  const [splitRatio, setSplitRatio] = useState("5050");
+  const [splitDone, setSplitDone] = useState("");
 
   const load = useCallback(() => {
     fetch(`${API}/people`, { headers: { Authorization: `Bearer ${token}` } })
@@ -661,24 +702,63 @@ function PeopleTab({ token, t, lang }) {
         <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
           style={{padding:"9px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}/>
         {[
-          {label:t.allStages,val:filterStage,set:setFilterStage,opts:[{value:"All",label:t.allStages}, ...STAGES.map(s => ({value:s, label:labelStage(s, lang)}))]},
-          {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:[{value:"All",label:t.allGiftings}, ...GIFTINGS.map(g => ({value:g, label:labelGifting(g, lang)}))]},
-          {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:[{value:"All",label:t.allLanguages}, ...LANGUAGES.map(l => ({value:l, label:labelLanguage(l, lang)}))]},
-          {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:[{value:"All",label:t.allGroups}, ...SPECIAL_GROUPS.map(g => ({value:g, label:labelGroup(g, lang)}))]},
-          {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:[{value:"All",label:t.allPastors}, ...pastorOptions.filter(o=>o!=="All").map(o => ({value:o, label:o}))]},
+          {label:t.allStages,val:filterStage,set:setFilterStage,opts:["All",...STAGES],optLabels:["All",...STAGES]},
+          {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS]},
+          {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES]},
+          {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS]},
+          {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:pastorOptions},
         ].map(({label,val,set,opts})=>(
           <select key={label} value={val} onChange={e=>set(e.target.value)}
             style={{padding:"9px 12px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:val==="All"?"#888":"#F0F0F0",fontSize:13,outline:"none",WebkitAppearance:"menulist"}}>
-            {opts.map(o=><option key={typeof o === "string" ? o : o.value} value={typeof o === "string" ? o : o.value} style={{background:"#1C1C1C",color:"#F0F0F0"}}>{typeof o === "string" ? (o==="All"?label:o) : o.label}</option>)}
+            {opts.map(o=><option key={o} value={o} style={{background:"#1C1C1C",color:"#F0F0F0"}}>{o==="All"?label:o}</option>)}
           </select>
         ))}
       </div>
 
-      <div style={{fontSize:12,color:"#505050",marginBottom:14}}>{filtered.length} / {people.length}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:12,color:"#505050"}}>{filtered.length} / {people.length}</div>
+        <button onClick={()=>setShowSplit(true)}
+          style={{padding:"6px 14px",background:"rgba(42,191,191,0.1)",border:"1px solid rgba(42,191,191,0.3)",borderRadius:3,color:"#2ABFBF",fontSize:11,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:1,textTransform:"uppercase",cursor:"pointer"}}>
+          ⚡ {lang==="PT"?"Distribuir Pessoas":"Split Assignments"}
+        </button>
+      </div>
+      {showSplit && (
+        <div style={{background:"#141414",border:"1px solid #2ABFBF",borderRadius:4,padding:"20px 24px",marginBottom:16}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,textTransform:"uppercase",marginBottom:8,color:"#F0F0F0"}}>
+            {lang==="PT"?"Distribuir Pessoas Não Atribuídas":"Split Unassigned People"}
+          </div>
+          <div style={{fontSize:12,color:"#777",marginBottom:14,lineHeight:1.6}}>
+            {lang==="PT"
+              ? "Inglês/Ambos → Pra Alice automaticamente. Português → dividido entre os pastores."
+              : "English/Both speakers → Pra Alice automatically. Portuguese → split between pastors."}
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <button onClick={()=>setSplitRatio("5050")}
+              style={{padding:"8px 16px",borderRadius:3,border:`1px solid ${splitRatio==="5050"?"#2ABFBF":"#333"}`,background:splitRatio==="5050"?"rgba(42,191,191,0.15)":"#1C1C1C",color:splitRatio==="5050"?"#2ABFBF":"#777",fontSize:12,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>
+              50 / 50
+            </button>
+            <button onClick={()=>setSplitRatio("7525")}
+              style={{padding:"8px 16px",borderRadius:3,border:`1px solid ${splitRatio==="7525"?"#2ABFBF":"#333"}`,background:splitRatio==="7525"?"rgba(42,191,191,0.15)":"#1C1C1C",color:splitRatio==="7525"?"#2ABFBF":"#777",fontSize:12,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>
+              75 (Alice) / 25 (Rafa)
+            </button>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>executeSplit(people,token,load,setSplitDone,setSaving,splitRatio,setShowSplit)}
+              style={{padding:"9px 20px",background:"#2ABFBF",border:"none",borderRadius:3,color:"#0A0A0A",fontSize:12,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,textTransform:"uppercase",letterSpacing:1,cursor:"pointer"}}>
+              {lang==="PT"?"Confirmar":"Confirm Split"}
+            </button>
+            <button onClick={()=>setShowSplit(false)}
+              style={{padding:"9px 16px",background:"#1C1C1C",border:"1px solid #333",borderRadius:3,color:"#777",fontSize:12,cursor:"pointer"}}>
+              {lang==="PT"?"Cancelar":"Cancel"}
+            </button>
+          </div>
+          {splitDone && <div style={{marginTop:12,fontSize:12,color:"#2ABFBF"}}>{splitDone}</div>}
+        </div>
+      )}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
         {filtered.map(p => (
-          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} lang={lang} t={t} />
+          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} />
         ))}
         {filtered.length === 0 && (
           <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#505050"}}>{t.noMatch}</div>
@@ -714,11 +794,11 @@ function GiftingTab({ token, t, lang }) {
       <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:2,color:"#505050",textTransform:"uppercase",marginBottom:16}}>{t.selectGifting}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:28}}>
         {GIFTINGS.map(g=>(
-          <button key={labelGroup(g, lang)} onClick={()=>setSelectedGifting(g)}
+          <button key={g} onClick={()=>setSelectedGifting(g)}
             style={{padding:"12px 16px",background:selectedGifting===g?"rgba(42,191,191,0.15)":"#141414",
               border:`1px solid ${selectedGifting===g?"#2ABFBF":"#252525"}`,borderRadius:4,color:selectedGifting===g?"#2ABFBF":"#F0F0F0",
               fontSize:13,cursor:"pointer",textAlign:"left",fontFamily:"'Barlow',sans-serif",transition:"all 0.15s"}}>
-            <span style={{marginRight:8}}>{GIFTING_ICONS[g]||"◆"}</span>{labelGroup(g, lang)}
+            <span style={{marginRight:8}}>{GIFTING_ICONS[g]||"◆"}</span>{g}
           </button>
         ))}
       </div>
@@ -727,14 +807,14 @@ function GiftingTab({ token, t, lang }) {
         <div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:700,textTransform:"uppercase"}}>
-              {GIFTING_ICONS[selectedGifting]} {labelGifting(selectedGifting, lang)}
+              {GIFTING_ICONS[selectedGifting]} {selectedGifting}
             </div>
             {!loading && <div style={{fontSize:12,color:"#505050"}}>{people.length} people</div>}
           </div>
           {loading ? <div style={{color:"#505050"}}>{t.loading}</div> : (
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
               {people.map(p=>(
-                <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} lang={lang} t={t} />
+                <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} />
               ))}
               {people.length===0 && <div style={{color:"#505050",fontSize:13}}>{t.noPeople}</div>}
             </div>
@@ -761,7 +841,7 @@ export default function App() {
     setToken(pw);
   }
 
-  if (!token) return <Login onLogin={handleLogin} t={t} />;
+  if (!token) return <Login onLogin={handleLogin} lang={lang} t={t} />;
 
   const tabs = [
     { id: "analytics", label: t.analytics },

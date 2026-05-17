@@ -252,7 +252,7 @@ function PersonCard({ person, onClick }) {
         </div>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:person.assigned_pastor?8:0}}>
-        {[person.gifting_1,person.gifting_2,person.gifting_3].filter(Boolean).map((g,i)=>(
+        {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
           <span key={i} style={{fontSize:11,padding:"2px 8px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
             {GIFTING_ICONS[g]||"◆"} {g}
           </span>
@@ -340,7 +340,8 @@ function PersonPanel({ personId, token, onClose, onUpdated }) {
     updateConnection({ current_ministries: ministries.filter(x=>x!==m) });
   }
 
-  const sortedScores = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const SHORT_TO_FULL = {visual:"Visual Storytelling",encouragement:"Encouragement",creativity:"Creativity",worship:"Worship & Music",hospitality:"Hospitality",faith:"Faith",administration:"Administration",prophetic:"Discernment & Prophetic",helps:"Gift of Helps",digital:"Digital Communication",intercession:"Intercession",evangelism:"Evangelism",teaching:"Teaching",technical:"Technical Arts",leadership:"Influence & Servant Leadership"};
+  const sortedScores = Object.entries(scores).map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",justifyContent:"flex-end"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -477,7 +478,7 @@ function PersonPanel({ personId, token, onClose, onUpdated }) {
           <div>
             <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>Gifting Profile</div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
-              {[person.gifting_1,person.gifting_2,person.gifting_3].filter(Boolean).map((g,i)=>(
+              {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
                 <span key={i} style={{fontSize:12,padding:"4px 12px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
                   {i===0?"#1 ":i===1?"#2 ":"#3 "}{GIFTING_ICONS[g]||""} {g}
                 </span>
@@ -486,7 +487,7 @@ function PersonPanel({ personId, token, onClose, onUpdated }) {
             {sortedScores.length > 0 && (
               <div style={{background:"#1C1C1C",borderRadius:4,padding:"16px 18px"}}>
                 {sortedScores.map(([gifting,score])=>{
-                  const pct = Math.round((score/10)*100);
+                  const pct = Math.min(Math.round(Number(score)),100);
                   return (
                     <div key={gifting} style={{marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>

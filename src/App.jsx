@@ -653,7 +653,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   reload();
   setSaving(false);
   setShowSplit(false);
-  setDone(`✓ ${englishSpeakers.length} English speakers → Pra Alice. ${aliceCount} PT → Pra Alice. ${rafaList.length} PT → Pr Rafa.`);
+  setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
 function PeopleTab({ token, t, lang }) {

@@ -448,6 +448,66 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   );
 }
 
+
+// ─── PLACED CARD (Victory View) ──────────────────────────────────
+function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
+  const ministries = parseJSON(person.current_ministries);
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
+
+  return (
+    <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid #2ABFBF",transition:"border-color 0.2s",position:"relative"}}
+      onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
+      onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
+
+      {/* Check mark */}
+      <div style={{position:"absolute",top:12,right:12,width:22,height:22,borderRadius:"50%",background:"rgba(42,191,191,0.15)",border:"1px solid rgba(42,191,191,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#2ABFBF",fontWeight:700}}>✓</div>
+
+      {/* Photo + Name */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+        {person.photo_url ? (
+          <img src={person.photo_url} alt={person.name} style={{width:48,height:48,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
+        ) : (
+          <div style={{width:48,height:48,borderRadius:"50%",background:"#252525",border:"2px solid #2ABFBF33",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:"#505050"}}>
+            {(person.name||"?")[0].toUpperCase()}
+          </div>
+        )}
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,marginBottom:2}}>{person.name}</div>
+          {person.gifting_1 && (
+            <span style={{fontSize:11,padding:"2px 8px",background:"rgba(42,191,191,0.15)",color:"#2ABFBF",borderRadius:2,border:"1px solid rgba(42,191,191,0.3)"}}>
+              {GIFTING_ICONS[person.gifting_1]||"◆"} {person.gifting_1}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Ministries they landed in */}
+      {ministries.length > 0 && (
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:waURL?10:0}}>
+          {ministries.map(function(m){
+            return (
+              <span key={m} style={{fontSize:11,padding:"2px 8px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2,border:"1px solid rgba(42,191,191,0.15)"}}>
+                {m}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* WhatsApp */}
+      {waURL && (
+        <div style={{marginTop:8}}>
+          <button
+            onClick={function(e){ e.stopPropagation(); window.open(waURL, '_blank'); }}
+            style={{fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+            {"💬 "}{t.whatsappMsg}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PERSON DETAIL PANEL ──────────────────────────────────────────
 function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT, templateEN }) {
   const [person, setPerson] = useState(null);
@@ -782,6 +842,7 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
   const [splitRatio, setSplitRatio] = useState("5050");
   const [splitDone, setSplitDone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState("active");
 
   const load = useCallback(() => {
     fetch(`${API}/people`, { headers: { Authorization: `Bearer ${token}` } })
@@ -790,10 +851,17 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = people.filter(p => {
+  const activePeople = people.filter(p => p.stage !== "Placed in Ministry");
+  const placedPeople = people.filter(p => p.stage === "Placed in Ministry");
+
+  const currentPool = view === "active" ? activePeople : placedPeople;
+
+  const filtered = currentPool.filter(p => {
     const s = search.toLowerCase();
     if (s && !p.name?.toLowerCase().includes(s) && !p.email?.toLowerCase().includes(s) && !p.whatsapp?.includes(s)) return false;
-    if (filterStage !== "All" && p.stage !== filterStage) return false;
+    if (view === "active") {
+      if (filterStage !== "All" && p.stage !== filterStage) return false;
+    }
     if (filterGifting !== "All" && p.gifting_1 !== filterGifting && p.gifting_2 !== filterGifting && p.gifting_3 !== filterGifting) return false;
     if (filterLang !== "All") {
       const langs = parseJSON(p.languages_spoken);
@@ -806,16 +874,39 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
     if (filterPastor !== "All" && p.assigned_pastor !== filterPastor) return false;
     return true;
   });
+
   const pastorOptions = ["All",...Array.from(new Set(people.map(p=>p.assigned_pastor).filter(Boolean)))];
+  const activeStages = STAGES.filter(s => s !== "Placed in Ministry");
 
   return (
     <div style={{padding:"24px 28px"}}>
       <style>{css}</style>
+
+      {/* Active / Placed sub-view toggle */}
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        <button onClick={()=>{ setView("active"); setFilterStage("All"); }}
+          style={{padding:"8px 20px",borderRadius:20,border:`1px solid ${view==="active"?"#2ABFBF":"#252525"}`,background:view==="active"?"rgba(42,191,191,0.12)":"transparent",color:view==="active"?"#2ABFBF":"#505050",fontSize:13,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:1,cursor:"pointer",transition:"all 0.15s"}}>
+          {lang==="PT" ? "Em Andamento" : "Active"}
+          <span style={{marginLeft:8,fontSize:11,padding:"1px 7px",background:view==="active"?"rgba(42,191,191,0.2)":"#1C1C1C",borderRadius:10,color:view==="active"?"#2ABFBF":"#505050"}}>{activePeople.length}</span>
+        </button>
+        <button onClick={()=>{ setView("placed"); setFilterStage("All"); }}
+          style={{padding:"8px 20px",borderRadius:20,border:`1px solid ${view==="placed"?"#2ABFBF":"#252525"}`,background:view==="placed"?"rgba(42,191,191,0.12)":"transparent",color:view==="placed"?"#2ABFBF":"#505050",fontSize:13,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:1,cursor:"pointer",transition:"all 0.15s"}}>
+          {lang==="PT" ? "Colocados" : "Placed"}
+          <span style={{marginLeft:8,fontSize:11,padding:"1px 7px",background:view==="placed"?"rgba(42,191,191,0.2)":"#1C1C1C",borderRadius:10,color:view==="placed"?"#2ABFBF":"#505050"}}>{placedPeople.length}</span>
+        </button>
+      </div>
+
+      {/* Filters */}
       <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
         <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
           style={{padding:"9px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}/>
+        {view === "active" && (
+          <select value={filterStage} onChange={e=>setFilterStage(e.target.value)}
+            style={{padding:"9px 12px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:filterStage==="All"?"#888":"#F0F0F0",fontSize:13,outline:"none",WebkitAppearance:"menulist"}}>
+            {["All",...activeStages].map(o=><option key={o} value={o} style={{background:"#1C1C1C",color:"#F0F0F0"}}>{o==="All"?t.allStages:o}</option>)}
+          </select>
+        )}
         {[
-          {label:t.allStages,val:filterStage,set:setFilterStage,opts:["All",...STAGES]},
           {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS]},
           {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES]},
           {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS]},
@@ -829,11 +920,16 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
       </div>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:12,color:"#505050"}}>{filtered.length} / {people.length}</div>
-        <button onClick={()=>setShowSplit(true)}
-          style={{padding:"6px 14px",background:"rgba(42,191,191,0.1)",border:"1px solid rgba(42,191,191,0.3)",borderRadius:3,color:"#2ABFBF",fontSize:11,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:1,textTransform:"uppercase",cursor:"pointer"}}>
-          ⚡ {lang==="PT"?"Distribuir Pessoas":"Split Assignments"}
-        </button>
+        <div style={{fontSize:12,color:"#505050"}}>{filtered.length} / {currentPool.length}</div>
+        {view === "active" && (
+          <button onClick={()=>setShowSplit(true)}
+            style={{padding:"6px 14px",background:"rgba(42,191,191,0.1)",border:"1px solid rgba(42,191,191,0.3)",borderRadius:3,color:"#2ABFBF",fontSize:11,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:1,textTransform:"uppercase",cursor:"pointer"}}>
+            {"⚡ "}{lang==="PT"?"Distribuir Pessoas":"Split Assignments"}
+          </button>
+        )}
+        {view === "placed" && placedPeople.length > 0 && (
+          <div style={{fontSize:12,color:"#2ABFBF"}}>{"🏠 "}{lang==="PT" ? `${placedPeople.length} pessoa${placedPeople.length!==1?"s":""} colocada${placedPeople.length!==1?"s":""}` : `${placedPeople.length} person${placedPeople.length!==1?"s":""} placed`}</div>
+        )}
       </div>
 
       {showSplit && (
@@ -870,12 +966,20 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
         </div>
       )}
 
+      {/* Cards grid */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
-        {filtered.map(p => (
+        {view === "active" && filtered.map(p => (
           <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
         ))}
+        {view === "placed" && filtered.map(p => (
+          <PlacedCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
+        ))}
         {filtered.length === 0 && (
-          <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#505050"}}>{t.noMatch}</div>
+          <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#505050"}}>
+            {view === "placed"
+              ? (lang==="PT" ? "Ninguém colocado ainda. Em breve! 🏠" : "No one placed yet. Keep going! 🏠")
+              : t.noMatch}
+          </div>
         )}
       </div>
 

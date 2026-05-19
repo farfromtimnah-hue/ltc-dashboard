@@ -403,7 +403,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
       onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
       onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}} onClick={onClick}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
           {person.photo_url ? (
             <img src={person.photo_url} alt={person.name} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
           ) : (
@@ -421,7 +421,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
           <span style={{fontSize:11,padding:"3px 8px",background:badge.bg,color:badge.color,borderRadius:2,fontWeight:600}}>{badge.label}</span>
         </div>
       </div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}} onClick={onClick}>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
         {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
           <span key={i} style={{fontSize:11,padding:"2px 8px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
             {GIFTING_ICONS[g]||"◆"} {g}
@@ -429,7 +429,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
         ))}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}} onClick={onClick}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {person.assigned_pastor && <span style={{fontSize:11,color:"#2ABFBF"}}>→ {person.assigned_pastor}</span>}
           {langs.map(l=><span key={l} style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#999",borderRadius:2}}>{l}</span>)}
           {groups.map(g=><span key={g} style={{fontSize:10,padding:"1px 6px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2}}>{g}</span>)}

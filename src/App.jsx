@@ -17,6 +17,30 @@ const GIFTING_ICONS = {
   "Creativity":"🎨","Discernment & Prophetic":"🔮"
 };
 
+const GIFTING_PT = {
+  "Worship & Music":"Louvor & Música",
+  "Gift of Helps":"Dom de Ajudar",
+  "Visual Storytelling":"Narrativa Visual",
+  "Digital Communication":"Comunicação Digital",
+  "Intercession":"Intercessão",
+  "Hospitality":"Hospitalidade",
+  "Evangelism":"Evangelismo",
+  "Encouragement":"Encorajamento",
+  "Faith":"Fé",
+  "Teaching":"Ensino",
+  "Administration":"Administração",
+  "Technical Arts":"Artes Técnicas",
+  "Influence & Servant Leadership":"Influência & Liderança",
+  "Creativity":"Criatividade",
+  "Discernment & Prophetic":"Discernimento & Profético"
+};
+
+function giftingLabel(name, personLang) {
+  if (!name) return "";
+  if (personLang === "PT") return GIFTING_PT[name] || name;
+  return name;
+}
+
 const STAGES = ["New","Reached Out","Responded","Meeting Scheduled","Meeting Done","Placed in Ministry"];
 const STAGES_PT = ["Novo","Contato Feito","Respondeu","Reunião Agendada","Reunião Realizada","Colocado no Ministério"];
 const SPECIAL_GROUPS_PT = ["Jovens","Link","Legacy","Serviço em Inglês","Outro"];
@@ -47,13 +71,41 @@ const STAGE_COLORS = {
 const PASTOR_SUGGESTIONS = ["Pra Alice","Pr Rafa"];
 
 const MINISTRIES_STARTER = [
-  "Worship Team","Media — ProPresenter","Media — Lights","Media — Sound",
-  "Media — Stream","Media — Camera","Content & Creative","Hospitality — Café",
-  "Hospitality — Welcome","Stage Operations","Intercession","Kids Ministry",
-  "Youth","Legacy","English Service","Link","Parking","Setup & Teardown"
+  "Worship Team","Sound","Lighting","Projection","Streaming","Photo & Video",
+  "Social Media","Service Experience","Consolidation","Translation",
+  "Lagoinha Kids","Intercession","Volunteer Coffee","Hospitality — Welcome",
+  "Parking","Setup & Teardown","GC Leader","Legacy","English Service"
 ];
 
-const SPECIAL_GROUPS = ["Youth","Link","Legacy","English Service","Other"];
+const MINISTRY_PT = {
+  "Worship Team":"Ministério de Louvor",
+  "Sound":"Som",
+  "Lighting":"Luz",
+  "Projection":"Projeção",
+  "Streaming":"Transmissão",
+  "Photo & Video":"Foto & Vídeo",
+  "Social Media":"Mídias Sociais",
+  "Service Experience":"Experiência do Culto",
+  "Consolidation":"Consolidação",
+  "Translation":"Tradução",
+  "Lagoinha Kids":"Lagoinha Kids",
+  "Intercession":"Intercessão",
+  "Volunteer Coffee":"Café dos Voluntários",
+  "Hospitality — Welcome":"Recepção",
+  "Parking":"Estacionamento",
+  "Setup & Teardown":"Montagem",
+  "GC Leader":"Líder de GC",
+  "Legacy":"Legacy",
+  "English Service":"Culto em Inglês"
+};
+
+function ministryLabel(name, lang, personLang) {
+  var displayLang = personLang || lang;
+  if (displayLang === "PT") return MINISTRY_PT[name] || name;
+  return name;
+}
+
+const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other"];
 const LANGUAGES = ["English","Português","Both"];
 
 const DEFAULT_TEMPLATE_PT = "Oi, {{name}}! Tudo bem? 😊 Que alegria ter você conosco! Vi que você tem o dom de {{gifting}} e isso é incrível! Adoraria marcar um tempo com você para te conhecer melhor e ver como podemos servir os seus dons aqui na Lagoinha Tampa. Quando seria um bom momento?";
@@ -426,7 +478,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
         {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
           <span key={i} style={{fontSize:11,padding:"2px 8px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
-            {GIFTING_ICONS[g]||"◆"} {g}
+            {GIFTING_ICONS[g]||"◆"} {giftingLabel(g, person.language)}
           </span>
         ))}
       </div>
@@ -475,7 +527,7 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,marginBottom:2}}>{person.name}</div>
           {person.gifting_1 && (
             <span style={{fontSize:11,padding:"2px 8px",background:"rgba(42,191,191,0.15)",color:"#2ABFBF",borderRadius:2,border:"1px solid rgba(42,191,191,0.3)"}}>
-              {GIFTING_ICONS[person.gifting_1]||"◆"} {person.gifting_1}
+              {GIFTING_ICONS[person.gifting_1]||"◆"} {giftingLabel(person.gifting_1, person.language)}
             </span>
           )}
         </div>
@@ -487,7 +539,7 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
           {ministries.map(function(m){
             return (
               <span key={m} style={{fontSize:11,padding:"2px 8px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2,border:"1px solid rgba(42,191,191,0.15)"}}>
-                {m}
+                {ministryLabel(m, "EN", person.language)}
               </span>
             );
           })}
@@ -663,7 +715,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
               {ministries.map(m=>(
                 <span key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,padding:"4px 10px",background:"rgba(42,191,191,0.1)",color:"#4DD4D4",borderRadius:2,border:"1px solid rgba(42,191,191,0.2)"}}>
-                  {m}
+                  {ministryLabel(m, "EN", person.language)}
                   <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#2ABFBF",cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>×</button>
                 </span>
               ))}
@@ -728,10 +780,10 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           {/* Gifting Profile */}
           <div>
             <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.giftingProfile}</div>
-            <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
               {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
                 <span key={i} style={{fontSize:12,padding:"4px 12px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
-                  {i===0?"#1 ":i===1?"#2 ":"#3 "}{GIFTING_ICONS[g]||""} {g}
+                  {i===0?"#1 ":i===1?"#2 ":"#3 "}{GIFTING_ICONS[g]||""} {giftingLabel(g, person.language)}
                 </span>
               ))}
             </div>
@@ -742,7 +794,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   return (
                     <div key={gifting} style={{marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                        <span style={{fontSize:11,color:"#999"}}>{GIFTING_ICONS[gifting]||"◆"} {gifting}</span>
+                        <span style={{fontSize:11,color:"#999"}}>{GIFTING_ICONS[gifting]||"◆"} {giftingLabel(gifting, person.language)}</span>
                         <span style={{fontSize:11,color:"#2ABFBF",fontWeight:600}}>{pct}%</span>
                       </div>
                       <div style={{height:4,background:"#252525",borderRadius:2}}>
@@ -1050,22 +1102,23 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
 
 // ─── MINISTRY HEALTH TAB ─────────────────────────────────────────
 const MINISTRY_HEALTH_DATA = [
-  { name:"Worship Team", min:6, ideal:10, current:8, leader:"Pr Rafa" },
-  { name:"Media — Sound", min:2, ideal:4, current:2, leader:"Pr Rafa" },
-  { name:"Media — ProPresenter", min:1, ideal:2, current:1, leader:"Pr Rafa" },
-  { name:"Media — Lights", min:1, ideal:2, current:2, leader:"Pr Rafa" },
-  { name:"Media — Stream", min:1, ideal:2, current:1, leader:"Pr Rafa" },
-  { name:"Media — Camera", min:2, ideal:4, current:3, leader:"Pr Rafa" },
-  { name:"Content & Creative", min:3, ideal:6, current:4, leader:"Pra Alice" },
-  { name:"Hospitality — Café", min:4, ideal:8, current:5, leader:"Pra Alice" },
-  { name:"Hospitality — Welcome", min:4, ideal:8, current:6, leader:"Pra Alice" },
-  { name:"Stage Operations", min:3, ideal:5, current:3, leader:"Pr Rafa" },
-  { name:"Intercession", min:4, ideal:8, current:7, leader:"Pra Alice" },
-  { name:"Kids Ministry", min:6, ideal:12, current:5, leader:"Pra Alice" },
-  { name:"Legacy", min:3, ideal:6, current:4, leader:"Pr Rafa" },
-  { name:"English Service", min:5, ideal:10, current:3, leader:"Pra Alice" },
-  { name:"Setup & Teardown", min:4, ideal:8, current:6, leader:"Pr Rafa" },
-  { name:"Parking", min:3, ideal:6, current:2, leader:"Pr Rafa" },
+  { name:"Worship Team", min:6, ideal:10, current:8, leader:"Kênia" },
+  { name:"Sound", min:2, ideal:4, current:2, leader:"Cláudio" },
+  { name:"Lighting", min:2, ideal:4, current:3, leader:"Kevin" },
+  { name:"Projection", min:2, ideal:4, current:2, leader:"Marjorie" },
+  { name:"Streaming", min:1, ideal:2, current:1, leader:"Maurício" },
+  { name:"Photo & Video", min:2, ideal:4, current:2, leader:"Marjorie" },
+  { name:"Social Media", min:2, ideal:4, current:3, leader:"Marjorie" },
+  { name:"Service Experience", min:3, ideal:6, current:3, leader:"Fabi" },
+  { name:"Consolidation", min:4, ideal:8, current:5, leader:"Petito" },
+  { name:"Translation", min:2, ideal:4, current:1, leader:"Pastora Paula" },
+  { name:"Lagoinha Kids", min:6, ideal:12, current:5, leader:"Babi" },
+  { name:"Intercession", min:4, ideal:8, current:7, leader:"Vânia" },
+  { name:"Volunteer Coffee", min:2, ideal:4, current:3, leader:"Juliana" },
+  { name:"Hospitality — Welcome", min:4, ideal:8, current:6, leader:"—" },
+  { name:"Parking", min:3, ideal:6, current:2, leader:"—" },
+  { name:"Setup & Teardown", min:4, ideal:8, current:6, leader:"Anderson" },
+  { name:"GC Leader", min:5, ideal:10, current:4, leader:"—" },
 ];
 
 function ministryHealthStatus(current, min, ideal) {
@@ -1116,7 +1169,7 @@ function MinistryHealthTab({ t, lang }) {
             <div key={m.name} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",opacity:0.8,cursor:"default"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                 <div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,marginBottom:3}}>{m.name}</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,marginBottom:3}}>{lang==="PT" ? (MINISTRY_PT[m.name] || m.name) : m.name}</div>
                   <div style={{fontSize:11,color:"#505050"}}>{"-> "}{m.leader}</div>
                 </div>
                 <span style={{fontSize:11,padding:"3px 8px",background:status.bg,color:status.color,borderRadius:2,fontWeight:600,whiteSpace:"nowrap"}}>{status.label}</span>

@@ -79,6 +79,7 @@ const L = {
     noNotes:"Sem notas ainda.",loading:"Carregando…",available:"Disponível",
     selectGifting:"Selecione um dom para ver pessoas disponíveis — ordenado por carga ministerial",
     noPeople:"Ninguém tem este dom ainda.",
+    ministryHealth:"Saúde dos Ministérios",
     settings:"Configurações",
     settingsTitle:"Configurações do Painel",
     templatePT:"Modelo de Mensagem — Português",
@@ -107,6 +108,7 @@ const L = {
     noNotes:"No notes yet.",loading:"Loading…",available:"Available",
     selectGifting:"Select a gifting to find available people — sorted by ministry load",
     noPeople:"No one has this gifting yet.",
+    ministryHealth:"Ministry Health",
     settings:"Settings",
     settingsTitle:"Dashboard Settings",
     templatePT:"Message Template — Português",
@@ -974,6 +976,7 @@ export default function App() {
     { id: "analytics", label: t.analytics },
     { id: "people", label: t.people },
     { id: "gifting", label: t.byGifting },
+    { id: "health", label: t.ministryHealth },
   ];
 
   return (
@@ -1023,6 +1026,7 @@ export default function App() {
         {tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
         {tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
         {tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
+        {tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
       </div>
 
       {showSettings && (

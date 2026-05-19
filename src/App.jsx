@@ -399,7 +399,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   const waURL = buildWhatsAppURL(person, templatePT, templateEN);
 
   return (
-    <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
+    <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
       onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
       onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -435,11 +435,11 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
           {groups.map(g=><span key={g} style={{fontSize:10,padding:"1px 6px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2}}>{g}</span>)}
         </div>
         {waURL && (
-          <a href={waURL} target="_blank" rel="noreferrer"
-            onClick={e=>e.stopPropagation()}
-            style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+          <button
+            onClick={e=>{ e.stopPropagation(); window.open(waURL, '_blank'); }}
+            style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"'Barlow',sans-serif"}}>
             💬 {t.whatsappMsg}
-          </a>
+          </button>
         )}
       </div>
     </div>

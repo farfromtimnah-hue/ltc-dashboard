@@ -56,6 +56,9 @@ const MINISTRIES_STARTER = [
 const SPECIAL_GROUPS = ["Youth","Link","Legacy","English Service","Other"];
 const LANGUAGES = ["English","Português","Both"];
 
+const DEFAULT_TEMPLATE_PT = "Oi, {{name}}! Tudo bem? 😊 Que alegria ter você conosco! Vi que você tem o dom de {{gifting}} e isso é incrível! Adoraria marcar um tempo com você para te conhecer melhor e ver como podemos servir os seus dons aqui na Lagoinha Tampa. Quando seria um bom momento?";
+const DEFAULT_TEMPLATE_EN = "Hi {{name}}! So glad you are here with us! I saw that you have the gifting of {{gifting}} and that is amazing! I would love to find a time to meet with you and see how we can best serve your giftings here at Lagoinha Tampa. When would be a good time?";
+
 const L = {
   PT: {
     dashboard:"Painel Pastoral",analytics:"Análise",people:"Pessoas",byGifting:"Por Dom",
@@ -76,6 +79,14 @@ const L = {
     noNotes:"Sem notas ainda.",loading:"Carregando…",available:"Disponível",
     selectGifting:"Selecione um dom para ver pessoas disponíveis — ordenado por carga ministerial",
     noPeople:"Ninguém tem este dom ainda.",
+    settings:"Configurações",
+    settingsTitle:"Configurações do Painel",
+    templatePT:"Modelo de Mensagem — Português",
+    templateEN:"Modelo de Mensagem — English",
+    templateHint:"Variáveis disponíveis: {{name}} e {{gifting}}",
+    saveSettings:"Salvar",
+    settingsSaved:"Salvo!",
+    whatsappMsg:"WhatsApp",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -96,6 +107,14 @@ const L = {
     noNotes:"No notes yet.",loading:"Loading…",available:"Available",
     selectGifting:"Select a gifting to find available people — sorted by ministry load",
     noPeople:"No one has this gifting yet.",
+    settings:"Settings",
+    settingsTitle:"Dashboard Settings",
+    templatePT:"Message Template — Português",
+    templateEN:"Message Template — English",
+    templateHint:"Available variables: {{name}} and {{gifting}}",
+    saveSettings:"Save",
+    settingsSaved:"Saved!",
+    whatsappMsg:"WhatsApp",
   }
 };
 
@@ -130,6 +149,95 @@ function timeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
   return `${Math.floor(diff/86400)}d ago`;
+}
+
+function buildWhatsAppURL(person, templatePT, templateEN) {
+  if (!person.whatsapp) return null;
+  const lang = person.language === "EN" ? "EN" : "PT";
+  const template = lang === "EN"
+    ? (templateEN || DEFAULT_TEMPLATE_EN)
+    : (templatePT || DEFAULT_TEMPLATE_PT);
+  const firstName = (person.name || "").split(" ")[0];
+  const gifting = person.gifting_1 || "";
+  const message = template
+    .replace(/\{\{name\}\}/g, firstName)
+    .replace(/\{\{gifting\}\}/g, gifting);
+  const phone = person.whatsapp.replace(/\D/g, "");
+  return "https://wa.me/" + phone + "?text=" + encodeURIComponent(message);
+}
+
+// ─── SETTINGS MODAL ───────────────────────────────────────────────
+function SettingsModal({ token, t, onClose, onSaved }) {
+  const [templatePT, setTemplatePT] = useState("");
+  const [templateEN, setTemplateEN] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/settings`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => {
+        setTemplatePT(d.whatsapp_template_pt || DEFAULT_TEMPLATE_PT);
+        setTemplateEN(d.whatsapp_template_en || DEFAULT_TEMPLATE_EN);
+      })
+      .catch(() => {
+        setTemplatePT(DEFAULT_TEMPLATE_PT);
+        setTemplateEN(DEFAULT_TEMPLATE_EN);
+      });
+  }, [token]);
+
+  async function handleSave() {
+    setSaving(true);
+    await fetch(`${API}/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ whatsapp_template_pt: templatePT, whatsapp_template_en: templateEN })
+    });
+    setSaving(false);
+    setSaved(true);
+    onSaved({ whatsapp_template_pt: templatePT, whatsapp_template_en: templateEN });
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{width:"min(560px,95vw)",background:"#141414",border:"1px solid #252525",borderTop:"2px solid #2ABFBF",borderRadius:4,padding:"32px 36px",display:"flex",flexDirection:"column",gap:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,textTransform:"uppercase",letterSpacing:1}}>{t.settingsTitle}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        <div style={{fontSize:12,color:"#505050",background:"#1C1C1C",padding:"8px 12px",borderRadius:3,borderLeft:"2px solid #2ABFBF"}}>
+          {t.templateHint}
+        </div>
+
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.templatePT}</div>
+          <textarea value={templatePT} onChange={e => setTemplatePT(e.target.value)} rows={5}
+            style={{width:"100%",padding:"10px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none",resize:"vertical",fontFamily:"'Barlow',sans-serif",lineHeight:1.6}}/>
+        </div>
+
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.templateEN}</div>
+          <textarea value={templateEN} onChange={e => setTemplateEN(e.target.value)} rows={5}
+            style={{width:"100%",padding:"10px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none",resize:"vertical",fontFamily:"'Barlow',sans-serif",lineHeight:1.6}}/>
+        </div>
+
+        <div style={{display:"flex",justifyContent:"flex-end",gap:10,alignItems:"center"}}>
+          {saved && <span style={{fontSize:13,color:"#22c55e"}}>{t.settingsSaved}</span>}
+          <button onClick={onClose}
+            style={{padding:"9px 20px",background:"#1C1C1C",border:"1px solid #333",borderRadius:3,color:"#999",fontSize:13,cursor:"pointer"}}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{padding:"9px 24px",background:"#2ABFBF",border:"none",borderRadius:3,color:"#0A0A0A",fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1,textTransform:"uppercase",cursor:"pointer"}}>
+            {saving ? "..." : t.saveSettings}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────
@@ -191,16 +299,13 @@ function AnalyticsTab({ token, t }) {
     return { stage: s, count: found ? found.count : 0 };
   });
   const maxStage = Math.max(...stageFunnel.map(x => x.count), 1);
-
   const maxGifting = Math.max(...(data.byGifting || []).map(x => x.count), 1);
-
   const ptCount = data.byLanguage.find(x => x.language === "PT")?.count || 0;
   const enCount = data.byLanguage.find(x => x.language === "EN")?.count || 0;
   const total = data.total || 1;
 
   return (
     <div style={{padding:"32px 28px",display:"grid",gap:24}}>
-      {/* Top stats */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:16}}>
         {[
           {label:t.totalSub,value:data.total,accent:"#2ABFBF"},
@@ -215,7 +320,6 @@ function AnalyticsTab({ token, t }) {
         ))}
       </div>
 
-      {/* Stage funnel */}
       <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20,color:"#F0F0F0"}}>{t.pipeline}</div>
         {stageFunnel.map(({stage,count})=>(
@@ -232,7 +336,6 @@ function AnalyticsTab({ token, t }) {
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-        {/* Top giftings */}
         <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.topGiftings}</div>
           {(data.byGifting||[]).slice(0,8).map(({gifting,count})=>(
@@ -249,7 +352,6 @@ function AnalyticsTab({ token, t }) {
         </div>
 
         <div style={{display:"flex",flexDirection:"column",gap:24}}>
-          {/* Language split */}
           <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px",flex:1}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.langSplit}</div>
             {[{label:"Português",count:ptCount,color:"#2ABFBF"},{label:"English",count:enCount,color:"#4DD4D4"}].map(({label,count,color})=>(
@@ -265,7 +367,6 @@ function AnalyticsTab({ token, t }) {
             ))}
           </div>
 
-          {/* Weekly submissions */}
           <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px",flex:1}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.weeklySub}</div>
             {data.byWeek?.length > 0 ? (
@@ -289,19 +390,20 @@ function AnalyticsTab({ token, t }) {
 }
 
 // ─── PERSON CARD ──────────────────────────────────────────────────
-function PersonCard({ person, onClick }) {
+function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   const ministries = parseJSON(person.current_ministries);
   const groups = parseJSON(person.special_groups);
   const langs = parseJSON(person.languages_spoken);
   const badge = ministryBadge(person.ministry_count || 0);
   const stageColor = STAGE_COLORS[person.stage] || "#505050";
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
 
   return (
-    <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
+    <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
       onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
       onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}} onClick={onClick}>
           {person.photo_url ? (
             <img src={person.photo_url} alt={person.name} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
           ) : (
@@ -319,26 +421,33 @@ function PersonCard({ person, onClick }) {
           <span style={{fontSize:11,padding:"3px 8px",background:badge.bg,color:badge.color,borderRadius:2,fontWeight:600}}>{badge.label}</span>
         </div>
       </div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:person.assigned_pastor?8:0}}>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}} onClick={onClick}>
         {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
           <span key={i} style={{fontSize:11,padding:"2px 8px",background:i===0?"rgba(42,191,191,0.15)":"#1C1C1C",color:i===0?"#2ABFBF":"#999",borderRadius:2,border:`1px solid ${i===0?"rgba(42,191,191,0.3)":"#252525"}`}}>
             {GIFTING_ICONS[g]||"◆"} {g}
           </span>
         ))}
       </div>
-      {(langs.length>0||groups.length>0||person.assigned_pastor) && (
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6,paddingTop:6,borderTop:"1px solid #252525"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}} onClick={onClick}>
           {person.assigned_pastor && <span style={{fontSize:11,color:"#2ABFBF"}}>→ {person.assigned_pastor}</span>}
           {langs.map(l=><span key={l} style={{fontSize:10,padding:"1px 6px",background:"#1C1C1C",color:"#999",borderRadius:2}}>{l}</span>)}
           {groups.map(g=><span key={g} style={{fontSize:10,padding:"1px 6px",background:"rgba(42,191,191,0.08)",color:"#4DD4D4",borderRadius:2}}>{g}</span>)}
         </div>
-      )}
+        {waURL && (
+          <a href={waURL} target="_blank" rel="noreferrer"
+            onClick={e=>e.stopPropagation()}
+            style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+            💬 {t.whatsappMsg}
+          </a>
+        )}
+      </div>
     </div>
   );
 }
 
 // ─── PERSON DETAIL PANEL ──────────────────────────────────────────
-function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
+function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT, templateEN }) {
   const [person, setPerson] = useState(null);
   const [saving, setSaving] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -364,6 +473,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
   const groups = parseJSON(person.special_groups);
   const scores = parseJSON(person.scores, {});
   const badge = ministryBadge(person.ministry_count || 0);
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
 
   async function updateConnection(patch) {
     setSaving(true);
@@ -426,18 +536,20 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang }) {
               </div>
             )}
             <div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800}}>{person.name}</div>
-            <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap"}}>
-              {person.whatsapp && (
-                <a href={`https://wa.me/${person.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
-                  style={{fontSize:12,color:"#22c55e",textDecoration:"none"}}>💬 WhatsApp</a>
-              )}
-              {person.email && (
-                <a href={`mailto:${person.email}`} style={{fontSize:12,color:"#2ABFBF",textDecoration:"none"}}>✉ {person.email}</a>
-              )}
-              <span style={{fontSize:12,color:"#505050"}}>{person.language === "PT" ? "🇧🇷 Português" : "🇺🇸 English"}</span>
-              <span style={{fontSize:12,color:"#505050"}}>{timeAgo(person.submitted_at)}</span>
-            </div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800}}>{person.name}</div>
+              <div style={{display:"flex",gap:12,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                {waURL && (
+                  <a href={waURL} target="_blank" rel="noreferrer"
+                    style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,padding:"5px 12px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:3,border:"1px solid rgba(37,211,102,0.25)",textDecoration:"none",fontWeight:600}}>
+                    💬 {t.whatsappMsg}
+                  </a>
+                )}
+                {person.email && (
+                  <a href={`mailto:${person.email}`} style={{fontSize:12,color:"#2ABFBF",textDecoration:"none"}}>✉ {person.email}</a>
+                )}
+                <span style={{fontSize:12,color:"#505050"}}>{person.language === "PT" ? "🇧🇷 Português" : "🇺🇸 English"}</span>
+                <span style={{fontSize:12,color:"#505050"}}>{timeAgo(person.submitted_at)}</span>
+              </div>
             </div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer",padding:"4px 8px",lineHeight:1}}>✕</button>
@@ -655,7 +767,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
-function PeopleTab({ token, t, lang }) {
+function PeopleTab({ token, t, lang, templatePT, templateEN }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("All");
@@ -667,6 +779,7 @@ function PeopleTab({ token, t, lang }) {
   const [showSplit, setShowSplit] = useState(false);
   const [splitRatio, setSplitRatio] = useState("5050");
   const [splitDone, setSplitDone] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
     fetch(`${API}/people`, { headers: { Authorization: `Bearer ${token}` } })
@@ -696,12 +809,11 @@ function PeopleTab({ token, t, lang }) {
   return (
     <div style={{padding:"24px 28px"}}>
       <style>{css}</style>
-      {/* Filters */}
       <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
         <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
           style={{padding:"9px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none"}}/>
         {[
-          {label:t.allStages,val:filterStage,set:setFilterStage,opts:["All",...STAGES],optLabels:["All",...STAGES]},
+          {label:t.allStages,val:filterStage,set:setFilterStage,opts:["All",...STAGES]},
           {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS]},
           {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES]},
           {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS]},
@@ -721,6 +833,7 @@ function PeopleTab({ token, t, lang }) {
           ⚡ {lang==="PT"?"Distribuir Pessoas":"Split Assignments"}
         </button>
       </div>
+
       {showSplit && (
         <div style={{background:"#141414",border:"1px solid #2ABFBF",borderRadius:4,padding:"20px 24px",marginBottom:16}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,textTransform:"uppercase",marginBottom:8,color:"#F0F0F0"}}>
@@ -757,7 +870,7 @@ function PeopleTab({ token, t, lang }) {
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
         {filtered.map(p => (
-          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} />
+          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
         ))}
         {filtered.length === 0 && (
           <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#505050"}}>{t.noMatch}</div>
@@ -765,14 +878,14 @@ function PeopleTab({ token, t, lang }) {
       </div>
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} />
+        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />
       )}
     </div>
   );
 }
 
 // ─── GIFTING FILTER TAB ───────────────────────────────────────────
-function GiftingTab({ token, t, lang }) {
+function GiftingTab({ token, t, lang, templatePT, templateEN }) {
   const [selectedGifting, setSelectedGifting] = useState(null);
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -813,7 +926,7 @@ function GiftingTab({ token, t, lang }) {
           {loading ? <div style={{color:"#505050"}}>{t.loading}</div> : (
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
               {people.map(p=>(
-                <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} />
+                <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
               ))}
               {people.length===0 && <div style={{color:"#505050",fontSize:13}}>{t.noPeople}</div>}
             </div>
@@ -822,7 +935,7 @@ function GiftingTab({ token, t, lang }) {
       )}
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} />
+        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />
       )}
     </div>
   );
@@ -833,7 +946,22 @@ export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("ltc_token") || null);
   const [tab, setTab] = useState("analytics");
   const [lang, setLang] = useState("PT");
+  const [showSettings, setShowSettings] = useState(false);
+  const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
+  const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
+
+  // Load settings on login
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/settings`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => {
+        if (d.whatsapp_template_pt) setTemplatePT(d.whatsapp_template_pt);
+        if (d.whatsapp_template_en) setTemplateEN(d.whatsapp_template_en);
+      })
+      .catch(() => {});
+  }, [token]);
 
   function handleLogin(pw) {
     sessionStorage.setItem("ltc_token", pw);
@@ -874,6 +1002,13 @@ export default function App() {
                 textTransform:"uppercase",cursor:"pointer",marginLeft:8}}>
               {lang==="PT"?"EN":"PT"}
             </button>
+            <button onClick={()=>setShowSettings(true)}
+              title={t.settings}
+              style={{padding:"7px 10px",background:"none",border:"1px solid #252525",borderRadius:3,color:"#505050",fontSize:16,cursor:"pointer",marginLeft:4,lineHeight:1,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#2ABFBF";e.currentTarget.style.color="#2ABFBF";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="#252525";e.currentTarget.style.color="#505050";}}>
+              ⚙️
+            </button>
             <button onClick={()=>{sessionStorage.removeItem("ltc_token");setToken(null);}}
               style={{padding:"10px 14px",background:"none",border:"none",color:"#252525",fontSize:12,cursor:"pointer"}}
               onMouseEnter={e=>e.target.style.color="#505050"} onMouseLeave={e=>e.target.style.color="#252525"}>
@@ -886,9 +1021,18 @@ export default function App() {
       {/* Content */}
       <div style={{maxWidth:1400,margin:"0 auto"}}>
         {tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {tab === "people" && <PeopleTab token={token} t={t} lang={lang} />}
-        {tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} />}
+        {tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
+        {tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
       </div>
+
+      {showSettings && (
+        <SettingsModal
+          token={token}
+          t={t}
+          onClose={() => setShowSettings(false)}
+          onSaved={d => { setTemplatePT(d.whatsapp_template_pt); setTemplateEN(d.whatsapp_template_en); }}
+        />
+      )}
     </div>
   );
 }

@@ -943,6 +943,101 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
   );
 }
 
+
+// ─── MINISTRY HEALTH TAB ─────────────────────────────────────────
+const MINISTRY_HEALTH_DATA = [
+  { name:"Worship Team", min:6, ideal:10, current:8, leader:"Pr Rafa" },
+  { name:"Media — Sound", min:2, ideal:4, current:2, leader:"Pr Rafa" },
+  { name:"Media — ProPresenter", min:1, ideal:2, current:1, leader:"Pr Rafa" },
+  { name:"Media — Lights", min:1, ideal:2, current:2, leader:"Pr Rafa" },
+  { name:"Media — Stream", min:1, ideal:2, current:1, leader:"Pr Rafa" },
+  { name:"Media — Camera", min:2, ideal:4, current:3, leader:"Pr Rafa" },
+  { name:"Content & Creative", min:3, ideal:6, current:4, leader:"Pra Alice" },
+  { name:"Hospitality — Café", min:4, ideal:8, current:5, leader:"Pra Alice" },
+  { name:"Hospitality — Welcome", min:4, ideal:8, current:6, leader:"Pra Alice" },
+  { name:"Stage Operations", min:3, ideal:5, current:3, leader:"Pr Rafa" },
+  { name:"Intercession", min:4, ideal:8, current:7, leader:"Pra Alice" },
+  { name:"Kids Ministry", min:6, ideal:12, current:5, leader:"Pra Alice" },
+  { name:"Legacy", min:3, ideal:6, current:4, leader:"Pr Rafa" },
+  { name:"English Service", min:5, ideal:10, current:3, leader:"Pra Alice" },
+  { name:"Setup & Teardown", min:4, ideal:8, current:6, leader:"Pr Rafa" },
+  { name:"Parking", min:3, ideal:6, current:2, leader:"Pr Rafa" },
+];
+
+function ministryHealthStatus(current, min, ideal) {
+  if (current < min) return { color:"#ef4444", label:"Critical", bg:"rgba(239,68,68,0.12)" };
+  if (current < ideal) return { color:"#f59e0b", label:"Needs Volunteers", bg:"rgba(245,158,11,0.12)" };
+  return { color:"#22c55e", label:"Healthy", bg:"rgba(34,197,94,0.12)" };
+}
+
+function MinistryHealthTab({ t, lang }) {
+  const healthy = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current >= m.ideal; }).length;
+  const needs = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current >= m.min && m.current < m.ideal; }).length;
+  const critical = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current < m.min; }).length;
+  return (
+    <div style={{padding:"32px 28px"}}>
+      <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderLeft:"3px solid #f59e0b",borderRadius:4,padding:"16px 20px",marginBottom:32,display:"flex",gap:14,alignItems:"flex-start"}}>
+        <div style={{fontSize:20,flexShrink:0}}>{"🚧"}</div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"#f59e0b",marginBottom:4}}>
+            {lang==="PT" ? "Em Desenvolvimento" : "Under Construction"}
+          </div>
+          <div style={{fontSize:13,color:"#999",lineHeight:1.6}}>
+            {lang==="PT"
+              ? "Esta aba ainda nao esta ativa. Em breve os pastores poderao acompanhar a saude de cada ministerio em tempo real."
+              : "This tab is not yet active. Coming soon — pastors will be able to track each ministry's health in real time, seeing current volunteer counts, targets, and who is at capacity."}
+          </div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:16,marginBottom:32}}>
+        {[
+          { label: lang==="PT" ? "Total de Ministerios" : "Total Ministries", value: MINISTRY_HEALTH_DATA.length, accent:"#2ABFBF" },
+          { label: lang==="PT" ? "Saudaveis" : "Healthy", value: healthy, accent:"#22c55e" },
+          { label: lang==="PT" ? "Precisam de Voluntarios" : "Needs Volunteers", value: needs, accent:"#f59e0b" },
+          { label: lang==="PT" ? "Criticos" : "Critical", value: critical, accent:"#ef4444" },
+        ].map(function(item){
+          return (
+            <div key={item.label} style={{background:"#141414",border:"1px solid #252525",borderTop:"2px solid "+item.accent,borderRadius:4,padding:"20px 24px",opacity:0.75}}>
+              <div style={{fontSize:36,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,color:item.accent}}>{item.value}</div>
+              <div style={{fontSize:12,color:"#999",textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{item.label}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+        {MINISTRY_HEALTH_DATA.map(function(m){
+          var status = ministryHealthStatus(m.current, m.min, m.ideal);
+          var pct = Math.min(Math.round((m.current / m.ideal) * 100), 100);
+          return (
+            <div key={m.name} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",opacity:0.8,cursor:"default"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,marginBottom:3}}>{m.name}</div>
+                  <div style={{fontSize:11,color:"#505050"}}>{"-> "}{m.leader}</div>
+                </div>
+                <span style={{fontSize:11,padding:"3px 8px",background:status.bg,color:status.color,borderRadius:2,fontWeight:600,whiteSpace:"nowrap"}}>{status.label}</span>
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:12,color:"#999"}}>{lang==="PT" ? "Voluntarios" : "Volunteers"}</span>
+                  <span style={{fontSize:12,fontWeight:600,color:status.color}}>{m.current}{" "}<span style={{color:"#505050",fontWeight:400}}>{"/ "}{m.ideal}</span></span>
+                </div>
+                <div style={{height:8,background:"#1C1C1C",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:pct+"%",background:status.color,borderRadius:4}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:12}}>
+                <span style={{fontSize:11,color:"#505050"}}>{lang==="PT" ? "Min: " : "Min: "}<span style={{color:"#F0F0F0"}}>{m.min}</span></span>
+                <span style={{fontSize:11,color:"#505050"}}>{"Ideal: "}<span style={{color:"#F0F0F0"}}>{m.ideal}</span></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("ltc_token") || null);

@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 
 const API = "https://ltc-api.farfromtimnah.workers.dev";
 
+// ─── CARISMA LOGO (embedded) ──────────────────────────────────────
+const CARISMA_LOGO = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAzNTkgNTE3Ij4KICA8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMzAuNC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogMi4xLjQgQnVpbGQgMjI2KSAgLS0+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5zdDAgewogICAgICAgIGZpbGw6ICM1OTIyMWM7CiAgICAgIH0KCiAgICAgIC5zdDEgewogICAgICAgIGZpbGw6ICNiNDY5Njg7CiAgICAgIH0KCiAgICAgIC5zdDIgewogICAgICAgIGZpbGw6ICM0NDFjMTc7CiAgICAgIH0KCiAgICAgIC5zdDMgewogICAgICAgIGZpbGw6ICM2ODEyMTE7CiAgICAgIH0KCiAgICAgIC5zdDQgewogICAgICAgIGZpbGw6ICM0ZDFlMTk7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxnIGlkPSJXVlU2elgiPgogICAgPGc+CiAgICAgIDxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik0yODUuNCwzMy41OWwtMzAuMzYsNTUuMTZjMTIuMSw4LjkuMTgsMTkuODUtNy40OCwyNi4zMy0yLjI4LDIuNC04LjMsMTIuOTctNC41MywxNi44OSwyNS4xMSwyLjYyLDUwLjE3LDEuNDEsNzUuNS0xLjk3LDI0LjQ1LDM2Ljc4LDI5LjYxLDc0Ljk2LDMwLjU4LDExNi45NywyLjU0LDExMC40Ni03My44LDIwMC4xNC0xNjkuOTMsMjU2LjItMzMuNDYtMTYuMTEtNTguOTItMzguNzItODQuNjYtNjUuOTgtMTkuNzgsMTcuMzYtMTguMTIsNDguOTQtNTQuMjgsNTUuNzEtMjYuNDctNDAuMjcsMzQuOTYtNzYuNzQsMTUuNzMtMTA2Ljg2LTIyLjMxLTM0Ljk1LTM4Ljk1LTc0LjI0LTM4LjgxLTExNC4xMi0zLjQ3LTE1Ljk0LTMuOTItMzIuMTMtMS4zNC00OC41Nyw1LjcyLTI5Ljg0LDEwLjAyLTY2Ljg2LDM0LjkxLTkxLjEsMzMuOTUtMTEuODgsODUuNDgsOS4yMiwxMzkuMDUtMS4xNywxNS43OS0zLjA2LDIzLjg2LTM1LjAxLDE0LjY0LTQ1LjQ4LTEuMzktMTEuMjMsMy42OC0xMi44MiwxMy43Ny05LjcxLDE3LTIuMzEsMTUuMDUtMjguMTksMjguOTctMzguMjMsNy4yOC0yNS43LDM1LjcyLTMxLjE0LDM4LjI0LTQuMDVaTTE4Mi43OCwzMzguNDljLTMyLjI2LTEuODYtNDguNzgtMjkuODktNTAuMzUtNTUuMzctMS42MS0yNi4xNiwxOS4wNC01My43Niw0Ny4wNy01Ni40OCwyMi4zOS0yLjE3LDM4LjQ4LDEyLjMxLDU0LjA3LDI1LjAxbDM0LjAzLTE2Ljc0Yy0xNC4wOC0yOS41Ni0zOC41LTQ2LjE0LTY1LjEyLTUxLjYxLTI2LjkzLTUuNTMtNTcuMTksNC41OS03Ni43OCwyMy44NC00MS45LDQxLjE4LTQ0LjU1LDEwNC43NC00LjEyLDE0Ny4zMiwyMS4wNCwyMi4xNiw1MS42MiwzMS44OSw4MS45NCwyNS41NywyNS42Ny01LjM1LDU0LjQ0LTIwLjYzLDY0LjQ1LTUwLTkuNTEtOS4yMi0xOS42Ni0xNS4zNi0zMi4wNS0yMC43MS0xMy41NywxMy43MS0yOS4yNywzMC41NC01My4xMywyOS4xNloiLz4KICAgICAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTI4NS40LDMzLjU5Yy00LjQxLTkuMjMtMTYuNDgtMTUuMS0yNS4xMi03LjI2LTUuMDgsNC42LTguOTgsOC4zMy0xMy4xMiwxMS4zMWw2LjgzLTI2LjYxYzIuMi04LjEzLDM0LjY4LDEuMjcsMzYuNDQsMTQuMTguNTEsMy43Mi0zLjcyLDYuMDEtNS4wMiw4LjM3WiIvPgogICAgICA8cGF0aCBjbGFzcz0ic3Q0IiBkPSJNMjQ3LjU2LDExNS4wN2MtMy44MS0xMC4zOCwzLjQxLTE4LjkyLDcuNDgtMjYuMzMsMTAuMzIsMTAuMTksMjQuODYsOC43MywzNS4zOSwyMy4zLTE4LjIxLDUuODYtMzMuNDQtOS41Ny00Mi44OCwzLjAzWiIvPgogICAgICA8cGF0aCBjbGFzcz0ic3QyIiBkPSJNMjE4LjE5LDc1Ljg3Yy0yLjAzLDYuMDktNy43Niw5LjcyLTEzLjc3LDkuNzEtNi41Ny03LjQ2LTE0LjQ2LTEyLjc5LTE1LjE1LTI1LjEzLDEzLjQ3LDIuMzksMTkuMzQsMTEuNjgsMjguOTIsMTUuNDJaIi8+CiAgICAgIDxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNy4xNywyNzEuOWMtOS4xMS0xNC44NS00LjM0LTMyLjk0LTEuMzQtNDguNTdsMS4zNCw0OC41N1oiLz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPg==";
+
 const GIFTINGS = [
   "Worship & Music","Gift of Helps","Visual Storytelling","Digital Communication",
   "Intercession","Hospitality","Evangelism","Encouragement","Faith","Teaching",
@@ -140,6 +143,8 @@ const L = {
     saveSettings:"Salvar",
     settingsSaved:"Salvo!",
     whatsappMsg:"WhatsApp",
+    carisma:"Carisma",
+    carismaLabel:"Carisma",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -169,6 +174,8 @@ const L = {
     saveSettings:"Save",
     settingsSaved:"Saved!",
     whatsappMsg:"WhatsApp",
+    carisma:"Carisma",
+    carismaLabel:"Carisma",
   }
 };
 
@@ -188,6 +195,11 @@ function parseJSON(str, fallback = []) {
   try { return JSON.parse(str) || fallback; } catch { return fallback; }
 }
 
+function parseCarisma(val) {
+  if (!val) return [];
+  try { return JSON.parse(val); } catch { return []; }
+}
+
 function ministryBadge(count) {
   if (count === 0) return { color: "#2ABFBF", label: "Available", bg: "rgba(42,191,191,0.15)" };
   if (count <= 2) return { color: "#22c55e", label: `${count} min`, bg: "rgba(34,197,94,0.15)" };
@@ -205,8 +217,13 @@ function timeAgo(ts) {
   return `${Math.floor(diff/86400)}d ago`;
 }
 
-function buildWhatsAppURL(person, templatePT, templateEN) {
+// ─── FIX: buildWhatsAppURL now accepts skipTemplate flag ──────────
+// PersonCard (active): skipTemplate = false  → uses template
+// PlacedCard (placed): skipTemplate = true   → empty chat, no ?text=
+function buildWhatsAppURL(person, templatePT, templateEN, skipTemplate) {
   if (!person.whatsapp) return null;
+  const phone = person.whatsapp.replace(/\D/g, "");
+  if (skipTemplate) return "https://wa.me/" + phone;
   const lang = person.language === "EN" ? "EN" : "PT";
   const template = lang === "EN"
     ? (templateEN || DEFAULT_TEMPLATE_EN)
@@ -216,8 +233,28 @@ function buildWhatsAppURL(person, templatePT, templateEN) {
   const message = template
     .replace(/\{\{name\}\}/g, firstName)
     .replace(/\{\{gifting\}\}/g, gifting);
-  const phone = person.whatsapp.replace(/\D/g, "");
   return "https://wa.me/" + phone + "?text=" + encodeURIComponent(message);
+}
+
+// ─── CARISMA BADGE COMPONENT ──────────────────────────────────────
+// Used in PersonCard (size="sm") and PersonPanel (size="lg")
+function CarismaBadge({ levels }) {
+  if (!levels || levels.length === 0) return null;
+  return (
+    <>
+      {levels.map(lv => (
+        <span key={lv} style={{
+          display:"inline-flex", alignItems:"center", gap:"3px",
+          background:"rgba(89,34,28,0.18)", border:"1px solid rgba(180,105,104,0.45)",
+          borderRadius:"3px", padding:"2px 6px",
+          fontSize:"10px", color:"#b46968", fontWeight:700, whiteSpace:"nowrap"
+        }}>
+          <img src={CARISMA_LOGO} alt="Carisma" style={{ width:13, height:13, objectFit:"contain", verticalAlign:"middle" }} />
+          {lv}
+        </span>
+      ))}
+    </>
+  );
 }
 
 // ─── SETTINGS MODAL ───────────────────────────────────────────────
@@ -261,23 +298,19 @@ function SettingsModal({ token, t, onClose, onSaved }) {
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,textTransform:"uppercase",letterSpacing:1}}>{t.settingsTitle}</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
-
         <div style={{fontSize:12,color:"#505050",background:"#1C1C1C",padding:"8px 12px",borderRadius:3,borderLeft:"2px solid #2ABFBF"}}>
           {t.templateHint}
         </div>
-
         <div>
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.templatePT}</div>
           <textarea value={templatePT} onChange={e => setTemplatePT(e.target.value)} rows={5}
             style={{width:"100%",padding:"10px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none",resize:"vertical",fontFamily:"'Barlow',sans-serif",lineHeight:1.6}}/>
         </div>
-
         <div>
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t.templateEN}</div>
           <textarea value={templateEN} onChange={e => setTemplateEN(e.target.value)} rows={5}
             style={{width:"100%",padding:"10px 14px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:13,outline:"none",resize:"vertical",fontFamily:"'Barlow',sans-serif",lineHeight:1.6}}/>
         </div>
-
         <div style={{display:"flex",justifyContent:"flex-end",gap:10,alignItems:"center"}}>
           {saved && <span style={{fontSize:13,color:"#22c55e"}}>{t.settingsSaved}</span>}
           <button onClick={onClose}
@@ -346,7 +379,7 @@ function AnalyticsTab({ token, t }) {
       .then(r => r.json()).then(setData).catch(() => {});
   }, [token]);
 
-  if (!data) return <div style={{padding:40,color:"#505050"}}>{t ? t.loading : 'Loading...'}</div>;
+  if (!data) return <div style={{padding:40,color:"#505050"}}>{t ? t.loading : "Loading..."}</div>;
 
   const stageFunnel = STAGES.map(s => {
     const found = data.byStage.find(x => x.stage === s);
@@ -450,7 +483,9 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   const langs = parseJSON(person.languages_spoken);
   const badge = ministryBadge(person.ministry_count || 0);
   const stageColor = STAGE_COLORS[person.stage] || "#505050";
-  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
+  const carisma = parseCarisma(person.carisma_completed);
+  // PersonCard: use template (skipTemplate = false)
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN, false);
 
   return (
     <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
@@ -466,7 +501,11 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
             </div>
           )}
           <div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700}}>{person.name}</div>
+            {/* Name row with Carisma badges inline */}
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700}}>{person.name}</span>
+              <CarismaBadge levels={carisma} />
+            </div>
             <div style={{fontSize:12,color:"#999",marginTop:2}}>{person.whatsapp || person.email || "No contact"}</div>
           </div>
         </div>
@@ -490,7 +529,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
         </div>
         {waURL && (
           <button
-            onClick={e=>{ e.stopPropagation(); window.open(waURL, '_blank'); }}
+            onClick={e=>{ e.stopPropagation(); window.open(waURL, "_blank"); }}
             style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"'Barlow',sans-serif"}}>
             💬 {t.whatsappMsg}
           </button>
@@ -500,11 +539,12 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   );
 }
 
-
-// ─── PLACED CARD (Victory View) ──────────────────────────────────
+// ─── PLACED CARD (Victory View) ───────────────────────────────────
 function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
   const ministries = parseJSON(person.current_ministries);
-  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
+  const carisma = parseCarisma(person.carisma_completed);
+  // FIX: PlacedCard opens empty chat — no template pre-fill (skipTemplate = true)
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN, true);
 
   return (
     <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid #2ABFBF",transition:"border-color 0.2s",position:"relative"}}
@@ -524,7 +564,11 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
           </div>
         )}
         <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,marginBottom:2}}>{person.name}</div>
+          {/* Name + Carisma badges inline */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700}}>{person.name}</span>
+            <CarismaBadge levels={carisma} />
+          </div>
           {person.gifting_1 && (
             <span style={{fontSize:11,padding:"2px 8px",background:"rgba(42,191,191,0.15)",color:"#2ABFBF",borderRadius:2,border:"1px solid rgba(42,191,191,0.3)"}}>
               {GIFTING_ICONS[person.gifting_1]||"◆"} {giftingLabel(person.gifting_1, person.language)}
@@ -546,11 +590,11 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
         </div>
       )}
 
-      {/* WhatsApp */}
+      {/* WhatsApp — empty chat, no template */}
       {waURL && (
         <div style={{marginTop:8}}>
           <button
-            onClick={function(e){ e.stopPropagation(); window.open(waURL, '_blank'); }}
+            onClick={function(e){ e.stopPropagation(); window.open(waURL, "_blank"); }}
             style={{fontSize:11,padding:"4px 10px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:2,border:"1px solid rgba(37,211,102,0.25)",cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
             {"💬 "}{t.whatsappMsg}
           </button>
@@ -578,7 +622,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
   if (!person) return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
-      <div style={{color:"#2ABFBF"}}>{t ? t.loading : 'Loading...'}</div>
+      <div style={{color:"#2ABFBF"}}>{t ? t.loading : "Loading..."}</div>
     </div>
   );
 
@@ -587,7 +631,9 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const groups = parseJSON(person.special_groups);
   const scores = parseJSON(person.scores, {});
   const badge = ministryBadge(person.ministry_count || 0);
-  const waURL = buildWhatsAppURL(person, templatePT, templateEN);
+  const carisma = parseCarisma(person.carisma_completed);
+  // PersonPanel WhatsApp: same as PersonCard — uses template
+  const waURL = buildWhatsAppURL(person, templatePT, templateEN, false);
 
   async function updateConnection(patch) {
     setSaving(true);
@@ -622,6 +668,13 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     updateConnection({ special_groups: next });
   }
 
+  function toggleCarisma(level) {
+    const next = carisma.includes(level)
+      ? carisma.filter(x => x !== level)
+      : [...carisma, level];
+    updateConnection({ carisma_completed: next });
+  }
+
   function addMinistry(m) {
     if (!m || ministries.includes(m)) return;
     updateConnection({ current_ministries: [...ministries, m] });
@@ -634,6 +687,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
   const SHORT_TO_FULL = {visual:"Visual Storytelling",encouragement:"Encouragement",creativity:"Creativity",worship:"Worship & Music",hospitality:"Hospitality",faith:"Faith",administration:"Administration",prophetic:"Discernment & Prophetic",helps:"Gift of Helps",digital:"Digital Communication",intercession:"Intercession",evangelism:"Evangelism",teaching:"Teaching",technical:"Technical Arts",leadership:"Influence & Servant Leadership"};
   const sortedScores = Object.entries(scores).map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
+
+  const CARISMA_LEVELS = ["1 Ano", "Masters"];
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",justifyContent:"flex-end"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -650,8 +705,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               </div>
             )}
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800}}>{person.name}</div>
-              <div style={{display:"flex",gap:12,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+              {/* Name + Carisma badges in panel header */}
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800}}>{person.name}</span>
+                <CarismaBadge levels={carisma} />
+              </div>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
                 {waURL && (
                   <a href={waURL} target="_blank" rel="noreferrer"
                     style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,padding:"5px 12px",background:"rgba(37,211,102,0.12)",color:"#25D366",borderRadius:3,border:"1px solid rgba(37,211,102,0.25)",textDecoration:"none",fontWeight:600}}>
@@ -745,6 +804,39 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   style={{padding:"8px 16px",background:"#2ABFBF",color:"#0A0A0A",border:"none",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600}}>Add</button>
               </div>
             )}
+          </div>
+
+          {/* Carisma — Pastor can toggle levels */}
+          <div>
+            <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:2,color:"#505050",marginBottom:10,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
+              <img src={CARISMA_LOGO} alt="" style={{width:14,height:14,objectFit:"contain",verticalAlign:"middle"}} />
+              {t.carismaLabel}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              {CARISMA_LEVELS.map(level => {
+                const active = carisma.includes(level);
+                return (
+                  <button key={level} onClick={() => toggleCarisma(level)} disabled={saving}
+                    style={{
+                      display:"flex", alignItems:"center", gap:5,
+                      padding:"7px 16px", borderRadius:3,
+                      border:`1px solid ${active?"rgba(180,105,104,0.7)":"#252525"}`,
+                      background:active?"rgba(89,34,28,0.2)":"transparent",
+                      color:active?"#b46968":"#505050",
+                      fontSize:13, cursor:"pointer", fontFamily:"'Barlow',sans-serif",
+                      transition:"all 0.15s"
+                    }}>
+                    {active && <img src={CARISMA_LOGO} alt="" style={{width:13,height:13,objectFit:"contain"}} />}
+                    {level}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,color:"#505050",marginTop:6,lineHeight:1.5}}>
+              {lang === "PT"
+                ? "Escola teológica da Lagoinha. Exige 4h/mês de serviço ministerial documentado."
+                : "Lagoinha theological school. Requires 4h/month of documented ministry service."}
+            </div>
           </div>
 
           {/* Languages */}
@@ -905,7 +997,6 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
 
   const activePeople = people.filter(p => p.stage !== "Placed in Ministry");
   const placedPeople = people.filter(p => p.stage === "Placed in Ministry");
-
   const currentPool = view === "active" ? activePeople : placedPeople;
 
   const filtered = currentPool.filter(p => {
@@ -1099,8 +1190,7 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
   );
 }
 
-
-// ─── MINISTRY HEALTH TAB ─────────────────────────────────────────
+// ─── MINISTRY HEALTH TAB ──────────────────────────────────────────
 const MINISTRY_HEALTH_DATA = [
   { name:"Worship Team", min:6, ideal:10, current:8, leader:"Kênia" },
   { name:"Sound", min:2, ideal:4, current:2, leader:"Cláudio" },
@@ -1205,7 +1295,6 @@ export default function App() {
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
 
-  // Load settings on login
   useEffect(() => {
     if (!token) return;
     fetch(`${API}/settings`, { headers: { Authorization: `Bearer ${token}` } })

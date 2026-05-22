@@ -183,11 +183,120 @@ const L = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:#0A0A0A;color:#F0F0F0;font-family:'Barlow',sans-serif;}
+  body{
+    background: linear-gradient(160deg, #141c24 0%, #101518 50%, #0e1318 100%);
+    background-attachment: fixed;
+    color: #e0e3e5;
+    font-family: 'Barlow', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
   ::-webkit-scrollbar{width:6px;height:6px;}
   ::-webkit-scrollbar-track{background:#141414;}
   ::-webkit-scrollbar-thumb{background:#2ABFBF33;border-radius:3px;}
   ::-webkit-scrollbar-thumb:hover{background:#2ABFBF66;}
+  .app { position: relative; z-index: 1; }
+  .bg-orb-1 {
+    position: fixed; top: -10%; right: -15%;
+    width: 600px; height: 600px;
+    background: rgba(42,191,191,0.07);
+    filter: blur(160px); border-radius: 50%;
+    pointer-events: none; z-index: 0;
+  }
+  .bg-orb-2 {
+    position: fixed; bottom: -20%; left: -15%;
+    width: 500px; height: 500px;
+    background: rgba(42,191,191,0.05);
+    filter: blur(140px); border-radius: 50%;
+    pointer-events: none; z-index: 0;
+  }
+  .nav {
+    background: rgba(12, 16, 18, 0.8);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .q-card {
+    background: rgba(18, 22, 26, 0.55);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+    border-radius: 12px;
+  }
+  .scale-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(12px);
+  }
+  .scale-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(42,191,191,0.3); }
+  .scale-btn.sel { background: rgba(42,191,191,0.1); border-color: rgba(42,191,191,0.5); box-shadow: 0 0 16px rgba(42,191,191,0.12); }
+  .snum { border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
+  .scale-btn.sel .snum { background: #2ABFBF; border-color: #2ABFBF; color: #000; box-shadow: 0 0 12px rgba(42,191,191,0.4); }
+  .prog-track { background: rgba(255,255,255,0.06); border-radius: 4px; }
+  .prog-fill { background: #2ABFBF; box-shadow: 0 0 12px rgba(42,191,191,0.5); border-radius: 4px; }
+  .form-card {
+    background: rgba(18, 22, 26, 0.6);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 2px solid #2ABFBF;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 40px rgba(42,191,191,0.05);
+    border-radius: 14px;
+  }
+  .field input {
+    background: rgba(10, 13, 15, 0.7);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    color: #F0F0F0;
+    font-size: 16px;
+    transition: all 0.2s ease;
+  }
+  .field input:focus {
+    border-color: rgba(42,191,191,0.5);
+    box-shadow: 0 0 0 3px rgba(42,191,191,0.08);
+    background: rgba(10,13,15,0.85);
+    outline: none;
+  }
+  .tc {
+    background: rgba(18, 22, 26, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    transition: all 0.2s ease;
+  }
+  .tc:hover { background: rgba(22, 28, 34, 0.65); box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+  .bar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
+  .bar-fill { background: #2ABFBF; box-shadow: 0 0 10px rgba(42,191,191,0.3); border-radius: 4px; }
+  .min-group { background: rgba(255,255,255,0.02); border: 1px solid rgba(42,191,191,0.1); border-radius: 8px; }
+  .min-tag { background: rgba(42,191,191,0.06); border: 1px solid rgba(42,191,191,0.2); border-radius: 4px; }
+  .share-more {
+    background: rgba(18,22,26,0.6);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-top: 2px solid rgba(42,191,191,0.35);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .chip { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-radius: 6px; transition: all 0.15s ease; }
+  .chip.sel { background: rgba(42,191,191,0.12); border-color: rgba(42,191,191,0.4); color: #2ABFBF; box-shadow: 0 0 8px rgba(42,191,191,0.15); }
+  .cta {
+    background: rgba(18,22,26,0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(42,191,191,0.2);
+    border-top: 3px solid #2ABFBF;
+    border-radius: 10px;
+  }
+  .sub-btn, .start-btn, .cta-btn { box-shadow: 0 8px 24px rgba(42,191,191,0.2); transition: all 0.2s ease; }
+  .sub-btn:hover, .start-btn:hover, .cta-btn:hover { box-shadow: 0 12px 32px rgba(42,191,191,0.3); transform: translateY(-1px); }
+  .btn-bk { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); backdrop-filter: blur(12px); border-radius: 8px; }
+  .btn-nx { box-shadow: 0 6px 20px rgba(42,191,191,0.2); border-radius: 8px; }
 `;
 
 // ─── HELPERS ─────────────────────────────────────────────────────
@@ -293,7 +402,7 @@ function SettingsModal({ token, t, onClose, onSaved }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{width:"min(560px,95vw)",background:"#141414",border:"1px solid #252525",borderTop:"2px solid #2ABFBF",borderRadius:4,padding:"32px 36px",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{width:"min(560px,95vw)",background:"rgba(18,22,26,0.7)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",border:"1px solid rgba(255,255,255,0.08)",borderTop:"2px solid #2ABFBF",borderRadius:14,padding:"32px 36px",display:"flex",flexDirection:"column",gap:20,boxShadow:"0 24px 64px rgba(0,0,0,0.5)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,textTransform:"uppercase",letterSpacing:1}}>{t.settingsTitle}</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#999",fontSize:20,cursor:"pointer"}}>✕</button>
@@ -349,20 +458,20 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0A0A0A"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <style>{css}</style>
-      <div style={{width:380,padding:"48px 40px",background:"#141414",border:"1px solid #252525",borderTop:"2px solid #2ABFBF",borderRadius:4}}>
+      <div style={{width:380,padding:"48px 40px",background:"rgba(18,22,26,0.6)",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",border:"1px solid rgba(255,255,255,0.08)",borderTop:"2px solid #2ABFBF",borderRadius:14,boxShadow:"0 24px 64px rgba(0,0,0,0.5), 0 0 40px rgba(42,191,191,0.05)"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:3,color:"#2ABFBF",textTransform:"uppercase",marginBottom:8}}>LTC Ministry</div>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:32}}>Pastor Dashboard</div>
         <input
           type="password" placeholder="Enter dashboard password"
           value={pw} onChange={e=>setPw(e.target.value)}
           onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-          style={{width:"100%",padding:"12px 16px",background:"#1C1C1C",border:"1px solid #252525",borderRadius:3,color:"#F0F0F0",fontSize:15,fontFamily:"'Barlow',sans-serif",outline:"none",marginBottom:12}}
+          style={{width:"100%",padding:"12px 16px",background:"rgba(10,13,15,0.7)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,color:"#F0F0F0",fontSize:15,fontFamily:"'Barlow',sans-serif",outline:"none",marginBottom:12,transition:"all 0.2s ease"}}
         />
         {error && <div style={{color:"#ef4444",fontSize:13,marginBottom:12}}>{error}</div>}
         <button onClick={handleLogin} disabled={loading}
-          style={{width:"100%",padding:"13px",background:"#2ABFBF",color:"#0A0A0A",fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,letterSpacing:2,textTransform:"uppercase",border:"none",borderRadius:3,cursor:"pointer"}}>
+          style={{width:"100%",padding:"13px",background:"#2ABFBF",color:"#0A0A0A",fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,letterSpacing:2,textTransform:"uppercase",border:"none",borderRadius:8,cursor:"pointer",boxShadow:"0 8px 24px rgba(42,191,191,0.2)",transition:"all 0.2s ease"}}>
           {loading ? "Checking..." : "Enter"}
         </button>
       </div>
@@ -400,14 +509,14 @@ function AnalyticsTab({ token, t }) {
           {label:t.awaitContact,value:stageFunnel.find(x=>x.stage==="New")?.count||0,accent:"#ef4444"},
           {label:t.inProgress,value:stageFunnel.filter(x=>!["New","Placed in Ministry"].includes(x.stage)).reduce((a,b)=>a+b.count,0),accent:"#f59e0b"},
         ].map(({label,value,accent})=>(
-          <div key={label} style={{background:"#141414",border:"1px solid #252525",borderTop:`2px solid ${accent}`,borderRadius:4,padding:"20px 24px"}}>
+          <div key={label} style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderTop:`2px solid ${accent}`,borderRadius:12,padding:"20px 24px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
             <div style={{fontSize:36,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,color:accent}}>{value}</div>
             <div style={{fontSize:12,color:"#999",textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
+      <div style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"24px 28px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20,color:"#F0F0F0"}}>{t.pipeline}</div>
         {stageFunnel.map(({stage,count})=>(
           <div key={stage} style={{marginBottom:12}}>
@@ -415,7 +524,7 @@ function AnalyticsTab({ token, t }) {
               <span style={{fontSize:13,color:"#F0F0F0"}}>{stage}</span>
               <span style={{fontSize:13,fontWeight:600,color:STAGE_COLORS[stage]||"#2ABFBF"}}>{count}</span>
             </div>
-            <div style={{height:8,background:"#1C1C1C",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden"}}>
               <div style={{height:"100%",width:`${(count/maxStage)*100}%`,background:STAGE_COLORS[stage]||"#2ABFBF",borderRadius:4,transition:"width 0.6s ease"}}/>
             </div>
           </div>
@@ -423,7 +532,7 @@ function AnalyticsTab({ token, t }) {
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-        <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px"}}>
+        <div style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"24px 28px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.topGiftings}</div>
           {(data.byGifting||[]).slice(0,8).map(({gifting,count})=>(
             <div key={gifting} style={{marginBottom:10}}>
@@ -431,15 +540,15 @@ function AnalyticsTab({ token, t }) {
                 <span style={{fontSize:12,color:"#F0F0F0"}}>{GIFTING_ICONS[gifting]||"◆"} {gifting}</span>
                 <span style={{fontSize:12,fontWeight:600,color:"#2ABFBF"}}>{count}</span>
               </div>
-              <div style={{height:6,background:"#1C1C1C",borderRadius:3}}>
-                <div style={{height:"100%",width:`${(count/maxGifting)*100}%`,background:"#2ABFBF",borderRadius:3}}/>
+              <div style={{height:6,background:"rgba(255,255,255,0.05)",borderRadius:3}}>
+                <div style={{height:"100%",width:`${(count/maxGifting)*100}%`,background:"#2ABFBF",borderRadius:3,boxShadow:"0 0 10px rgba(42,191,191,0.3)"}}/>
               </div>
             </div>
           ))}
         </div>
 
         <div style={{display:"flex",flexDirection:"column",gap:24}}>
-          <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px",flex:1}}>
+          <div style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"24px 28px",flex:1,boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.langSplit}</div>
             {[{label:"Português",count:ptCount,color:"#2ABFBF"},{label:"English",count:enCount,color:"#4DD4D4"}].map(({label,count,color})=>(
               <div key={label} style={{marginBottom:14}}>
@@ -447,14 +556,14 @@ function AnalyticsTab({ token, t }) {
                   <span style={{fontSize:13}}>{label}</span>
                   <span style={{fontSize:13,fontWeight:600,color}}>{count} <span style={{color:"#505050",fontWeight:400}}>({Math.round((count/total)*100)}%)</span></span>
                 </div>
-                <div style={{height:8,background:"#1C1C1C",borderRadius:4}}>
+                <div style={{height:8,background:"rgba(255,255,255,0.06)",borderRadius:4}}>
                   <div style={{height:"100%",width:`${(count/total)*100}%`,background:color,borderRadius:4}}/>
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"24px 28px",flex:1}}>
+          <div style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"24px 28px",flex:1,boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:20}}>{t.weeklySub}</div>
             {data.byWeek?.length > 0 ? (
               <div style={{display:"flex",alignItems:"flex-end",gap:6,height:80}}>
@@ -488,9 +597,9 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
   const waURL = buildWhatsAppURL(person, templatePT, templateEN, false);
 
   return (
-    <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"16px 20px",cursor:"pointer",transition:"border-color 0.2s",borderLeft:`3px solid ${stageColor}`}}
-      onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
-      onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
+    <div onClick={onClick} style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px 20px",cursor:"pointer",transition:"all 0.2s ease",borderLeft:`3px solid ${stageColor}`,boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}
+      onMouseEnter={e=>{ e.currentTarget.style.borderColor="rgba(42,191,191,0.4)"; e.currentTarget.style.boxShadow="0 8px 32px rgba(0,0,0,0.4)"; }}
+      onMouseLeave={e=>{ e.currentTarget.style.borderColor="rgba(255,255,255,0.08)"; e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.25)"; }}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           {person.photo_url ? (
@@ -547,9 +656,9 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
   const waURL = buildWhatsAppURL(person, templatePT, templateEN, true);
 
   return (
-    <div onClick={onClick} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid #2ABFBF",transition:"border-color 0.2s",position:"relative"}}
-      onMouseEnter={e=>e.currentTarget.style.borderColor="#2ABFBF"}
-      onMouseLeave={e=>e.currentTarget.style.borderColor="#252525"}>
+    <div onClick={onClick} style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid #2ABFBF",transition:"all 0.2s ease",position:"relative",boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}
+      onMouseEnter={e=>{ e.currentTarget.style.boxShadow="0 8px 32px rgba(42,191,191,0.12)"; }}
+      onMouseLeave={e=>{ e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.25)"; }}>
 
       {/* Check mark */}
       <div style={{position:"absolute",top:12,right:12,width:22,height:22,borderRadius:"50%",background:"rgba(42,191,191,0.15)",border:"1px solid rgba(42,191,191,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#2ABFBF",fontWeight:700}}>✓</div>
@@ -692,10 +801,10 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",justifyContent:"flex-end"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{width:"min(600px,100vw)",height:"100vh",background:"#141414",borderLeft:"1px solid #252525",overflowY:"auto",display:"flex",flexDirection:"column"}}>
+      <div style={{width:"min(600px,100vw)",height:"100vh",background:"rgba(12,16,18,0.9)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderLeft:"1px solid rgba(255,255,255,0.08)",overflowY:"auto",display:"flex",flexDirection:"column"}}>
 
         {/* Header */}
-        <div style={{padding:"24px 28px",borderBottom:"1px solid #252525",borderTop:"2px solid #2ABFBF",position:"sticky",top:0,background:"#141414",zIndex:10,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{padding:"24px 28px",borderBottom:"1px solid rgba(255,255,255,0.06)",borderTop:"2px solid #2ABFBF",position:"sticky",top:0,background:"rgba(12,16,18,0.92)",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",zIndex:10,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             {person.photo_url ? (
               <img src={person.photo_url} alt={person.name} style={{width:56,height:56,borderRadius:"50%",objectFit:"cover",border:"2px solid #2ABFBF",flexShrink:0}} />
@@ -1244,7 +1353,7 @@ function MinistryHealthTab({ t, lang }) {
           { label: lang==="PT" ? "Criticos" : "Critical", value: critical, accent:"#ef4444" },
         ].map(function(item){
           return (
-            <div key={item.label} style={{background:"#141414",border:"1px solid #252525",borderTop:"2px solid "+item.accent,borderRadius:4,padding:"20px 24px",opacity:0.75}}>
+            <div key={item.label} style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderTop:"2px solid "+item.accent,borderRadius:12,padding:"20px 24px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
               <div style={{fontSize:36,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,color:item.accent}}>{item.value}</div>
               <div style={{fontSize:12,color:"#999",textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{item.label}</div>
             </div>
@@ -1256,7 +1365,7 @@ function MinistryHealthTab({ t, lang }) {
           var status = ministryHealthStatus(m.current, m.min, m.ideal);
           var pct = Math.min(Math.round((m.current / m.ideal) * 100), 100);
           return (
-            <div key={m.name} style={{background:"#141414",border:"1px solid #252525",borderRadius:4,padding:"18px 20px",opacity:0.8,cursor:"default"}}>
+            <div key={m.name} style={{background:"rgba(18,22,26,0.55)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"18px 20px",cursor:"default",boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                 <div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,marginBottom:3}}>{lang==="PT" ? (MINISTRY_PT[m.name] || m.name) : m.name}</div>
@@ -1269,7 +1378,7 @@ function MinistryHealthTab({ t, lang }) {
                   <span style={{fontSize:12,color:"#999"}}>{lang==="PT" ? "Voluntarios" : "Volunteers"}</span>
                   <span style={{fontSize:12,fontWeight:600,color:status.color}}>{m.current}{" "}<span style={{color:"#505050",fontWeight:400}}>{"/ "}{m.ideal}</span></span>
                 </div>
-                <div style={{height:8,background:"#1C1C1C",borderRadius:4,overflow:"hidden"}}>
+                <div style={{height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden"}}>
                   <div style={{height:"100%",width:pct+"%",background:status.color,borderRadius:4}}/>
                 </div>
               </div>
@@ -1321,11 +1430,13 @@ export default function App() {
   ];
 
   return (
-    <div style={{minHeight:"100vh",background:"#0A0A0A"}}>
+    <div className="app" style={{minHeight:"100vh"}}>
+      <div className="bg-orb-1" />
+      <div className="bg-orb-2" />
       <style>{css}</style>
 
       {/* Nav */}
-      <div style={{borderBottom:"1px solid #252525",background:"#0A0A0A",position:"sticky",top:0,zIndex:50}}>
+      <div className="nav" style={{position:"sticky",top:0,zIndex:50,backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)"}}>
         <div style={{maxWidth:1400,margin:"0 auto",padding:"0 28px",display:"flex",alignItems:"center",gap:32}}>
           <div style={{padding:"16px 0",display:"flex",alignItems:"baseline",gap:10}}>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,textTransform:"uppercase",letterSpacing:1,color:"#2ABFBF"}}>LTC</span>

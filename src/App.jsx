@@ -531,7 +531,7 @@ function Login({ onLogin }) {
       <div style={{width:440,maxWidth:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:36,position:"relative"}}>
         {/* LTC2 circle mark */}
         <div style={{width:84,height:84,borderRadius:"50%",background:"radial-gradient(circle at 30% 30%, #f5fefb, #d4f5ed 60%, #b8e8df 100%)",display:"grid",placeItems:"center",boxShadow:"0 0 40px rgba(94,234,212,0.45), 0 0 0 1px rgba(94,234,212,0.4), inset 0 -4px 12px rgba(13,148,136,0.15)",flexShrink:0}}>
-          <img src="/LTC2.svg" alt="LTC" style={{width:60,height:60,objectFit:"contain"}} />
+          <img src={`${import.meta.env.BASE_URL}LTC2.svg`} alt="LTC" style={{width:60,height:60,objectFit:"contain"}} />
         </div>
         {/* Card */}
         <div className="glass" style={{width:"100%",padding:36,borderRadius:20,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(94,234,212,0.08) inset",position:"relative"}}>
@@ -578,6 +578,145 @@ function Login({ onLogin }) {
   );
 }
 
+// ─── SVG CHART PRIMITIVES ─────────────────────────────────────────
+function MiniSpark({ values, color="#5eead4", width=80, height=30 }) {
+  if (!values || values.length < 2) return null;
+  const max = Math.max(...values), min = Math.min(...values);
+  const range = max - min || 1;
+  const stepX = width / (values.length - 1);
+  const pts = values.map((v,i) => `${i*stepX},${height - ((v-min)/range)*(height-4) - 2}`).join(" ");
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
+        style={{filter:`drop-shadow(0 0 3px ${color})`}} />
+    </svg>
+  );
+}
+
+function Donut({ data, size=180, strokeWidth=18, centerLabel, centerValue, gap=2 }) {
+  const total = data.reduce((s,d)=>s+d.value,0)||1;
+  const r = (size - strokeWidth) / 2;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
+      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+        <circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.04)" strokeWidth={strokeWidth} fill="none"/>
+        {data.map((d,i) => {
+          const frac = d.value/total;
+          const len = c*frac - gap;
+          const da = `${Math.max(len,0)} ${c}`;
+          const do_ = -offset;
+          offset += c*frac;
+          return <circle key={i} cx={size/2} cy={size/2} r={r} fill="none"
+            stroke={d.color} strokeWidth={strokeWidth}
+            strokeDasharray={da} strokeDashoffset={do_}
+            strokeLinecap="butt"
+            style={{filter:`drop-shadow(0 0 8px ${d.color}66)`}} />;
+        })}
+      </svg>
+      <div style={{position:"absolute",inset:0,display:"grid",placeItems:"center",textAlign:"center"}}>
+        <div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:size*0.22,color:"#e6f1f0",lineHeight:1}}>{centerValue}</div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginTop:6}}>{centerLabel}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SegmentRing({ stages, size=260 }) {
+  const center = size/2;
+  const baseR = 28, gap = 13;
+  return (
+    <div style={{position:"relative",width:size,height:size}}>
+      <svg width={size} height={size}>
+        <defs>
+          {stages.map((s,i) => (
+            <linearGradient key={i} id={`seg-${i}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.95"/>
+              <stop offset="100%" stopColor={s.color} stopOpacity="0.45"/>
+            </linearGradient>
+          ))}
+        </defs>
+        {stages.map((s,i) => {
+          const r = baseR + i*gap;
+          const c = 2*Math.PI*r;
+          const pct = s.total>0 ? s.count/s.total : 0;
+          const dash = c*pct;
+          return (
+            <g key={i} transform={`rotate(-90 ${center} ${center})`}>
+              <circle cx={center} cy={center} r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={7}/>
+              <circle cx={center} cy={center} r={r} fill="none"
+                stroke={`url(#seg-${i})`} strokeWidth={7}
+                strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
+                style={{filter:`drop-shadow(0 0 6px ${s.color}66)`,transition:"stroke-dasharray 0.8s"}}/>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function AreaChart({ data, height=160 }) {
+  if (!data || data.length < 2) return <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"20px 0"}}>No data yet</div>;
+  const W=600, max=Math.max(...data.map(d=>d.count),1);
+  const stepX = W/(data.length-1);
+  const pts = data.map((d,i)=>[i*stepX, height-(d.count/max)*(height-30)-8]);
+  const path = pts.map((p,i)=>`${i===0?"M":"L"} ${p[0]} ${p[1]}`).join(" ");
+  const area = `${path} L ${W} ${height} L 0 ${height} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5eead4" stopOpacity="0.3"/>
+          <stop offset="100%" stopColor="#5eead4" stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      {[0.25,0.5,0.75].map((g,i)=>(
+        <line key={i} x1={0} x2={W} y1={height*g} y2={height*g}
+          stroke="rgba(255,255,255,0.04)" strokeDasharray="2 4"/>
+      ))}
+      <path d={area} fill="url(#area-grad)"/>
+      <path d={path} stroke="#5eead4" strokeWidth="2" fill="none"
+        style={{filter:"drop-shadow(0 0 6px #5eead4)"}}/>
+      {pts.map((p,i)=>(
+        <g key={i}>
+          <circle cx={p[0]} cy={p[1]} r="3.5" fill="#050a10" stroke="#5eead4" strokeWidth="2"/>
+          <text x={p[0]} y={p[1]-10} textAnchor="middle" fontSize="11" fill="#5eead4"
+            fontFamily="JetBrains Mono, monospace">{data[i].count}</text>
+          <text x={p[0]} y={height-2} textAnchor="middle" fontSize="9" fill="#475a64"
+            fontFamily="JetBrains Mono, monospace">{String(data[i].week||"").slice(-5)}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function RadialGauge({ value, max, color="#5eead4", size=84, thickness=6 }) {
+  const r = (size-thickness)/2;
+  const c = 2*Math.PI*r;
+  const pct = Math.min(value/Math.max(max,1),1);
+  const dash = c*pct;
+  return (
+    <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
+      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+        <circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={thickness} fill="none"/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none"
+          stroke={color} strokeWidth={thickness}
+          strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
+          style={{filter:`drop-shadow(0 0 8px ${color}55)`,transition:"stroke-dasharray 0.6s"}}/>
+      </svg>
+      <div style={{position:"absolute",inset:0,display:"grid",placeItems:"center",textAlign:"center"}}>
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:Math.round(size*0.26),color:"#e6f1f0",lineHeight:1}}>
+          {value}<span style={{color:"#6b7a82",fontWeight:400,fontSize:Math.round(size*0.15)}}>/{max}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ANALYTICS TAB ────────────────────────────────────────────────
 function AnalyticsTab({ token, t }) {
   const [data, setData] = useState(null);
@@ -593,93 +732,227 @@ function AnalyticsTab({ token, t }) {
     const found = data.byStage.find(x => x.stage === s);
     return { stage: s, count: found ? found.count : 0 };
   });
-  const maxStage = Math.max(...stageFunnel.map(x => x.count), 1);
   const maxGifting = Math.max(...(data.byGifting || []).map(x => x.count), 1);
   const ptCount = data.byLanguage.find(x => x.language === "PT")?.count || 0;
   const enCount = data.byLanguage.find(x => x.language === "EN")?.count || 0;
   const total = data.total || 1;
+  const placedCount = stageFunnel.find(x => x.stage === "Placed in Ministry")?.count || 0;
+  const newCount = stageFunnel.find(x => x.stage === "New")?.count || 0;
+  const inProgressCount = stageFunnel.filter(x => !["New","Placed in Ministry"].includes(x.stage)).reduce((a,b) => a+b.count, 0);
+  const conversionPct = total > 0 ? Math.round((placedCount/total)*100) : 0;
+
+  // Donut colors aligned with STAGE_COLORS palette
+  const donutColors = ["#5eead4","#60a5fa","#a78bfa","#f59e0b","#f472b6","#34d399","#fb923c","#e879f9"];
+
+  // Weekly sparkline from byWeek data (last 8 points)
+  const sparkWeekly = (data.byWeek||[]).slice(-8).map(x=>x.count);
 
   return (
-    <div style={{padding:"32px 28px",display:"grid",gap:24}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:16}}>
+    <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* ── KPI row ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
         {[
-          {label:t.totalSub,value:data.total,accent:"#5eead4"},
-          {label:t.placedMin,value:stageFunnel.find(x=>x.stage==="Placed in Ministry")?.count||0,accent:"#34d399"},
-          {label:t.awaitContact,value:stageFunnel.find(x=>x.stage==="New")?.count||0,accent:"#f87171"},
-          {label:t.inProgress,value:stageFunnel.filter(x=>!["New","Placed in Ministry"].includes(x.stage)).reduce((a,b)=>a+b.count,0),accent:"#f59e0b"},
-        ].map(({label,value,accent})=>(
-          <div key={label} className="glass" style={{borderTop:`2px solid ${accent}`,borderRadius:12,padding:"20px 24px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-            <div style={{fontSize:40,fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,color:accent,letterSpacing:"-0.02em",lineHeight:1}}>{value}</div>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",color:"#6b7a82",textTransform:"uppercase",letterSpacing:"0.14em",marginTop:8}}>{label}</div>
+          {label:t.totalSub,        value:data.total,       accent:"#5eead4", spark:sparkWeekly},
+          {label:t.placedMin,       value:placedCount,      accent:"#34d399", spark:[0,0,1,1,0,1,placedCount]},
+          {label:t.awaitContact,    value:newCount,         accent:"#f87171", spark:[2,3,2,4,3,newCount]},
+          {label:t.inProgress,      value:inProgressCount,  accent:"#f59e0b", spark:[4,3,3,inProgressCount]},
+        ].map(({label,value,accent,spark})=>(
+          <div key={label} className="glass" style={{padding:24,position:"relative",overflow:"hidden",borderRadius:12}}>
+            {/* Left-top gradient line */}
+            <div style={{position:"absolute",top:0,left:0,right:0,height:2,
+              background:`linear-gradient(90deg, ${accent}, transparent 60%)`,
+              boxShadow:`0 0 12px ${accent}66`}}/>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:52,
+                  color:accent,lineHeight:1,letterSpacing:"-0.02em",
+                  textShadow:`0 0 24px ${accent}33`}}>
+                  {value}
+                </div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",
+                  letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginTop:10}}>
+                  {label}
+                </div>
+              </div>
+              {spark.length >= 2 && (
+                <div style={{opacity:0.65,paddingTop:4}}>
+                  <MiniSpark values={spark} color={accent} width={72} height={28}/>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="glass" style={{borderRadius:12,padding:"24px 28px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:20,fontWeight:500}}>{t.pipeline}</div>
-        {stageFunnel.map(({stage,count})=>(
-          <div key={stage} style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:13,color:"#aebac0"}}>{stage}</span>
-              <span style={{fontSize:13,fontWeight:600,fontFamily:"'JetBrains Mono',monospace",color:STAGE_COLORS[stage]||"#5eead4"}}>{count}</span>
-            </div>
-            <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${(count/maxStage)*100}%`,background:STAGE_COLORS[stage]||"#5eead4",borderRadius:999,transition:"width 0.6s ease",opacity:0.85}}/>
+      {/* ── Connection Funnel ── */}
+      <div className="glass" style={{padding:28,borderRadius:12}}>
+        <div style={{marginBottom:22}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+            letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:4}}>
+            {t.pipeline}
+          </div>
+          <p style={{margin:0,fontSize:12,color:"#6b7a82"}}>
+            {t.lang==="PT"
+              ? "Caminho do voluntário desde inscrição até colocação ministerial"
+              : "Volunteer journey from sign-up to ministry placement"}
+          </p>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
+          {/* Left: numbered stage rows */}
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {stageFunnel.map(({stage,count},i) => {
+              const color = STAGE_COLORS[stage]||"#5eead4";
+              const pct = total>0 ? (count/total)*100 : 0;
+              return (
+                <div key={stage} style={{display:"flex",alignItems:"center",gap:14}}>
+                  <div style={{width:24,height:24,borderRadius:6,flexShrink:0,
+                    background:`linear-gradient(135deg,${color}44,${color}22)`,
+                    border:`1px solid ${color}55`,display:"grid",placeItems:"center",
+                    fontSize:10,fontWeight:700,color,fontFamily:"'JetBrains Mono',monospace"}}>
+                    {i+1}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <span style={{fontSize:12.5,color:"#aebac0"}}>{stage}</span>
+                      <span style={{fontSize:13,fontWeight:600,fontFamily:"'JetBrains Mono',monospace",color}}>
+                        {count}
+                        <span style={{color:"#475a64",fontWeight:400,fontSize:11,marginLeft:5}}>/ {total}</span>
+                      </span>
+                    </div>
+                    <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${Math.max(pct,1)}%`,
+                        background:`linear-gradient(90deg,${color}aa,${color})`,
+                        borderRadius:999,boxShadow:`0 0 10px ${color}55`,
+                        transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right: concentric ring + conversion rate */}
+          <div style={{display:"flex",justifyContent:"center",alignItems:"center",position:"relative"}}>
+            <SegmentRing
+              size={260}
+              stages={stageFunnel.map(({stage,count}) => ({
+                color: STAGE_COLORS[stage]||"#5eead4",
+                count,
+                total
+              }))}
+            />
+            <div style={{position:"absolute",top:"50%",left:"50%",
+              transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9px",
+                letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4}}>
+                Conversão
+              </div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,
+                fontSize:38,color:"#5eead4",lineHeight:1}}>
+                {conversionPct}%
+              </div>
+              <div style={{fontSize:11,color:"#6b7a82",marginTop:4}}>
+                {placedCount} / {total}
+              </div>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-        <div className="glass" style={{borderRadius:12,padding:"24px 28px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:20,fontWeight:500}}>{t.topGiftings}</div>
-          {(data.byGifting||[]).slice(0,8).map(({gifting,count})=>(
-            <div key={gifting} style={{marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:12,color:"#aebac0"}}>{GIFTING_ICONS[gifting]||"◆"} {gifting}</span>
-                <span style={{fontSize:12,fontWeight:500,fontFamily:"'JetBrains Mono',monospace",color:"#5eead4"}}>{count}</span>
-              </div>
-              <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
-                <div style={{height:"100%",width:`${(count/maxGifting)*100}%`,background:"linear-gradient(90deg,#5eead4,#2dd4bf)",borderRadius:999,boxShadow:"0 0 8px rgba(94,234,212,0.25)"}}/>
-              </div>
+      {/* ── Two-col: Giftings donut + Languages ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:20}}>
+
+        {/* Donut + legend */}
+        <div className="glass" style={{padding:28,borderRadius:12}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+            letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:4}}>
+            {t.topGiftings}
+          </div>
+          <p style={{margin:"0 0 22px",fontSize:12,color:"#6b7a82"}}>
+            {t.lang==="PT" ? "Distribuição entre voluntários ativos" : "Distribution across active volunteers"}
+          </p>
+          <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:28,alignItems:"center"}}>
+            <Donut
+              size={180} strokeWidth={18}
+              centerValue={String(data.total||0)}
+              centerLabel="mapeados"
+              data={(data.byGifting||[]).slice(0,6).map((g,i)=>({
+                value:g.count,
+                color:donutColors[i]||"#5eead4"
+              }))}
+            />
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {(data.byGifting||[]).slice(0,6).map(({gifting,count},i)=>(
+                <div key={gifting} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,
+                    background:donutColors[i]||"#5eead4",
+                    boxShadow:`0 0 8px ${donutColors[i]||"#5eead4"}`}}/>
+                  <span style={{fontSize:16,flexShrink:0}}>{GIFTING_ICONS[gifting]||"◆"}</span>
+                  <span style={{flex:1,fontSize:12.5,color:"#aebac0",lineHeight:1.3}}>{gifting}</span>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{count}</span>
+                </div>
+              ))}
+              {(data.byGifting||[]).length > 6 && (
+                <div style={{fontSize:11,color:"#475a64",fontFamily:"'JetBrains Mono',monospace",paddingTop:4,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                  +{(data.byGifting||[]).length - 6} more
+                </div>
+              )}
             </div>
-          ))}
+          </div>
         </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:24}}>
-          <div className="glass" style={{borderRadius:12,padding:"24px 28px",flex:1,boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:20,fontWeight:500}}>{t.langSplit}</div>
-            {[{label:"Português",count:ptCount,color:"#5eead4"},{label:"English",count:enCount,color:"#4cb6c8"}].map(({label,count,color})=>(
-              <div key={label} style={{marginBottom:14}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{fontSize:13,color:"#aebac0"}}>{label}</span>
-                  <span style={{fontSize:13,fontWeight:500,fontFamily:"'JetBrains Mono',monospace",color}}>{count} <span style={{color:"#475a64",fontWeight:400}}>({Math.round((count/total)*100)}%)</span></span>
+        {/* Languages */}
+        <div className="glass" style={{padding:28,borderRadius:12}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+            letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:22}}>
+            {t.langSplit}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:22}}>
+            {[
+              {label:"Português",flag:"🇧🇷",count:ptCount,color:"#5eead4",grad:"linear-gradient(90deg,#5eead4,#2dd4bf)"},
+              {label:"English",  flag:"🇺🇸",count:enCount,color:"#4cb6c8",grad:"linear-gradient(90deg,#4cb6c8,#60a5fa)"},
+            ].map(({label,flag,count,color,grad})=>(
+              <div key={label}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:20}}>{flag}</span>
+                    <span style={{fontSize:14,color:"#e6f1f0",fontWeight:500}}>{label}</span>
+                  </div>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0"}}>
+                    {count} <span style={{color:"#6b7a82"}}>({Math.round((count/total)*100)}%)</span>
+                  </span>
                 </div>
-                <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
-                  <div style={{height:"100%",width:`${(count/total)*100}%`,background:color,borderRadius:999,opacity:0.8}}/>
+                <div style={{height:8,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${(count/total)*100}%`,
+                    background:grad,
+                    boxShadow:`0 0 12px ${color}66`,
+                    borderRadius:999,transition:"width 0.8s"}}/>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="glass" style={{borderRadius:12,padding:"24px 28px",flex:1,boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:20,fontWeight:500}}>{t.weeklySub}</div>
-            {data.byWeek?.length > 0 ? (
-              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:80}}>
-                {(() => {
-                  const maxW = Math.max(...data.byWeek.map(x=>x.count),1);
-                  return data.byWeek.slice(-10).map(({week,count})=>(
-                    <div key={week} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                      <div style={{fontSize:10,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontWeight:500}}>{count}</div>
-                      <div style={{width:"100%",background:"linear-gradient(180deg,rgba(94,234,212,0.35),rgba(94,234,212,0.12))",borderRadius:"3px 3px 0 0",height:`${(count/maxW)*60}px`,minHeight:4}}/>
-                    </div>
-                  ));
-                })()}
-              </div>
-            ) : <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{t.noData}</div>}
-          </div>
         </div>
       </div>
+
+      {/* ── Weekly responses area chart ── */}
+      <div className="glass" style={{padding:28,borderRadius:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22}}>
+          <div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+              letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:4}}>
+              {t.weeklySub}
+            </div>
+            <p style={{margin:0,fontSize:12,color:"#6b7a82"}}>
+              {t.lang==="PT"
+                ? "Volume de novas inscrições por semana"
+                : "New sign-ups per week — last 10 weeks"}
+            </p>
+          </div>
+        </div>
+        <AreaChart data={(data.byWeek||[]).slice(-10)} height={160}/>
+      </div>
+
     </div>
   );
 }
@@ -1409,37 +1682,163 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
   useEffect(() => { if (selectedGifting) load(selectedGifting); }, [selectedGifting, load]);
 
   return (
-    <div style={{padding:"24px 28px"}}>
-      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",color:"#6b7a82",textTransform:"uppercase",marginBottom:16,fontWeight:500}}>{t.selectGifting}</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:28}}>
-        {GIFTINGS.map(g=>(
-          <button key={g} onClick={()=>setSelectedGifting(g)}
-            style={{padding:"12px 16px",
-              background:selectedGifting===g?"linear-gradient(180deg,rgba(94,234,212,0.15),rgba(94,234,212,0.07))":"rgba(255,255,255,0.02)",
-              border:`1px solid ${selectedGifting===g?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.04)"}`,
-              borderRadius:10,color:selectedGifting===g?"#5eead4":"#aebac0",
-              fontSize:13,cursor:"pointer",textAlign:"left",
-              transition:"all 0.18s",
-              boxShadow:selectedGifting===g?"0 0 14px rgba(94,234,212,0.15)":"none"}}>
-            <span style={{marginRight:8}}>{GIFTING_ICONS[g]||"◆"}</span>{g}
-          </button>
-        ))}
+    <div style={{padding:"24px 28px",display:"flex",flexDirection:"column",gap:24}}>
+
+      {/* ── Intro strip ── */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"18px 24px",borderRadius:14,
+        background:"linear-gradient(90deg,rgba(94,234,212,0.06),transparent)",
+        border:"1px solid rgba(255,255,255,0.04)",
+        borderLeft:"2px solid #5eead4"}}>
+        <div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+            textTransform:"uppercase",color:"#5eead4",marginBottom:6}}>
+            {t.selectGifting}
+          </div>
+          <p style={{margin:0,fontSize:13,color:"#aebac0"}}>
+            {lang==="PT"
+              ? "Visualize pessoas disponíveis ordenadas por carga ministerial."
+              : "See available people sorted by ministry load."}
+          </p>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#6b7a82"}}>
+            {GIFTINGS.length} DONS
+          </span>
+        </div>
       </div>
 
+      {/* ── Gifting tile grid ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
+        {GIFTINGS.map(g => {
+          const sel = selectedGifting === g;
+          return (
+            <button key={g} onClick={()=>setSelectedGifting(g)}
+              className={`glass ${sel ? "glow-active" : "glow-hover"}`}
+              style={{
+                padding:18, textAlign:"left", cursor:"pointer",
+                display:"flex", flexDirection:"column", gap:10,
+                minHeight:110, position:"relative", overflow:"hidden",
+                background:sel?"linear-gradient(180deg,rgba(94,234,212,0.12),rgba(94,234,212,0.04))":undefined,
+                border:sel?"1px solid rgba(94,234,212,0.35)":undefined,
+                borderRadius:12,
+              }}>
+              {/* Icon box + label row */}
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:38,height:38,borderRadius:10,flexShrink:0,
+                  background:"linear-gradient(135deg,rgba(94,234,212,0.16),rgba(94,234,212,0.04))",
+                  border:"1px solid rgba(94,234,212,0.12)",
+                  display:"grid",placeItems:"center",fontSize:20}}>
+                  {GIFTING_ICONS[g]||"◆"}
+                </div>
+                <span style={{fontSize:13.5,color:"#e6f1f0",fontWeight:500,lineHeight:1.3,flex:1}}>
+                  {g}
+                </span>
+              </div>
+              {/* Footer */}
+              <div style={{marginTop:"auto",display:"flex",justifyContent:"space-between",
+                alignItems:"center",paddingTop:8,
+                borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",
+                  letterSpacing:"0.14em",textTransform:"uppercase",
+                  color:sel?"#5eead4":"#475a64"}}>
+                  {sel && people.length > 0 ? `${people.length} ${lang==="PT"?"disponíve"+(people.length===1?"l":"is"):"available"}` : lang==="PT"?"Ver pessoas":"View people"}
+                </span>
+                {sel && <span style={{color:"#5eead4",fontSize:14}}>→</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Selected gifting results panel ── */}
       {selectedGifting && (
-        <div>
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>
-              {GIFTING_ICONS[selectedGifting]} {selectedGifting}
+        <div className="glass" style={{padding:24,borderRadius:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+                textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
+                {lang==="PT" ? "DISPONÍVEIS PARA" : "AVAILABLE FOR"}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:24}}>{GIFTING_ICONS[selectedGifting]||"◆"}</span>
+                <h2 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,
+                  color:"#e6f1f0",letterSpacing:"-0.01em"}}>
+                  {selectedGifting}
+                </h2>
+                {!loading && (
+                  <span style={{fontSize:11,padding:"4px 10px",borderRadius:999,
+                    background:"rgba(94,234,212,0.1)",border:"1px solid rgba(94,234,212,0.25)",
+                    color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontWeight:500}}>
+                    {people.length} {lang==="PT"?"pessoa"+(people.length!==1?"s":""):"person"+(people.length!==1?"s":"")}
+                  </span>
+                )}
+              </div>
             </div>
-            {!loading && <div style={{fontSize:12,fontFamily:"'JetBrains Mono',monospace",color:"#475a64"}}>{people.length} people</div>}
+            {!loading && people.length > 0 && (
+              <span style={{fontSize:11.5,color:"#6b7a82"}}>
+                {lang==="PT" ? "Ordenado por " : "Sorted by "}
+                <span style={{color:"#5eead4"}}>{lang==="PT" ? "carga ministerial ↑" : "ministry load ↑"}</span>
+              </span>
+            )}
           </div>
-          {loading ? <div style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>{t.loading}</div> : (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
-              {people.map(p=>(
-                <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
-              ))}
-              {people.length===0 && <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{t.noPeople}</div>}
+
+          {loading ? (
+            <div style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:13,padding:"16px 0"}}>
+              {t.loading}
+            </div>
+          ) : people.length === 0 ? (
+            <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"16px 0"}}>
+              {t.noPeople}
+            </div>
+          ) : (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
+              {people.map(p => {
+                const pMinistries = parseJSON(p.current_ministries);
+                const pLangs = parseJSON(p.languages_spoken);
+                const waURL = buildWhatsAppURL(p, templatePT, templateEN, false);
+                const initials = (p.name||"?").split(" ").map(n=>n[0]).slice(0,2).join("");
+                return (
+                  <div key={p.id} onClick={()=>setSelectedId(p.id)}
+                    style={{padding:14,borderRadius:10,cursor:"pointer",
+                      background:"rgba(255,255,255,0.02)",
+                      border:"1px solid rgba(255,255,255,0.04)",
+                      display:"flex",alignItems:"center",gap:12,
+                      transition:"all 0.18s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(94,234,212,0.04)";e.currentTarget.style.borderColor="rgba(94,234,212,0.18)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.02)";e.currentTarget.style.borderColor="rgba(255,255,255,0.04)";}}>
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt="" style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>
+                    ) : (
+                      <div style={{width:36,height:36,borderRadius:"50%",flexShrink:0,
+                        background:"rgba(94,234,212,0.1)",border:"1px solid rgba(94,234,212,0.18)",
+                        display:"grid",placeItems:"center",
+                        fontSize:12,color:"#5eead4",fontWeight:700,
+                        fontFamily:"'Space Grotesk',sans-serif"}}>
+                        {initials}
+                      </div>
+                    )}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,color:"#e6f1f0",fontWeight:500,
+                        whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                        {p.name}
+                      </div>
+                      <div style={{fontSize:11,color:"#6b7a82",marginTop:2}}>
+                        {pMinistries.length} {lang==="PT"?"ministério":"ministr"}{lang!=="PT"&&(pMinistries.length!==1?"ies":"y")}
+                        {p.assigned_pastor ? ` · ${p.assigned_pastor}` : ""}
+                      </div>
+                    </div>
+                    {waURL && (
+                      <button onClick={e=>{e.stopPropagation();window.open(waURL,"_blank");}}
+                        style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.25)",
+                          color:"#86efac",padding:6,borderRadius:6,cursor:"pointer",
+                          display:"grid",placeItems:"center",fontSize:14,flexShrink:0}}>
+                        💬
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1480,64 +1879,140 @@ function ministryHealthStatus(current, min, ideal) {
 }
 
 function MinistryHealthTab({ t, lang }) {
-  const healthy = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current >= m.ideal; }).length;
-  const needs = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current >= m.min && m.current < m.ideal; }).length;
-  const critical = MINISTRY_HEALTH_DATA.filter(function(m){ return m.current < m.min; }).length;
+  const healthy  = MINISTRY_HEALTH_DATA.filter(m => m.current >= m.ideal).length;
+  const needs    = MINISTRY_HEALTH_DATA.filter(m => m.current >= m.min && m.current < m.ideal).length;
+  const critical = MINISTRY_HEALTH_DATA.filter(m => m.current < m.min).length;
   return (
-    <div style={{padding:"32px 28px"}}>
-      <div style={{background:"rgba(245,158,11,0.07)",border:"1px solid rgba(245,158,11,0.22)",borderLeft:"3px solid rgba(245,158,11,0.7)",borderRadius:10,padding:"16px 20px",marginBottom:32,display:"flex",gap:14,alignItems:"flex-start"}}>
-        <div style={{fontSize:20,flexShrink:0}}>{"🚧"}</div>
+    <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* ── Dev banner ── */}
+      <div style={{display:"flex",gap:14,padding:"16px 22px",borderRadius:14,
+        background:"linear-gradient(90deg,rgba(245,158,11,0.10),rgba(245,158,11,0.02))",
+        border:"1px solid rgba(245,158,11,0.2)",alignItems:"center"}}>
+        <div style={{width:36,height:36,borderRadius:8,flexShrink:0,
+          background:"rgba(245,158,11,0.18)",display:"grid",placeItems:"center",
+          color:"#fbd590",fontSize:16}}>
+          🚧
+        </div>
         <div>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",fontWeight:500,textTransform:"uppercase",color:"#f59e0b",marginBottom:6}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:13,fontWeight:700,
+            letterSpacing:"0.1em",textTransform:"uppercase",color:"#fbd590",marginBottom:4}}>
             {lang==="PT" ? "Em Desenvolvimento" : "Under Construction"}
           </div>
-          <div style={{fontSize:13,color:"#6b7a82",lineHeight:1.7}}>
+          <p style={{margin:0,fontSize:12,color:"#6b7a82",lineHeight:1.6}}>
             {lang==="PT"
-              ? "Esta aba ainda nao esta ativa. Em breve os pastores poderao acompanhar a saude de cada ministerio em tempo real."
-              : "This tab is not yet active. Coming soon — pastors will be able to track each ministry's health in real time, seeing current volunteer counts, targets, and who is at capacity."}
-          </div>
+              ? "Em breve, pastores poderão acompanhar a saúde de cada ministério em tempo real."
+              : "Coming soon — pastors will track each ministry's health in real time."}
+          </p>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:16,marginBottom:32}}>
+
+      {/* ── KPI row ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
         {[
-          { label: lang==="PT" ? "Total de Ministerios" : "Total Ministries", value: MINISTRY_HEALTH_DATA.length, accent:"#5eead4" },
-          { label: lang==="PT" ? "Saudaveis" : "Healthy", value: healthy, accent:"#34d399" },
-          { label: lang==="PT" ? "Precisam de Voluntarios" : "Needs Volunteers", value: needs, accent:"#f59e0b" },
-          { label: lang==="PT" ? "Criticos" : "Critical", value: critical, accent:"#f87171" },
-        ].map(function(item){
-          return (
-            <div key={item.label} className="glass" style={{borderTop:"2px solid "+item.accent,borderRadius:12,padding:"20px 24px",boxShadow:"0 8px 32px rgba(0,0,0,0.3)"}}>
-              <div style={{fontSize:40,fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,color:item.accent,letterSpacing:"-0.02em",lineHeight:1}}>{item.value}</div>
-              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",color:"#6b7a82",textTransform:"uppercase",letterSpacing:"0.14em",marginTop:8}}>{item.label}</div>
+          {label:lang==="PT"?"Total de Ministérios":"Total Ministries", value:MINISTRY_HEALTH_DATA.length, accent:"#5eead4", spark:[16,16,16,17,17,17,17,17]},
+          {label:lang==="PT"?"Saudáveis":"Healthy",                     value:healthy,  accent:"#34d399", spark:[2,2,1,1,1,0,0,healthy]},
+          {label:lang==="PT"?"Precisam de Voluntários":"Need Volunteers",value:needs,   accent:"#f59e0b", spark:[10,11,12,12,13,13,13,needs]},
+          {label:lang==="PT"?"Críticos":"Critical",                      value:critical, accent:"#f87171", spark:[3,4,4,3,4,4,4,critical]},
+        ].map(({label,value,accent,spark})=>(
+          <div key={label} className="glass" style={{padding:24,position:"relative",overflow:"hidden",borderRadius:12}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:2,
+              background:`linear-gradient(90deg,${accent},transparent 60%)`,
+              boxShadow:`0 0 12px ${accent}66`}}/>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:52,
+                  color:accent,lineHeight:1,letterSpacing:"-0.02em",textShadow:`0 0 24px ${accent}33`}}>
+                  {value}
+                </div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",
+                  letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginTop:10}}>
+                  {label}
+                </div>
+              </div>
+              <div style={{opacity:0.65,paddingTop:4}}>
+                <MiniSpark values={spark} color={accent} width={72} height={28}/>
+              </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
-        {MINISTRY_HEALTH_DATA.map(function(m){
-          var status = ministryHealthStatus(m.current, m.min, m.ideal);
-          var pct = Math.min(Math.round((m.current / m.ideal) * 100), 100);
+
+      {/* ── Ministry health cards ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
+        {MINISTRY_HEALTH_DATA.map(m => {
+          const status = ministryHealthStatus(m.current, m.min, m.ideal);
+          const isCritical = m.current < m.min;
+          const aboveMin = m.current >= m.min;
+          const pct = (m.current / m.ideal) * 100;
           return (
-            <div key={m.name} className="glass glow-hover" style={{borderRadius:12,padding:"18px 20px",cursor:"default",boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-                <div>
-                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:600,color:"#e6f1f0",marginBottom:3}}>{lang==="PT" ? (MINISTRY_PT[m.name] || m.name) : m.name}</div>
-                  <div style={{fontSize:11,color:"#475a64"}}>{"→ "}{m.leader}</div>
-                </div>
-                <span style={{fontSize:11,padding:"3px 9px",background:status.bg,color:status.color,borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${status.color}33`}}>{status.label}</span>
+            <div key={m.name} className={`glass ${isCritical ? "" : "glow-hover"}`}
+              style={{padding:20,position:"relative",overflow:"hidden",borderRadius:12,
+                borderLeft:`2px solid ${status.color}88`,
+                boxShadow:isCritical
+                  ?"0 0 0 1px rgba(248,113,113,0.15), 0 20px 40px -20px rgba(248,113,113,0.2)"
+                  :"0 4px 16px rgba(0,0,0,0.25)"}}>
+
+              {/* Header */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#e6f1f0"}}>
+                  {lang==="PT" ? (MINISTRY_PT[m.name]||m.name) : m.name}
+                </h3>
+                <span style={{fontSize:9.5,padding:"3px 9px",background:status.bg,color:status.color,
+                  borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${status.color}33`,
+                  fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>
+                  ● {isCritical ? (lang==="PT"?"Crítico":"Critical") : (lang==="PT"?"Precisa de Voluntários":"Needs Volunteers")}
+                </span>
               </div>
-              <div style={{marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:12,color:"#6b7a82"}}>{lang==="PT" ? "Voluntários" : "Volunteers"}</span>
-                  <span style={{fontSize:12,fontWeight:600,fontFamily:"'JetBrains Mono',monospace",color:status.color}}>{m.current}<span style={{color:"#475a64",fontWeight:400}}>{" / "}{m.ideal}</span></span>
-                </div>
-                <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:pct+"%",background:status.color,borderRadius:999,opacity:0.8}}/>
-                </div>
+              <div style={{fontSize:11.5,color:"#6b7a82",marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
+                → {m.leader}
               </div>
-              <div style={{display:"flex",gap:12}}>
-                <span style={{fontSize:11,color:"#475a64"}}>{"Min: "}<span style={{color:"#aebac0"}}>{m.min}</span></span>
-                <span style={{fontSize:11,color:"#475a64"}}>{"Ideal: "}<span style={{color:"#aebac0"}}>{m.ideal}</span></span>
+
+              {/* Gauge + metrics */}
+              <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                <RadialGauge value={m.current} max={m.ideal} size={84} thickness={6} color={status.color}/>
+                <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
+                  {/* Bar with min marker */}
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9.5px",
+                        letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82"}}>
+                        {lang==="PT"?"VOLUNTÁRIOS":"VOLUNTEERS"}
+                      </span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#aebac0"}}>
+                        <span style={{color:status.color}}>{m.current}</span> / {m.ideal}
+                      </span>
+                    </div>
+                    <div style={{position:"relative",height:6,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
+                      <div style={{position:"absolute",left:0,top:0,height:"100%",
+                        width:`${Math.min(pct,100)}%`,
+                        background:`linear-gradient(90deg,${status.color},${status.color}aa)`,
+                        borderRadius:999,boxShadow:`0 0 8px ${status.color}66`}}/>
+                      {/* Min marker */}
+                      <div style={{position:"absolute",left:`${(m.min/m.ideal)*100}%`,
+                        top:-3,bottom:-3,width:1,background:"rgba(255,255,255,0.25)"}}/>
+                    </div>
+                  </div>
+                  {/* MIN / IDEAL / GAP stats */}
+                  <div style={{display:"flex",gap:14}}>
+                    {[
+                      {label:"MIN",  val:m.min,             color:aboveMin?"#34d399":"#f87171"},
+                      {label:"IDEAL",val:m.ideal,           color:"#aebac0"},
+                      {label:"GAP",  val:`−${m.ideal-m.current}`, color:status.color},
+                    ].map(({label,val,color})=>(
+                      <div key={label} style={{display:"flex",flexDirection:"column",gap:2}}>
+                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9px",
+                          letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82"}}>
+                          {label}
+                        </span>
+                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,
+                          fontWeight:600,color}}>
+                          {val}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -1591,7 +2066,7 @@ export default function App() {
         <div style={{maxWidth:1600,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:28,justifyContent:"space-between"}}>
           {/* Brand cluster */}
           <div style={{display:"flex",alignItems:"center",gap:20,flexShrink:0}}>
-            <img src="/LTC1.svg" alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block"}} />
+            <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block"}} />
             <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />
             <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
           </div>

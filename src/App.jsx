@@ -71,6 +71,12 @@ const STAGE_COLORS = {
   "Placed in Ministry":"#5eead4"
 };
 
+const DISC_TYPE = {
+  PT: { D:"Executor", I:"Comunicador", S:"Planejador", C:"Analista" },
+  EN: { D:"Driver", I:"Influencer", S:"Supporter", C:"Analyst" }
+};
+const DISC_COLORS = { D:"#f87171", I:"#f59e0b", S:"#34d399", C:"#60a5fa" };
+
 const LANGUAGE_DISPLAY = {
   PT: { "English":"Inglês", "Português":"Português", "Both":"Ambos" },
   EN: { "English":"English", "Português":"Português", "Both":"Both" }
@@ -184,6 +190,11 @@ const L = {
     selectCustom:"Digitar personalizado…",
     volunteers:"VOLUNTÁRIOS",
     availableVars:"Variáveis Disponíveis",
+    discProfile:"Perfil DISC",discType:"Tipo DISC",naturalStr:"Forca Natural",
+    leadership:"Lideranca",emotional:"Perfil Emocional",pairing:"Parceria",
+    ministryFit:"Fit Ministerial",pastoralAlert:"Potencial Pastoral",
+    discDist:"Distribuicao DISC",byLeadership:"Estilo de Lideranca",byEmotional:"Perfil Emocional",
+    reference:"Referencia",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -244,6 +255,11 @@ const L = {
     selectCustom:"Type custom…",
     volunteers:"VOLUNTEERS",
     availableVars:"Available Variables",
+    discProfile:"DISC Profile",discType:"DISC Type",naturalStr:"Natural Strength",
+    leadership:"Leadership",emotional:"Emotional Profile",pairing:"Pairing",
+    ministryFit:"Ministry Fit",pastoralAlert:"Pastoral Potential",
+    discDist:"DISC Distribution",byLeadership:"Leadership Style",byEmotional:"Emotional Profile",
+    reference:"Reference",
   }
 };
 
@@ -1016,6 +1032,103 @@ function AnalyticsTab({ token, t, lang }) {
         <AreaChart data={(data.byWeek||[]).slice(-10)} height={160} noDataMsg={t.noData}/>
       </div>
 
+      {/* ── DISC Distribution ── */}
+      {(data.byDisc||[]).length > 0 && (
+        <div className="glass" style={{padding:28,borderRadius:12}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+            letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:22}}>
+            {t.discDist}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {["D","I","S","C"].map(function(letter){
+              const found=(data.byDisc||[]).find(function(x){return x.disc_primary===letter;});
+              const count=found?found.count:0;
+              const pct=total>0?(count/total)*100:0;
+              const color=DISC_COLORS[letter]||"#5eead4";
+              const name=(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[letter];
+              return (
+                <div key={letter}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,
+                        background:color,boxShadow:`0 0 6px ${color}`}}/>
+                      <span style={{fontSize:12.5,color:"#aebac0"}}>{name}</span>
+                    </div>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{count}</span>
+                  </div>
+                  <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${count>0?Math.max(pct,2):0}%`,
+                      background:`linear-gradient(90deg,${color}aa,${color})`,
+                      borderRadius:999,boxShadow:`0 0 8px ${color}55`,
+                      transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Leadership + Emotional Distribution ── */}
+      {((data.byLeadership||[]).length > 0 || (data.byEmotional||[]).length > 0) && (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+          {(data.byLeadership||[]).length > 0 && (
+            <div className="glass" style={{padding:28,borderRadius:12}}>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,
+                letterSpacing:"0.10em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:20}}>
+                {t.byLeadership}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {(data.byLeadership||[]).map(function(row,i){
+                  const pct=total>0?(row.count/total)*100:0;
+                  const colors=["#5eead4","#60a5fa","#a78bfa","#f59e0b","#34d399"];
+                  const color=colors[i%colors.length];
+                  return (
+                    <div key={row.leadership_tendency||i}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                        <span style={{fontSize:12,color:"#aebac0"}}>{row.leadership_tendency||"Outro"}</span>
+                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:500}}>{row.count}</span>
+                      </div>
+                      <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${row.count>0?Math.max(pct,2):0}%`,
+                          background:`linear-gradient(90deg,${color}aa,${color})`,borderRadius:999,transition:"width 0.8s"}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {(data.byEmotional||[]).length > 0 && (
+            <div className="glass" style={{padding:28,borderRadius:12}}>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,
+                letterSpacing:"0.10em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:20}}>
+                {t.byEmotional}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {(data.byEmotional||[]).map(function(row,i){
+                  const pct=total>0?(row.count/total)*100:0;
+                  const colors=["#5eead4","#f59e0b","#f87171","#a78bfa","#34d399"];
+                  const color=colors[i%colors.length];
+                  return (
+                    <div key={row.emotional_profile||i}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                        <span style={{fontSize:12,color:"#aebac0"}}>{row.emotional_profile||"Outro"}</span>
+                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:500}}>{row.count}</span>
+                      </div>
+                      <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${row.count>0?Math.max(pct,2):0}%`,
+                          background:`linear-gradient(90deg,${color}aa,${color})`,borderRadius:999,transition:"width 0.8s"}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1043,9 +1156,22 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
             </div>
           )}
           <div>
-            {/* Name row with Carisma badges inline */}
+            {/* Name row with DISC badge, pastoral flag, Carisma badges inline */}
             <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-              <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.name}</span>
+              <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
+              {person.disc_primary && (
+                <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+                  background:`${DISC_COLORS[person.disc_primary]}1a`,
+                  border:`1px solid ${DISC_COLORS[person.disc_primary]}44`,
+                  color:DISC_COLORS[person.disc_primary],fontWeight:700}}>
+                  {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
+                </span>
+              )}
+              {person.pastoral_flag==1 && (
+                <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+                  background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
+                  color:"#fbd590",fontWeight:700}}>★</span>
+              )}
               <CarismaBadge levels={carisma} />
             </div>
             <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || t.noContact}</div>
@@ -1110,9 +1236,17 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
           </div>
         )}
         <div>
-          {/* Name + Carisma badges inline */}
+          {/* Name + DISC badge + Carisma badges inline */}
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
-            <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.name}</span>
+            <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
+            {person.disc_primary && (
+              <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+                background:`${DISC_COLORS[person.disc_primary]}1a`,
+                border:`1px solid ${DISC_COLORS[person.disc_primary]}44`,
+                color:DISC_COLORS[person.disc_primary],fontWeight:700}}>
+                {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
+              </span>
+            )}
             <CarismaBadge levels={carisma} />
           </div>
           {person.gifting_1 && (
@@ -1237,7 +1371,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const SHORT_TO_FULL = {visual:"Visual Storytelling",encouragement:"Encouragement",creativity:"Creativity",worship:"Worship & Music",hospitality:"Hospitality",faith:"Faith",administration:"Administration",prophetic:"Discernment & Prophetic",helps:"Gift of Helps",digital:"Digital Communication",intercession:"Intercession",evangelism:"Evangelism",teaching:"Teaching",technical:"Technical Arts",leadership:"Influence & Servant Leadership"};
   const sortedScores = Object.entries(scores).map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
 
-  const CARISMA_LEVELS = ["1 Ano", "Masters"];
+  const CARISMA_LEVELS = ["1 Ano", "1st Year", "Masters", "Level 5"];
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",justifyContent:"flex-end"}}>
@@ -1259,7 +1393,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               )}
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                  <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.name}</span>
+                  <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
                   <CarismaBadge levels={carisma} />
                 </div>
                 <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",fontSize:12,color:"#6b7a82"}}>
@@ -1471,6 +1605,77 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               </div>
             )}
           </div>
+
+          {/* DISC Profile */}
+          {(person.disc_primary || person.natural_strength) && (
+            <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.discProfile}</div>
+              {/* Type badges */}
+              {person.disc_primary && (
+                <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:12,padding:"6px 12px",borderRadius:8,
+                    background:`${DISC_COLORS[person.disc_primary]}18`,
+                    border:`1px solid ${DISC_COLORS[person.disc_primary]}50`,
+                    color:DISC_COLORS[person.disc_primary],fontWeight:700,
+                    display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#1</span>
+                    {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
+                  </span>
+                  {person.disc_secondary && (
+                    <span style={{fontSize:11,padding:"5px 10px",borderRadius:8,
+                      background:`${DISC_COLORS[person.disc_secondary]}0e`,
+                      border:`1px solid ${DISC_COLORS[person.disc_secondary]}30`,
+                      color:DISC_COLORS[person.disc_secondary],fontWeight:600,
+                      display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#2</span>
+                      {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_secondary]}
+                    </span>
+                  )}
+                  {person.pastoral_flag==1 && (
+                    <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
+                      background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
+                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                      {"★ "}{t.pastoralAlert}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Trait rows */}
+              {(person.natural_strength || person.leadership_tendency || person.emotional_profile) && (
+                <div style={{background:"rgba(8,16,22,0.6)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:12,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+                  {person.natural_strength && (
+                    <div style={{display:"flex",justifyContent:"space-between",gap:12}}>
+                      <span style={{fontSize:11,color:"#6b7a82",flexShrink:0}}>{t.naturalStr}</span>
+                      <span style={{fontSize:12,color:"#aebac0",textAlign:"right"}}>{person.natural_strength}</span>
+                    </div>
+                  )}
+                  {person.leadership_tendency && (
+                    <div style={{display:"flex",justifyContent:"space-between",gap:12}}>
+                      <span style={{fontSize:11,color:"#6b7a82",flexShrink:0}}>{t.leadership}</span>
+                      <span style={{fontSize:12,color:"#aebac0",textAlign:"right"}}>{person.leadership_tendency}</span>
+                    </div>
+                  )}
+                  {person.emotional_profile && (
+                    <div style={{display:"flex",justifyContent:"space-between",gap:12}}>
+                      <span style={{fontSize:11,color:"#6b7a82",flexShrink:0}}>{t.emotional}</span>
+                      <span style={{fontSize:12,color:"#aebac0",textAlign:"right"}}>{person.emotional_profile}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Ministry fit tags */}
+              {person.ministry_fit && parseJSON(person.ministry_fit,[]).length > 0 && (
+                <div>
+                  <div style={{fontSize:11,color:"#6b7a82",marginBottom:6}}>{t.ministryFit}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {parseJSON(person.ministry_fit,[]).map(function(m){return(
+                      <span key={m} style={{fontSize:11,padding:"3px 9px",background:"rgba(94,234,212,0.06)",color:"#5eead4",borderRadius:6,border:"1px solid rgba(94,234,212,0.15)"}}>{m}</span>
+                    );})}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
@@ -2089,6 +2294,206 @@ function MinistryHealthTab({ t, lang }) {
   );
 }
 
+// ─── REFERENCE CONTENT ───────────────────────────────────────────
+const REFERENCE = {
+  PT: {
+    title:"Guia de Referencia Pastoral",
+    subtitle:"Recursos para compreender os perfis dos voluntarios",
+    discSection:"Perfis DISC",
+    howToRead:"Como Ler o Perfil",
+    calibTitle:"Calibracao da Avaliacao",
+    calibDesc:"Score acima de 75% indica alta consistencia interna. Scores abaixo de 50% podem indicar inseguranca na auto-avaliacao e requerem conversa pastoral mais aprofundada.",
+    howToReadItems:[
+      "Dom primario (#1): area de maior forca e energia natural da pessoa.",
+      "Dom secundario (#2): complementa e equilibra o perfil.",
+      "Score de calibracao (0-100%): nivel de confianca na auto-avaliacao.",
+      "Estrela amarela: potencial pastoral (alto S + I ou C no perfil DISC).",
+      "Perfil emocional: como a pessoa processa emocoes no servico ministerial."
+    ],
+    types:[
+      {type:"D",name:"Executor",tagline:"Orientado para resultados, iniciativa, desafios",
+        desc:"Direto, decisivo e orientado para resultados. Lidera com energia e assume desafios de frente. No ministerio, e excelente para liderar equipes e projetos de alto impacto.",
+        strengths:["Iniciativa propria","Tomada de decisao rapida","Orientacao a resultados","Capacidade de delegar"],
+        watch:"Pode parecer impaciente ou dominante sem o direcionamento certo.",
+        ministries:["Lideranca de GC","Desenvolvimento de Lideranca","Plantacao de Igrejas"],
+        leadership:"Diretivo: define metas claras e avanca com energia"},
+      {type:"I",name:"Comunicador",tagline:"Entusiasmo, influencia, conexao com pessoas",
+        desc:"Expressivo, entusiasmado e magnetico. Constroi relacionamentos com facilidade e inspira outros. Brilha em acolhimento, pregacao e missoes.",
+        strengths:["Conexao rapida com pessoas","Comunicacao eficaz","Motivacao de equipes","Criatividade"],
+        watch:"Pode ser desorganizado ou comprometer prazos por excesso de ideias.",
+        ministries:["Evangelismo","Hospitalidade","Comunicacao Digital","Louvor"],
+        leadership:"Inspirador: motiva atraves de visao e entusiasmo"},
+      {type:"S",name:"Planejador",tagline:"Estabilidade, cooperacao, consistencia",
+        desc:"Leal, paciente e consistente. Prefere ambientes estaveis e constroi confianca ao longo do tempo. E a espinha dorsal das equipes ministeriais.",
+        strengths:["Lealdade e consistencia","Escuta ativa","Trabalho em equipe","Paciencia"],
+        watch:"Pode ter dificuldade com mudancas rapidas ou situacoes de conflito.",
+        ministries:["Intercessao","Aconselhamento","Lagoinha Kids","Servico de Apoio"],
+        leadership:"Servidor: lidera pelo exemplo e cria ambiente de seguranca"},
+      {type:"C",name:"Analista",tagline:"Precisao, qualidade, pensamento critico",
+        desc:"Analitico, cuidadoso e orientado a qualidade. Pensa antes de agir e valoriza excelencia nos processos. Garante que tudo seja feito com cuidado e integridade.",
+        strengths:["Atencao aos detalhes","Pensamento critico","Etica e integridade","Organizacao"],
+        watch:"Pode ser lento para decidir ou excessivamente critico.",
+        ministries:["Financas","Projecao","Administracao","Ensino e Teologia"],
+        leadership:"Tecnico: define sistemas e garante qualidade"}
+    ]
+  },
+  EN: {
+    title:"Pastoral Reference Guide",
+    subtitle:"Resources for understanding volunteer profiles",
+    discSection:"DISC Profiles",
+    howToRead:"How to Read the Profile",
+    calibTitle:"Assessment Calibration",
+    calibDesc:"A score above 75% indicates high internal consistency. Scores below 50% may indicate self-uncertainty and require a deeper pastoral conversation.",
+    howToReadItems:[
+      "Primary gift (#1): area of greatest strength and natural energy.",
+      "Secondary gift (#2): complements and balances the profile.",
+      "Calibration score (0-100%): confidence level in self-assessment.",
+      "Amber star: pastoral potential (high S + I or C in DISC profile).",
+      "Emotional profile: how the person processes emotions in ministry service."
+    ],
+    types:[
+      {type:"D",name:"Driver",tagline:"Results-oriented, initiative, challenges",
+        desc:"Direct, decisive and results-focused. Leads with energy and takes on challenges head-on. In ministry, excels at leading teams and high-impact projects.",
+        strengths:["Self-starter","Quick decision-making","Results orientation","Delegation"],
+        watch:"Can seem impatient or dominant without proper direction.",
+        ministries:["GC Leadership","Leadership Development","Church Planting"],
+        leadership:"Directive: sets clear goals and advances with energy"},
+      {type:"I",name:"Influencer",tagline:"Enthusiasm, influence, people connection",
+        desc:"Expressive, enthusiastic and magnetic. Builds relationships easily and inspires others. Shines in welcome, outreach and worship.",
+        strengths:["Quick connection with people","Effective communication","Team motivation","Creativity"],
+        watch:"Can be disorganized or miss deadlines due to too many ideas.",
+        ministries:["Evangelism","Hospitality","Digital Communication","Worship"],
+        leadership:"Inspirational: motivates through vision and enthusiasm"},
+      {type:"S",name:"Supporter",tagline:"Stability, cooperation, consistency",
+        desc:"Loyal, patient and consistent. Prefers stable environments and builds trust over time. The backbone of ministry teams.",
+        strengths:["Loyalty and consistency","Active listening","Teamwork","Patience"],
+        watch:"May struggle with rapid change or conflict situations.",
+        ministries:["Intercession","Counseling","Kids Ministry","Support Services"],
+        leadership:"Servant: leads by example and creates a safe environment"},
+      {type:"C",name:"Analyst",tagline:"Precision, quality, critical thinking",
+        desc:"Analytical, careful and quality-oriented. Thinks before acting and values excellence. Ensures things are done with care and integrity.",
+        strengths:["Attention to detail","Critical thinking","Ethics and integrity","Organization"],
+        watch:"Can be slow to decide or overly critical.",
+        ministries:["Finance","Projection","Administration","Teaching and Theology"],
+        leadership:"Technical: defines systems and ensures quality"}
+    ]
+  }
+};
+
+function ReferenceTab({ t, lang }) {
+  const ref = REFERENCE[lang] || REFERENCE.PT;
+  return (
+    <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
+      {/* Header */}
+      <div style={{padding:"24px 28px",borderRadius:14,
+        background:"linear-gradient(90deg,rgba(94,234,212,0.06),transparent)",
+        border:"1px solid rgba(255,255,255,0.04)",borderLeft:"2px solid #5eead4"}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+          textTransform:"uppercase",color:"#5eead4",marginBottom:8}}>LTC Ministry</div>
+        <h2 style={{margin:"0 0 8px",fontFamily:"'Space Grotesk',sans-serif",fontSize:24,fontWeight:700,
+          color:"#e6f1f0",letterSpacing:"-0.01em"}}>{ref.title}</h2>
+        <p style={{margin:0,fontSize:13,color:"#6b7a82"}}>{ref.subtitle}</p>
+      </div>
+
+      {/* How to read + Calibration */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <div className="glass" style={{padding:24,borderRadius:12}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+            textTransform:"uppercase",color:"#5eead4",marginBottom:14}}>{ref.howToRead}</div>
+          <ol style={{margin:0,paddingLeft:18,display:"flex",flexDirection:"column",gap:10}}>
+            {ref.howToReadItems.map(function(item,i){return(
+              <li key={i} style={{fontSize:13,color:"#aebac0",lineHeight:1.6}}>{item}</li>
+            );})}
+          </ol>
+        </div>
+        <div className="glass" style={{padding:24,borderRadius:12}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+            textTransform:"uppercase",color:"#5eead4",marginBottom:14}}>{ref.calibTitle}</div>
+          <p style={{margin:0,fontSize:13,color:"#aebac0",lineHeight:1.7}}>{ref.calibDesc}</p>
+          <div style={{marginTop:16,display:"flex",gap:12}}>
+            {[{label:"75%+",color:"#34d399",desc:lang==="PT"?"Alta consistencia":"High consistency"},
+              {label:"50-74%",color:"#f59e0b",desc:lang==="PT"?"Moderada":"Moderate"},
+              {label:"<50%",color:"#f87171",desc:lang==="PT"?"Requer conversa":"Needs conversation"}
+            ].map(function(item){return(
+              <div key={item.label} style={{flex:1,padding:"10px 12px",borderRadius:8,
+                background:`${item.color}10`,border:`1px solid ${item.color}30`,textAlign:"center"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:700,color:item.color,marginBottom:4}}>{item.label}</div>
+                <div style={{fontSize:10,color:"#6b7a82"}}>{item.desc}</div>
+              </div>
+            );})}
+          </div>
+        </div>
+      </div>
+
+      {/* DISC type cards */}
+      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+        letterSpacing:"0.12em",textTransform:"uppercase",color:"#e6f1f0",marginBottom:4}}>
+        {ref.discSection}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>
+        {ref.types.map(function(tp){
+          const color=DISC_COLORS[tp.type]||"#5eead4";
+          return (
+            <div key={tp.type} className="glass" style={{padding:24,borderRadius:12,
+              borderLeft:`3px solid ${color}`,position:"relative",overflow:"hidden"}}>
+              {/* Top accent */}
+              <div style={{position:"absolute",top:0,left:0,right:0,height:2,
+                background:`linear-gradient(90deg, ${color}, transparent 60%)`,opacity:0.5}}/>
+              {/* Header */}
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:44,height:44,borderRadius:10,flexShrink:0,
+                  background:`${color}18`,border:`1px solid ${color}40`,
+                  display:"grid",placeItems:"center",
+                  fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color}}>
+                  {tp.type}
+                </div>
+                <div>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:17,fontWeight:700,
+                    color:"#e6f1f0",marginBottom:2}}>{tp.name}</div>
+                  <div style={{fontSize:11,color:"#6b7a82"}}>{tp.tagline}</div>
+                </div>
+              </div>
+              {/* Description */}
+              <p style={{margin:"0 0 14px",fontSize:13,color:"#aebac0",lineHeight:1.6}}>{tp.desc}</p>
+              {/* Strengths */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.14em",
+                  textTransform:"uppercase",color:"#6b7a82",marginBottom:7}}>
+                  {lang==="PT"?"Forcas":"Strengths"}
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {tp.strengths.map(function(s){return(
+                    <span key={s} style={{fontSize:11,padding:"3px 9px",borderRadius:6,
+                      background:`${color}0e`,border:`1px solid ${color}25`,color:"#aebac0"}}>{s}</span>
+                  );})}
+                </div>
+              </div>
+              {/* Leadership */}
+              <div style={{marginBottom:12,padding:"10px 12px",borderRadius:8,
+                background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.14em",
+                  textTransform:"uppercase",color:"#6b7a82",marginBottom:5}}>
+                  {lang==="PT"?"Lideranca":"Leadership"}
+                </div>
+                <div style={{fontSize:12.5,color:"#aebac0"}}>{tp.leadership}</div>
+              </div>
+              {/* Watch */}
+              <div style={{padding:"10px 12px",borderRadius:8,
+                background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.15)"}}>
+                <div style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.14em",
+                  textTransform:"uppercase",color:"#f59e0b",marginBottom:5}}>
+                  {lang==="PT"?"Atencao":"Watch out"}
+                </div>
+                <div style={{fontSize:12.5,color:"#fbd590"}}>{tp.watch}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("ltc_token") || null);
@@ -2122,6 +2527,7 @@ export default function App() {
     { id: "people", label: t.people },
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
+    { id: "reference", label: t.reference },
   ];
 
   return (
@@ -2174,6 +2580,7 @@ export default function App() {
         {tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
         {tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} />}
         {tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
+        {tab === "reference" && <ReferenceTab t={t} lang={lang} />}
       </div>
 
       {showSettings && (

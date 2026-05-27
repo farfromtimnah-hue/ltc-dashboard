@@ -511,3 +511,130 @@ None identified. All static UI text now switches correctly with PT/EN toggle. Pr
 - All SVG chart components are still self-contained in `src/App.jsx`
 
 _Last updated: 2026-05-27 — Session 4 complete._
+
+---
+
+## Session 5 — DISC Assessment, Draft/Resume, Dashboard Expansion
+
+### Objective
+Major system expansion across three layers:
+1. **D1 database** — 17 new columns on submissions table
+2. **Cloudflare Worker v5** — POST /draft, GET /resume/:token, expanded POST /submit, analytics
+3. **Assessment app (index.html)** — DISC questions, calibration, preferred name, draft system, Saiba Mais modals
+4. **Dashboard (App.jsx)** — DISC labels on cards, Reference tab, DISC/leadership/emotional analytics
+
+### D1 Schema — new columns added (17 total)
+
+```sql
+preferred_name TEXT
+full_name TEXT
+status TEXT DEFAULT 'complete'
+resume_token TEXT
+calibration_score REAL
+disc_d INTEGER
+disc_i INTEGER
+disc_s INTEGER
+disc_c INTEGER
+disc_primary TEXT
+disc_secondary TEXT
+natural_strength TEXT
+leadership_tendency TEXT
+emotional_profile TEXT
+pairing_labels TEXT    -- JSON array
+ministry_fit TEXT      -- JSON array
+pastoral_flag INTEGER DEFAULT 0
+```
+
+### Worker v5 (deployed as ltc-api v5)
+
+New endpoints:
+- `POST /draft` — saves partial state, returns resume token
+- `GET /resume/:token` — retrieves saved draft by token
+
+Modified endpoints:
+- `POST /submit` — accepts all 17 new fields; updates draft if resume_token present
+- `GET /people` — filters `status='complete' OR status IS NULL` to not break old records
+- `GET /analytics` — added `byDisc`, `byLeadership`, `byEmotional` arrays
+
+New helpers: `num()`, `flt()`, `arr()`, `flag()` to prevent undefined-to-bind D1 issues.
+
+### Assessment app (index.html) changes
+
+#### New questions (59 total)
+- 2 calibration questions (CA1, CA2) — anchor/bias detection
+- 45 original gifting questions
+- 12 DISC questions (3 per dimension D/I/S/C)
+
+#### New screens and flows
+- Preferred name screen (between welcome and assessment)
+- Continue Later button during assessment (saves draft via POST /draft)
+- Resume banner on welcome screen (restores from localStorage token)
+
+#### DISC scoring and derivation
+- `calcCalibration()` — returns 0-1 float from CA1/CA2 answers
+- `calcDisc()` — returns {D,I,S,C} raw scores (3-15 range)
+- `deriveDISC(d,i,s,c)` — returns primary/secondary type, natural_strength, leadership_tendency, emotional_profile, pairing_labels (JSON), ministry_fit (JSON), pastoral_flag
+
+Portuguese DISC names: Executor (D), Comunicador (I), Planejador (S), Analista (C)
+— NEVER use D/I/S/C letters as labels
+
+#### New UI elements
+- Saiba Mais modals on top-3 gift cards
+- Carisma Level 5 confirmation modal
+- DISC profile card in results (discSection div)
+- full_name field in contact form
+
+### Dashboard (App.jsx) changes
+
+#### New constants
+- `DISC_TYPE` — PT and EN name maps (Executor/Comunicador/Planejador/Analista, Driver/Influencer/Supporter/Analyst)
+- `DISC_COLORS` — D:#f87171, I:#f59e0b, S:#34d399, C:#60a5fa
+- `REFERENCE` — bilingual JS constant with DISC type guide, strengths, leadership, watch-outs, calibration guide, how-to-read items
+
+#### PersonCard and PlacedCard
+- Shows `preferred_name || name` as display name
+- DISC type badge (colored, labeled with Portuguese name)
+- Amber ★ badge if `pastoral_flag == 1`
+
+#### PersonPanel
+- Shows `preferred_name || name` in drawer header
+- New DISC Profile section: primary/secondary type badges, natural_strength, leadership_tendency, emotional_profile, ministry_fit tags, pastoral_flag indicator
+- CARISMA_LEVELS expanded to `["1 Ano", "1st Year", "Masters", "Level 5"]`
+
+#### AnalyticsTab
+- DISC distribution panel (horizontal bars with DISC_COLORS)
+- Leadership tendency distribution panel
+- Emotional profile distribution panel
+- All three panels are conditional (only render if API returns data)
+
+#### ReferenceTab
+- New Reference tab in nav
+- DISC type cards (one per D/I/S/C): description, strengths chips, leadership style, watch-out box
+- Calibration score guide (75%+, 50-74%, <50% tiers)
+- How-to-read profile guide (5 bullets)
+
+#### L dictionary additions
+12 new keys in both PT and EN: `discProfile`, `discType`, `naturalStr`, `leadership`, `emotional`, `pairing`, `ministryFit`, `pastoralAlert`, `discDist`, `byLeadership`, `byEmotional`, `reference`
+
+### Critical rules carried forward
+- Portuguese default; English toggle
+- DISC labels: always Executor/Comunicador/Planejador/Analista (never D/I/S/C)
+- No em dashes or en dashes in any user-facing string
+- Visual design frozen: teal #5eead4, dark background, Space Grotesk / JetBrains Mono fonts
+- D1: never pass undefined to bind(); always use null; always JSON.stringify arrays
+- iOS Safari: addEventListener at bottom of body; IIFE closures for dynamic buttons
+- CARISMA_LOGO base64 constant on line 6 of App.jsx — do not touch
+
+### Carisma levels (stored values)
+Old records may have: `"1 Ano"`, `"Masters"`
+New assessment stores: `"1st Year"`, `"Masters"`, `"Level 5"`
+Dashboard toggle buttons support all four values.
+
+### Files committed
+
+| Repo | Commit | Description |
+|---|---|---|
+| ministry-gifting | `3a0fc21` | DISC assessment, draft/resume, preferred name, Saiba Mais modals |
+| ltc-dashboard | `500c1cb` | DISC profiles, Reference tab, analytics panels, person card updates |
+
+_Last updated: 2026-05-27 — Session 5 complete._

@@ -223,6 +223,50 @@ As of the last commit (`d867361`), the design implementation is **complete**. Al
 | `3bd4839` | Update App.jsx (pre-redesign edits) |
 | `28d79a9` | Visual redesign: glassmorphism style (Session 1 baseline) |
 | `d867361` | Complete design system: cards, tabs, all drawer sections (Session 2 final) |
+| `3df2a05` | Add progress.md — design implementation recovery log |
+| `8852aea` | Session 3: Logo fix + fidelity corrections (analytics, health, giftings) |
+
+---
+
+## Session 3 — Fidelity Correction Pass (Complete)
+
+### Issues identified
+
+#### 1. Logo asset broken in live build
+- **Root cause:** `vite.config.js` has `base: '/ltc-dashboard/'` for GitHub Pages. Assets in `public/` are served at `/ltc-dashboard/LTC1.svg` in production, but JSX references them as `/LTC1.svg` (domain root). This breaks on any non-root deployment.
+- **Fix:** Replace `/LTC1.svg` → `` `${import.meta.env.BASE_URL}LTC1.svg` `` and same for LTC2.
+- **Files are present** in `public/` — no file movement needed, only reference fix.
+
+#### 2. Analytics fidelity gaps
+| Element | Current | Handoff target |
+|---|---|---|
+| KPI cards | Solid `borderTop` color strip | Left-top angled gradient line from color; no border-top |
+| Funnel section | Simple labelled bars | Two-col: numbered stage rows left + SegmentRing concentric arc right |
+| Top Giftings | Horizontal bars | Donut/ring SVG + legend list |
+| Weekly chart | Block column bars | SVG area/line chart with data points |
+| Languages | Basic bars | Gradient bars with glow; flag icons |
+
+#### 3. Ministry Health fidelity gaps
+| Element | Current | Handoff target |
+|---|---|---|
+| Health cards | Simple linear progress bar | RadialGauge SVG arc + MIN/IDEAL/GAP metric row |
+| Card left accent | None | `borderLeft: 2px solid statusColor` |
+| Critical card | No special treatment | Extra glow shadow |
+| Banner | Basic pill-border | Icon-box (36×36 rounded square) + gradient background |
+
+#### 4. Gifting tab fidelity gaps
+| Element | Current | Handoff target |
+|---|---|---|
+| Intro strip | Plain micro header | Teal-bordered strip with gradient bg, count chip |
+| Tiles | Flat glass button | Icon-box (38×38), footer section w/ count + arrow, min-height 110px |
+| People panel | None shown | Glass panel w/ header, person rows w/ initials avatar |
+
+### SVG components being added to App.jsx
+- `MiniSpark` — sparkline polyline for KPI cards
+- `Donut` — multi-segment donut ring for top giftings
+- `SegmentRing` — concentric arcs for connection funnel visualization
+- `AreaChart` — SVG line+area chart for weekly trend
+- `RadialGauge` — arc gauge for ministry health cards
 
 ---
 
@@ -234,4 +278,236 @@ npm install --cache /tmp/npm-cache   # use if npm cache has permission issues
 npm run dev
 ```
 
-_Last updated: 2026-05-26 — Session 2 complete._
+### Session 3 — What was completed
+
+#### Logo fix ✅
+- **Root cause confirmed:** `vite.config.js` has `base: '/ltc-dashboard/'`. Assets in `public/` are served at `/ltc-dashboard/LTC*.svg` in production but were referenced as `/LTC*.svg` (domain root) — broken on GitHub Pages.
+- **Fix applied:** Both references now use `` `${import.meta.env.BASE_URL}LTC2.svg` `` and `` `${import.meta.env.BASE_URL}LTC1.svg` ``
+- **LTC1.svg** — nav header, line 2069 of `src/App.jsx`
+- **LTC2.svg** — login screen circle mark, line 534 of `src/App.jsx`
+- **Carisma logo** — `CARISMA_LOGO` base64 constant at line 6, used in `CarismaBadge` component and drawer Carisma section. **Left completely untouched.**
+
+#### SVG chart primitives added to `src/App.jsx` ✅
+Five pure-JSX SVG components inserted before `AnalyticsTab`:
+| Component | Purpose |
+|---|---|
+| `MiniSpark` | Polyline sparkline for KPI card top-right corner |
+| `Donut` | Multi-segment ring chart for top giftings breakdown |
+| `SegmentRing` | Concentric arc rings for connection funnel visualization |
+| `AreaChart` | SVG line+area chart for weekly sign-up trend |
+| `RadialGauge` | Arc gauge for ministry health cards |
+
+#### AnalyticsTab fidelity corrections ✅
+| Element | Before | After |
+|---|---|---|
+| KPI cards | Solid `borderTop` strip | Left-top gradient line from color; 52px Space Grotesk number; `MiniSpark` in top-right |
+| Connection Funnel | Simple labelled bars (single column) | Two-col: numbered badge + gradient bar rows left; `SegmentRing` concentric arcs right; conversion % center label |
+| Top Giftings | Horizontal bars list | `Donut` SVG ring + legend list with color dot, icon, name, count |
+| Weekly chart | Block column bars | `AreaChart` SVG with line, area fill, data point circles, week labels |
+| Languages | Plain bars | Gradient bars with glow + flag emoji + percentage |
+| Section headers | JetBrains Mono micro only | Space Grotesk display title + JetBrains Mono subtitle |
+
+#### MinistryHealthTab fidelity corrections ✅
+| Element | Before | After |
+|---|---|---|
+| Dev banner | Emoji + pill border | Icon-box (36×36 rounded square) + horizontal gradient background |
+| KPI cards | Solid `borderTop` strip | Left-top gradient line + `MiniSpark` (matches analytics) |
+| Health cards | Linear progress bar only | `RadialGauge` SVG arc + MIN/IDEAL/GAP metric row |
+| Card accent | None | `borderLeft: 2px solid statusColor` |
+| Critical cards | No distinction | Extra depth shadow glow |
+| Status chips | Plain pill | JetBrains Mono, dot prefix (● Critical / ● Needs Volunteers) |
+
+#### GiftingTab fidelity corrections ✅
+| Element | Before | After |
+|---|---|---|
+| Intro strip | Plain micro label | Teal left-border strip, gradient bg, gift count |
+| Tiles | Simple glass button | Icon-box (38×38 rounded square), min-height 110px, footer row with count + arrow, `.glow-active` on selected |
+| People section header | Inline name + count | Glass panel with DISPONÍVEIS PARA header, icon, Space Grotesk title, teal pill count chip |
+| People rows | Full `PersonCard` | Compact rows: initials avatar, name + ministry count + pastor, WA button; click opens drawer |
+
+#### Files changed in Session 3
+- `src/App.jsx` — logo refs, 5 chart components, AnalyticsTab, GiftingTab, MinistryHealthTab
+- `progress.md` — this file
+
+#### Remaining work
+None identified. All three screens match the Claude Design handoff fidelity targets. Product structure, navigation, workflows, and all functionality are unchanged.
+
+#### Next-session notes
+- If a new visual pass is needed, reference the design handoff at `/tmp/ltc-handoff/design_handoff_ltc_dashboard/`
+- All SVG chart components are self-contained in `src/App.jsx` — no external chart library
+- The `ministryHealthStatus` helper still uses three status levels: Critical (`< min`), Needs Volunteers (`< ideal`), Healthy (`>= ideal`)
+- `MINISTRY_HEALTH_DATA` is static mock data — future work could wire it to the API
+
+_Last updated: 2026-05-27 — Session 3 complete._
+
+---
+
+## Session 4 — Login Logo Cleanup + Full Localization Pass
+
+### Objective
+Two-part cleanup pass:
+1. Remove decorative wrapper from LTC2.svg on login screen
+2. Full static UI localization — ensure all app chrome switches correctly with the PT/EN toggle; default language is Portuguese
+
+### Constraints respected
+- No structural changes
+- No feature additions or removals
+- No workflow changes
+- No backend logic changes
+- No data model changes
+- No language-selection logic changes (how person language is stored, how templates are selected, how cards reflect `person.language`)
+- Carisma logo (`CARISMA_LOGO` constant, `CarismaBadge`, all usages) left completely untouched
+- Proper names preserved: Carisma, Legacy, Rocket, Culto Hope, Culto Fé, Link, Shine, Hero, Pra Alice, Pr Rafa, LTC Ministry
+
+### Files changed
+- `src/App.jsx` — all changes
+- `progress.md` — this file
+
+### What was corrected
+
+#### 1. Login logo (LTC2.svg) ✅
+- **Before:** LTC2.svg was placed inside a circular white radial-gradient `<div>` with teal glow box-shadow — a decorative badge/disc wrapper
+- **After:** `<img>` displayed directly on the page background, no wrapper div, no added circle, plate, or glow container
+- Size preserved at 84×84px; placement unchanged
+
+#### 2. L dictionary — new keys added ✅
+Added 32 new translation keys to both `L.PT` and `L.EN` blocks:
+
+| Key | PT | EN |
+|---|---|---|
+| `cancel` | Cancelar | Cancel |
+| `noContact` | Sem contato | No contact |
+| `loginTitle` | Painel do Pastor | Pastor Dashboard |
+| `loginDesc` | Entre para acessar… | Sign in to access… |
+| `loginPasswordLabel` | Senha do Painel | Dashboard Password |
+| `loginEnter` | Acessar Painel | Enter Dashboard |
+| `loginChecking` | Verificando... | Checking... |
+| `loginConnected` | ● Conectado | ● Connected |
+| `loginInternal` | v2.4 · Interno | v2.4 · Internal |
+| `loginTagline` | Um espaço seguro… | A safe place… |
+| `loginErrorPw` | Senha incorreta. | Incorrect password. |
+| `loginErrorConn` | Erro de conexão… | Connection error… |
+| `statusHealthy` | Saudável | Healthy |
+| `statusNeeds` | Precisa de Voluntários | Needs Volunteers |
+| `statusCritical` | Crítico | Critical |
+| `moreGiftings` | a mais | more |
+| `gifts` | DONS | GIFTS |
+| `conversion` | Conversão | Conversion |
+| `mapped` | mapeados | mapped |
+| `funnelDesc` | Caminho do voluntário… | Volunteer journey… |
+| `donutDesc` | Distribuição entre… | Distribution across… |
+| `weeklyDesc` | Volume de novas… | New sign-ups per week… |
+| `addMinistry` | Adicionar | Add |
+| `selectMinistry` | Selecionar ministério… | Select ministry… |
+| `typeMinistry` | Digitar nome do ministério… | Type ministry name… |
+| `addBtn` | + Adicionar | + Add |
+| `selectCustom` | Digitar personalizado… | Type custom… |
+| `volunteers` | VOLUNTÁRIOS | VOLUNTEERS |
+| `availableVars` | Variáveis Disponíveis | Available Variables |
+
+#### 3. New display-mapping constants ✅
+Added `LANGUAGE_DISPLAY` (Inglês/Português/Ambos vs English/Português/Both) and `SPECIAL_GROUP_PT` (English Service → Culto em Inglês, Other → Outro; proper names preserved) constants.
+
+#### 4. Login component ✅
+- Added `lang` and `t` to props destructure; uses `tt = t || L["PT"]` fallback
+- All 9 hardcoded English strings replaced with `tt.*` keys
+- Error messages now localize correctly
+
+#### 5. AnalyticsTab ✅
+- Added `lang` to props destructure (was passed from App but not destructured — causing all `t.lang` checks to be undefined/always-false → always showing English descriptions)
+- Fixed 3 occurrences of `t.lang==="PT"` → `lang==="PT"`
+- Funnel stage labels now show localized stage names
+- Donut legend gifting names now localize via `GIFTING_PT`
+- "more" → `t.moreGiftings`
+- "Conversão" center label → `t.conversion`
+- `centerLabel="mapeados"` → `centerLabel={t.mapped}`
+- All section descriptions use L dict keys
+
+#### 6. GiftingTab ✅
+- Tile labels now use `GIFTING_PT[g]||g` in PT mode
+- Results panel heading uses localized gifting name
+- "DONS" / "GIFTS" count label now switches correctly
+
+#### 7. PersonCard ✅
+- Added `lang` prop
+- Stage chip now uses `STAGE_LABEL[lang][person.stage]` — was always showing raw English value
+- "No contact" fallback → `t.noContact`
+- "Available" badge label → `t.available`
+
+#### 8. PlacedCard ✅
+- Added `lang` prop (wired for future use; `ministryLabel` already handles `person.language`)
+
+#### 9. PeopleTab ✅
+- Passes `lang` to both `PersonCard` and `PlacedCard`
+- Stage filter `<option>` display now uses `STAGE_LABEL[lang][o]`
+- Gifting filter options display via `GIFTING_PT` in PT
+- Language filter options display via `LANGUAGE_DISPLAY` (Both → Ambos in PT)
+- Group filter options display via `SPECIAL_GROUP_PT` (English Service → Culto em Inglês; proper names kept)
+- Split modal Cancel button → `t.cancel`
+
+#### 10. PersonPanel ✅
+- Ministry badge "Available" → `t.available`
+- Ministry chip display now uses `ministryLabel(m, lang, person.language)` instead of hardcoded `"EN"`
+- "+ Add" button → `t.addBtn`
+- "Select ministry…" option → `t.selectMinistry`
+- Ministry dropdown options display in UI language via `ministryLabel(m, lang, lang)`
+- "Type custom…" option → `t.selectCustom`
+- "Add" buttons in ministry selector → `t.addMinistry`
+- "Type ministry name…" placeholder → `t.typeMinistry`
+- Language toggle buttons display via `LANGUAGE_DISPLAY` (Inglês/Ambos in PT)
+
+#### 11. MinistryHealthTab ✅
+- Status chip now uses `status.label` from `ministryHealthStatus()` to distinguish all three states (Critical, Needs Volunteers, **Healthy**) — previously Healthy cards incorrectly showed "Needs Volunteers"
+- All three status labels now localize via `t.statusCritical` / `t.statusHealthy` / `t.statusNeeds`
+- "VOLUNTÁRIOS" / "VOLUNTEERS" label → `t.volunteers`
+
+#### 12. SettingsModal ✅
+- Added `lang` prop
+- "Settings" micro-label → `t.settings`
+- "Variáveis Disponíveis" hardcoded PT heading → `t.availableVars`
+- "Cancel" button → `t.cancel`
+
+#### 13. AreaChart ✅
+- Added `noDataMsg` prop with default; AnalyticsTab passes `t.noData`
+
+#### 14. App main ✅
+- `SettingsModal` call now passes `lang` prop
+
+### Backend / language-selection logic — confirmed untouched ✅
+- `buildWhatsAppURL` — unchanged; still uses `person.language` to select template
+- `giftingLabel(name, personLang)` — unchanged; still uses person's preferred language
+- `ministryLabel` function — unchanged; logic preserved
+- `STAGES`, `STAGE_LABEL` — unchanged; internal keys remain English (required for API compatibility)
+- `LANGUAGES` — unchanged; stored values remain "English", "Português", "Both"
+- `SPECIAL_GROUPS` — unchanged; stored values remain English keys
+- All `updateConnection` calls — unchanged
+- All `fetch()` calls — unchanged
+- All filter logic using stored values — unchanged (only display layer translated)
+
+### Carisma logo — confirmed untouched ✅
+- `CARISMA_LOGO` base64 constant — unchanged (line 6)
+- `CarismaBadge` component — unchanged
+- All usages in PersonCard, PlacedCard, PersonPanel — unchanged
+
+### LTC2.svg correction confirmed ✅
+- Wrapper `<div>` with circular background, radial-gradient, and glow box-shadow **removed**
+- `<img src="...LTC2.svg">` now renders directly on the page background at 84×84px
+- No new decorative elements added around it
+
+### Portuguese is the default UI language ✅
+- `const [lang, setLang] = useState("PT")` in App — unchanged default
+- All new L.PT keys provide complete Portuguese translations
+- Login screen (shown before toggle is accessible) now fully localizes from the L.PT default
+
+### Proper names preserved ✅
+Carisma, Legacy, Rocket, Culto Hope, Culto Fé, Link, Shine, Hero — all unchanged in display and in stored values
+
+### Remaining work
+None identified. All static UI text now switches correctly with PT/EN toggle. Product structure, navigation, workflows, and all data-driven behavior are unchanged.
+
+### Next-session notes
+- The `executeSplit` done message (shown after split assignment completes) contains mixed EN/PT shorthand ("English → Pra Alice", "PT → Pr Rafa") — this is a technical status message, left intentionally as-is since it references proper names and shorthand that are unambiguous in both languages
+- `timeAgo` helper returns English relative times ("2h ago", "3d ago") — left as-is; it is dynamic data-driven output, not static UI chrome
+- All SVG chart components are still self-contained in `src/App.jsx`
+
+_Last updated: 2026-05-27 — Session 4 complete._

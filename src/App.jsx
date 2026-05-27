@@ -71,6 +71,16 @@ const STAGE_COLORS = {
   "Placed in Ministry":"#5eead4"
 };
 
+const LANGUAGE_DISPLAY = {
+  PT: { "English":"Inglês", "Português":"Português", "Both":"Ambos" },
+  EN: { "English":"English", "Português":"Português", "Both":"Both" }
+};
+
+const SPECIAL_GROUP_PT = {
+  "Rocket":"Rocket","Link":"Link","Legacy":"Legacy","Shine":"Shine","Hero":"Hero",
+  "Culto Hope":"Culto Hope","Culto Fé":"Culto Fé","English Service":"Culto em Inglês","Other":"Outro"
+};
+
 const PASTOR_SUGGESTIONS = ["Pra Alice","Pr Rafa"];
 
 const MINISTRIES_STARTER = [
@@ -145,6 +155,35 @@ const L = {
     whatsappMsg:"WhatsApp",
     carisma:"Carisma",
     carismaLabel:"Carisma",
+    cancel:"Cancelar",
+    noContact:"Sem contato",
+    loginTitle:"Painel do Pastor",
+    loginDesc:"Entre para acessar os dados ministeriais da Lagoinha Tampa.",
+    loginPasswordLabel:"Senha do Painel",
+    loginEnter:"Acessar Painel",
+    loginChecking:"Verificando...",
+    loginConnected:"● Conectado",
+    loginInternal:"v2.4 · Interno",
+    loginTagline:"Um espaço seguro para pastores acompanharem novos voluntários enquanto descobrem seus dons e encontram seu lar ministerial.",
+    loginErrorPw:"Senha incorreta.",
+    loginErrorConn:"Erro de conexão. Tente novamente.",
+    statusHealthy:"Saudável",
+    statusNeeds:"Precisa de Voluntários",
+    statusCritical:"Crítico",
+    moreGiftings:"a mais",
+    gifts:"DONS",
+    conversion:"Conversão",
+    mapped:"mapeados",
+    funnelDesc:"Caminho do voluntário desde inscrição até colocação ministerial",
+    donutDesc:"Distribuição entre voluntários ativos",
+    weeklyDesc:"Volume de novas inscrições por semana",
+    addMinistry:"Adicionar",
+    selectMinistry:"Selecionar ministério…",
+    typeMinistry:"Digitar nome do ministério…",
+    addBtn:"+ Adicionar",
+    selectCustom:"Digitar personalizado…",
+    volunteers:"VOLUNTÁRIOS",
+    availableVars:"Variáveis Disponíveis",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -176,6 +215,35 @@ const L = {
     whatsappMsg:"WhatsApp",
     carisma:"Carisma",
     carismaLabel:"Carisma",
+    cancel:"Cancel",
+    noContact:"No contact",
+    loginTitle:"Pastor Dashboard",
+    loginDesc:"Sign in to access ministry insights for Lagoinha Tampa.",
+    loginPasswordLabel:"Dashboard Password",
+    loginEnter:"Enter Dashboard",
+    loginChecking:"Checking...",
+    loginConnected:"● Connected",
+    loginInternal:"v2.4 · Internal",
+    loginTagline:"A safe place for pastors to walk alongside new volunteers as they discover their gifts and find a ministry home.",
+    loginErrorPw:"Incorrect password.",
+    loginErrorConn:"Connection error. Try again.",
+    statusHealthy:"Healthy",
+    statusNeeds:"Needs Volunteers",
+    statusCritical:"Critical",
+    moreGiftings:"more",
+    gifts:"GIFTS",
+    conversion:"Conversion",
+    mapped:"mapped",
+    funnelDesc:"Volunteer journey from sign-up to ministry placement",
+    donutDesc:"Distribution across active volunteers",
+    weeklyDesc:"New sign-ups per week — last 10 weeks",
+    addMinistry:"Add",
+    selectMinistry:"Select ministry…",
+    typeMinistry:"Type ministry name…",
+    addBtn:"+ Add",
+    selectCustom:"Type custom…",
+    volunteers:"VOLUNTEERS",
+    availableVars:"Available Variables",
   }
 };
 
@@ -421,7 +489,7 @@ function CarismaBadge({ levels }) {
 }
 
 // ─── SETTINGS MODAL ───────────────────────────────────────────────
-function SettingsModal({ token, t, onClose, onSaved }) {
+function SettingsModal({ token, t, onClose, onSaved, lang }) {
   const [templatePT, setTemplatePT] = useState("");
   const [templateEN, setTemplateEN] = useState("");
   const [saving, setSaving] = useState(false);
@@ -461,7 +529,7 @@ function SettingsModal({ token, t, onClose, onSaved }) {
         <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg, transparent, #5eead4, transparent)",opacity:0.6,boxShadow:"0 0 16px #5eead4"}} />
         <div style={{padding:"24px 32px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>Settings</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>{t.settings}</div>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color:"#e6f1f0",letterSpacing:"-0.01em"}}>{t.settingsTitle}</div>
           </div>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,color:"#6b7a82",fontSize:14,cursor:"pointer",width:32,height:32,display:"grid",placeItems:"center"}}>✕</button>
@@ -471,7 +539,7 @@ function SettingsModal({ token, t, onClose, onSaved }) {
           <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10}}>
             <span style={{fontSize:20,flexShrink:0}}>✨</span>
             <div>
-              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>Variáveis Disponíveis</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>{t.availableVars}</div>
               <div style={{fontSize:13,color:"#aebac0",display:"flex",gap:8,flexWrap:"wrap"}}>
                 {["{{name}}","{{gifting}}"].map(v=>(
                   <code key={v} style={{padding:"3px 8px",borderRadius:5,background:"rgba(94,234,212,0.08)",border:"1px solid rgba(94,234,212,0.15)",color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{v}</code>
@@ -492,7 +560,7 @@ function SettingsModal({ token, t, onClose, onSaved }) {
         </div>
         <div style={{padding:"18px 32px",borderTop:"1px solid rgba(255,255,255,0.04)",background:"rgba(0,0,0,0.2)",display:"flex",justifyContent:"flex-end",gap:10,alignItems:"center",borderRadius:"0 0 16px 16px"}}>
           {saved && <span style={{fontSize:13,color:"#34d399",marginRight:8}}>{t.settingsSaved}</span>}
-          <button onClick={onClose} className="btn-ghost" style={{padding:"9px 20px"}}>Cancel</button>
+          <button onClick={onClose} className="btn-ghost" style={{padding:"9px 20px"}}>{t.cancel}</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary" style={{padding:"9px 24px"}}>
             {saving ? "..." : t.saveSettings}
           </button>
@@ -503,7 +571,8 @@ function SettingsModal({ token, t, onClose, onSaved }) {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────
-function Login({ onLogin }) {
+function Login({ onLogin, lang, t }) {
+  const tt = t || L["PT"];
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -518,8 +587,8 @@ function Login({ onLogin }) {
       });
       const d = await r.json();
       if (d.success) { onLogin(pw); }
-      else { setError("Incorrect password."); }
-    } catch { setError("Connection error. Try again."); }
+      else { setError(tt.loginErrorPw); }
+    } catch { setError(tt.loginErrorConn); }
     setLoading(false);
   }
 
@@ -529,10 +598,8 @@ function Login({ onLogin }) {
       {/* Backdrop glow halo behind logo */}
       <div style={{position:"absolute",top:"24%",left:"50%",transform:"translateX(-50%)",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle, rgba(94,234,212,0.08), transparent 70%)",pointerEvents:"none"}} />
       <div style={{width:440,maxWidth:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:36,position:"relative"}}>
-        {/* LTC2 circle mark */}
-        <div style={{width:84,height:84,borderRadius:"50%",background:"radial-gradient(circle at 30% 30%, #f5fefb, #d4f5ed 60%, #b8e8df 100%)",display:"grid",placeItems:"center",boxShadow:"0 0 40px rgba(94,234,212,0.45), 0 0 0 1px rgba(94,234,212,0.4), inset 0 -4px 12px rgba(13,148,136,0.15)",flexShrink:0}}>
-          <img src={`${import.meta.env.BASE_URL}LTC2.svg`} alt="LTC" style={{width:60,height:60,objectFit:"contain"}} />
-        </div>
+        {/* LTC2 circle mark — displayed directly on background, no wrapper */}
+        <img src={`${import.meta.env.BASE_URL}LTC2.svg`} alt="LTC" style={{width:84,height:84,objectFit:"contain",flexShrink:0}} />
         {/* Card */}
         <div className="glass" style={{width:"100%",padding:36,borderRadius:20,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(94,234,212,0.08) inset",position:"relative"}}>
           {/* Top accent line */}
@@ -540,15 +607,15 @@ function Login({ onLogin }) {
           <div style={{marginBottom:28}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:10}}>LTC Ministry</div>
             <h1 style={{margin:0,fontSize:30,fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,letterSpacing:"-0.01em",color:"#e6f1f0"}}>
-              Pastor Dashboard
+              {tt.loginTitle}
             </h1>
             <p style={{margin:"10px 0 0",color:"#6b7a82",fontSize:13.5}}>
-              Sign in to access ministry insights for Lagoinha Tampa.
+              {tt.loginDesc}
             </p>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:18}}>
             <div>
-              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>Dashboard Password</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>{tt.loginPasswordLabel}</div>
               <div style={{position:"relative"}}>
                 <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:"#6b7a82",pointerEvents:"none",fontSize:14}}>🔒</div>
                 <input
@@ -562,16 +629,16 @@ function Login({ onLogin }) {
             {error && <div style={{color:"#f87171",fontSize:13}}>{error}</div>}
             <button onClick={handleLogin} disabled={loading} className="btn-primary"
               style={{height:46,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginTop:6}}>
-              {loading ? "Checking..." : "Enter Dashboard"} {!loading && <span style={{fontSize:14}}>→</span>}
+              {loading ? tt.loginChecking : tt.loginEnter} {!loading && <span style={{fontSize:14}}>→</span>}
             </button>
           </div>
           <div style={{marginTop:24,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#475a64"}}>
-            <span style={{fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.18em",textTransform:"uppercase",fontSize:"10.5px"}}>v2.4 · Internal</span>
-            <span style={{fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.18em",textTransform:"uppercase",fontSize:"10.5px",color:"#5eead4",opacity:0.7}}>● Connected</span>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.18em",textTransform:"uppercase",fontSize:"10.5px"}}>{tt.loginInternal}</span>
+            <span style={{fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.18em",textTransform:"uppercase",fontSize:"10.5px",color:"#5eead4",opacity:0.7}}>{tt.loginConnected}</span>
           </div>
         </div>
         <p style={{fontSize:11.5,color:"#475a64",textAlign:"center",maxWidth:320,lineHeight:1.6}}>
-          A safe place for pastors to walk alongside new volunteers as they discover their gifts and find a ministry home.
+          {tt.loginTagline}
         </p>
       </div>
     </div>
@@ -659,8 +726,8 @@ function SegmentRing({ stages, size=260 }) {
   );
 }
 
-function AreaChart({ data, height=160 }) {
-  if (!data || data.length < 2) return <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"20px 0"}}>No data yet</div>;
+function AreaChart({ data, height=160, noDataMsg="No data yet" }) {
+  if (!data || data.length < 2) return <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"20px 0"}}>{noDataMsg}</div>;
   const W=600, max=Math.max(...data.map(d=>d.count),1);
   const stepX = W/(data.length-1);
   const pts = data.map((d,i)=>[i*stepX, height-(d.count/max)*(height-30)-8]);
@@ -718,7 +785,7 @@ function RadialGauge({ value, max, color="#5eead4", size=84, thickness=6 }) {
 }
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────
-function AnalyticsTab({ token, t }) {
+function AnalyticsTab({ token, t, lang }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -793,9 +860,7 @@ function AnalyticsTab({ token, t }) {
             {t.pipeline}
           </div>
           <p style={{margin:0,fontSize:12,color:"#6b7a82"}}>
-            {t.lang==="PT"
-              ? "Caminho do voluntário desde inscrição até colocação ministerial"
-              : "Volunteer journey from sign-up to ministry placement"}
+            {t.funnelDesc}
           </p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
@@ -814,7 +879,7 @@ function AnalyticsTab({ token, t }) {
                   </div>
                   <div style={{flex:1}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <span style={{fontSize:12.5,color:"#aebac0"}}>{stage}</span>
+                      <span style={{fontSize:12.5,color:"#aebac0"}}>{(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[stage]||stage}</span>
                       <span style={{fontSize:13,fontWeight:600,fontFamily:"'JetBrains Mono',monospace",color}}>
                         {count}
                         <span style={{color:"#475a64",fontWeight:400,fontSize:11,marginLeft:5}}>/ {total}</span>
@@ -846,7 +911,7 @@ function AnalyticsTab({ token, t }) {
               transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9px",
                 letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4}}>
-                Conversão
+                {t.conversion}
               </div>
               <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,
                 fontSize:38,color:"#5eead4",lineHeight:1}}>
@@ -870,13 +935,13 @@ function AnalyticsTab({ token, t }) {
             {t.topGiftings}
           </div>
           <p style={{margin:"0 0 22px",fontSize:12,color:"#6b7a82"}}>
-            {t.lang==="PT" ? "Distribuição entre voluntários ativos" : "Distribution across active volunteers"}
+            {t.donutDesc}
           </p>
           <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:28,alignItems:"center"}}>
             <Donut
               size={180} strokeWidth={18}
               centerValue={String(data.total||0)}
-              centerLabel="mapeados"
+              centerLabel={t.mapped}
               data={(data.byGifting||[]).slice(0,6).map((g,i)=>({
                 value:g.count,
                 color:donutColors[i]||"#5eead4"
@@ -889,13 +954,13 @@ function AnalyticsTab({ token, t }) {
                     background:donutColors[i]||"#5eead4",
                     boxShadow:`0 0 8px ${donutColors[i]||"#5eead4"}`}}/>
                   <span style={{fontSize:16,flexShrink:0}}>{GIFTING_ICONS[gifting]||"◆"}</span>
-                  <span style={{flex:1,fontSize:12.5,color:"#aebac0",lineHeight:1.3}}>{gifting}</span>
+                  <span style={{flex:1,fontSize:12.5,color:"#aebac0",lineHeight:1.3}}>{lang==="PT" ? GIFTING_PT[gifting]||gifting : gifting}</span>
                   <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{count}</span>
                 </div>
               ))}
               {(data.byGifting||[]).length > 6 && (
                 <div style={{fontSize:11,color:"#475a64",fontFamily:"'JetBrains Mono',monospace",paddingTop:4,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                  +{(data.byGifting||[]).length - 6} more
+                  +{(data.byGifting||[]).length - 6} {t.moreGiftings}
                 </div>
               )}
             </div>
@@ -944,13 +1009,11 @@ function AnalyticsTab({ token, t }) {
               {t.weeklySub}
             </div>
             <p style={{margin:0,fontSize:12,color:"#6b7a82"}}>
-              {t.lang==="PT"
-                ? "Volume de novas inscrições por semana"
-                : "New sign-ups per week — last 10 weeks"}
+              {t.weeklyDesc}
             </p>
           </div>
         </div>
-        <AreaChart data={(data.byWeek||[]).slice(-10)} height={160}/>
+        <AreaChart data={(data.byWeek||[]).slice(-10)} height={160} noDataMsg={t.noData}/>
       </div>
 
     </div>
@@ -958,7 +1021,7 @@ function AnalyticsTab({ token, t }) {
 }
 
 // ─── PERSON CARD ──────────────────────────────────────────────────
-function PersonCard({ person, onClick, templatePT, templateEN, t }) {
+function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
   const ministries = parseJSON(person.current_ministries);
   const groups = parseJSON(person.special_groups);
   const langs = parseJSON(person.languages_spoken);
@@ -985,12 +1048,12 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
               <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.name}</span>
               <CarismaBadge levels={carisma} />
             </div>
-            <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || "No contact"}</div>
+            <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || t.noContact}</div>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-          <span style={{fontSize:11,padding:"3px 9px",background:`${stageColor}1a`,color:stageColor,borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${stageColor}33`}}>{person.stage||"New"}</span>
-          <span style={{fontSize:11,padding:"3px 9px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:`1px solid ${badge.color}33`}}>{badge.label}</span>
+          <span style={{fontSize:11,padding:"3px 9px",background:`${stageColor}1a`,color:stageColor,borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${stageColor}33`}}>{(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[person.stage||"New"]||person.stage||"New"}</span>
+          <span style={{fontSize:11,padding:"3px 9px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:`1px solid ${badge.color}33`}}>{badge.label==="Available"?t.available:badge.label}</span>
         </div>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
@@ -1025,7 +1088,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t }) {
 }
 
 // ─── PLACED CARD (Victory View) ───────────────────────────────────
-function PlacedCard({ person, onClick, templatePT, templateEN, t }) {
+function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
   const ministries = parseJSON(person.current_ministries);
   const carisma = parseCarisma(person.carisma_completed);
   // FIX: PlacedCard opens empty chat — no template pre-fill (skipTemplate = true)
@@ -1264,34 +1327,34 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>{t.currentMin}</div>
-              <span style={{fontSize:11,padding:"4px 10px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:`1px solid ${badge.color}44`}}>{badge.label}</span>
+              <span style={{fontSize:11,padding:"4px 10px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:`1px solid ${badge.color}44`}}>{badge.label==="Available"?t.available:badge.label}</span>
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
               {ministries.map(m=>(
                 <span key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,padding:"6px 11px",background:"rgba(94,234,212,0.08)",color:"#c5f5ec",borderRadius:8,border:"1px solid rgba(94,234,212,0.22)"}}>
-                  {ministryLabel(m, "EN", person.language)}
+                  {ministryLabel(m, lang, person.language)}
                   <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#5eead4",cursor:"pointer",fontSize:14,lineHeight:1,padding:0,opacity:0.7}}>×</button>
                 </span>
               ))}
-              <button onClick={()=>setShowMinistryInput(true)} style={{fontSize:12,padding:"6px 11px",background:"rgba(255,255,255,0.02)",color:"#6b7a82",border:"1px dashed rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer"}}>+ Add</button>
+              <button onClick={()=>setShowMinistryInput(true)} style={{fontSize:12,padding:"6px 11px",background:"rgba(255,255,255,0.02)",color:"#6b7a82",border:"1px dashed rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer"}}>{t.addBtn}</button>
             </div>
             {showMinistryInput && (
               <div style={{display:"flex",gap:8}}>
                 <select value={newMinistry} onChange={e=>setNewMinistry(e.target.value)} style={{flex:1}}>
-                  <option value="">Select ministry…</option>
-                  {MINISTRIES_STARTER.filter(m=>!ministries.includes(m)).map(m=><option key={m} value={m}>{m}</option>)}
-                  <option value="__custom">Type custom…</option>
+                  <option value="">{t.selectMinistry}</option>
+                  {MINISTRIES_STARTER.filter(m=>!ministries.includes(m)).map(m=><option key={m} value={m}>{ministryLabel(m, lang, lang)}</option>)}
+                  <option value="__custom">{t.selectCustom}</option>
                 </select>
-                <button onClick={()=>newMinistry==="__custom"?setShowMinistryInput("custom"):addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>Add</button>
+                <button onClick={()=>newMinistry==="__custom"?setShowMinistryInput("custom"):addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>{t.addMinistry}</button>
                 <button onClick={()=>{setShowMinistryInput(false);setNewMinistry("");}} className="btn-ghost" style={{padding:"8px 12px"}}>✕</button>
               </div>
             )}
             {showMinistryInput === "custom" && (
               <div style={{display:"flex",gap:8,marginTop:8}}>
-                <input placeholder="Type ministry name…" value={newMinistry==="__custom"?"":newMinistry}
+                <input placeholder={t.typeMinistry} value={newMinistry==="__custom"?"":newMinistry}
                   onChange={e=>setNewMinistry(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&addMinistry(newMinistry)}/>
-                <button onClick={()=>addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>Add</button>
+                <button onClick={()=>addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>{t.addMinistry}</button>
               </div>
             )}
           </div>
@@ -1342,7 +1405,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     color:langs.includes(l)?"#5eead4":"#aebac0",
                     fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
                     boxShadow:langs.includes(l)?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
-                  {l}
+                  {(LANGUAGE_DISPLAY[lang]||LANGUAGE_DISPLAY.EN)[l]||l}
                 </button>
               ))}
             </div>
@@ -1568,17 +1631,21 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
           style={{padding:"9px 14px"}}/>
         {view === "active" && (
           <select value={filterStage} onChange={e=>setFilterStage(e.target.value)} style={{padding:"9px 12px"}}>
-            {["All",...activeStages].map(o=><option key={o} value={o}>{o==="All"?t.allStages:o}</option>)}
+            {["All",...activeStages].map(o=><option key={o} value={o}>{o==="All"?t.allStages:(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[o]||o}</option>)}
           </select>
         )}
         {[
-          {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS]},
-          {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES]},
-          {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS]},
-          {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:pastorOptions},
-        ].map(({label,val,set,opts})=>(
+          {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS],
+            disp:o=>lang==="PT"?GIFTING_PT[o]||o:o},
+          {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES],
+            disp:o=>(LANGUAGE_DISPLAY[lang]||LANGUAGE_DISPLAY.EN)[o]||o},
+          {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS],
+            disp:o=>lang==="PT"?SPECIAL_GROUP_PT[o]||o:o},
+          {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:pastorOptions,
+            disp:o=>o},
+        ].map(({label,val,set,opts,disp})=>(
           <select key={label} value={val} onChange={e=>set(e.target.value)} style={{padding:"9px 12px"}}>
-            {opts.map(o=><option key={o} value={o}>{o==="All"?label:o}</option>)}
+            {opts.map(o=><option key={o} value={o}>{o==="All"?label:disp(o)}</option>)}
           </select>
         ))}
       </div>
@@ -1633,7 +1700,7 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
             </button>
             <button onClick={()=>setShowSplit(false)}
               className="btn-ghost" style={{padding:"9px 16px"}}>
-              {lang==="PT"?"Cancelar":"Cancel"}
+              {t.cancel}
             </button>
           </div>
           {splitDone && <div style={{marginTop:12,fontSize:12,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace"}}>{splitDone}</div>}
@@ -1643,10 +1710,10 @@ function PeopleTab({ token, t, lang, templatePT, templateEN }) {
       {/* Cards grid */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
         {view === "active" && filtered.map(p => (
-          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
+          <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} lang={lang} />
         ))}
         {view === "placed" && filtered.map(p => (
-          <PlacedCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} />
+          <PlacedCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} lang={lang} />
         ))}
         {filtered.length === 0 && (
           <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>
@@ -1703,7 +1770,7 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#6b7a82"}}>
-            {GIFTINGS.length} DONS
+            {GIFTINGS.length} {lang==="PT" ? "DONS" : "GIFTS"}
           </span>
         </div>
       </div>
@@ -1732,7 +1799,7 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
                   {GIFTING_ICONS[g]||"◆"}
                 </div>
                 <span style={{fontSize:13.5,color:"#e6f1f0",fontWeight:500,lineHeight:1.3,flex:1}}>
-                  {g}
+                  {lang==="PT" ? GIFTING_PT[g]||g : g}
                 </span>
               </div>
               {/* Footer */}
@@ -1764,7 +1831,7 @@ function GiftingTab({ token, t, lang, templatePT, templateEN }) {
                 <span style={{fontSize:24}}>{GIFTING_ICONS[selectedGifting]||"◆"}</span>
                 <h2 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,
                   color:"#e6f1f0",letterSpacing:"-0.01em"}}>
-                  {selectedGifting}
+                  {lang==="PT" ? GIFTING_PT[selectedGifting]||selectedGifting : selectedGifting}
                 </h2>
                 {!loading && (
                   <span style={{fontSize:11,padding:"4px 10px",borderRadius:999,
@@ -1961,7 +2028,7 @@ function MinistryHealthTab({ t, lang }) {
                 <span style={{fontSize:9.5,padding:"3px 9px",background:status.bg,color:status.color,
                   borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${status.color}33`,
                   fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>
-                  ● {isCritical ? (lang==="PT"?"Crítico":"Critical") : (lang==="PT"?"Precisa de Voluntários":"Needs Volunteers")}
+                  ● {status.label==="Critical" ? t.statusCritical : status.label==="Healthy" ? t.statusHealthy : t.statusNeeds}
                 </span>
               </div>
               <div style={{fontSize:11.5,color:"#6b7a82",marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
@@ -1977,7 +2044,7 @@ function MinistryHealthTab({ t, lang }) {
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9.5px",
                         letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82"}}>
-                        {lang==="PT"?"VOLUNTÁRIOS":"VOLUNTEERS"}
+                        {t.volunteers}
                       </span>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#aebac0"}}>
                         <span style={{color:status.color}}>{m.current}</span> / {m.ideal}
@@ -2113,6 +2180,7 @@ export default function App() {
         <SettingsModal
           token={token}
           t={t}
+          lang={lang}
           onClose={() => setShowSettings(false)}
           onSaved={d => { setTemplatePT(d.whatsapp_template_pt); setTemplateEN(d.whatsapp_template_en); }}
         />

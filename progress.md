@@ -636,5 +636,64 @@ Dashboard toggle buttons support all four values.
 |---|---|---|
 | ministry-gifting | `3a0fc21` | DISC assessment, draft/resume, preferred name, Saiba Mais modals |
 | ltc-dashboard | `500c1cb` | DISC profiles, Reference tab, analytics panels, person card updates |
+| ltc-dashboard | `445d665` | Session 6: PersonCard expansion, full Reference tab, analytics |
 
-_Last updated: 2026-05-27 — Session 5 complete._
+---
+
+## Session 6 — Comprehensive Dashboard Correction (4-Section Prompt)
+
+### Section 1 — PersonCard New Data Fields
+- Added `onNavigate(tabId, anchor)` prop wired from App through PeopleTab to PersonCard
+- Collapsible gifting score bars (toggle: "Ver todos os dons" / "Ocultar dons")
+- DISC primary badge (colored) + secondary badge (dimmer) — hide if null
+- Natural Strength row with PT/EN translation via `NATURAL_STRENGTH_MAP` — hide if null
+- Leadership Tendency row + amber dot indicator if `pastoral_flag==1` — hide if null
+- Emotional Profile row with PT/EN translation via `EMOTIONAL_MAP` — hide if null
+- Pairing Labels row (up to 2 tags + overflow count) — hide if null/empty
+- Ministry Fit italic muted text — hide if null
+- All tags clickable → `onNavigate("reference", anchorId)` scrolls Reference tab
+
+### Section 2 — Analytics Tab Improvements
+- `langSplit` label fixed: PT → "Idioma Preferido", EN → "Preferred Language"
+- DISC Distribution section now always visible (placeholder if no data) + shows % + cultural note
+- Leadership Tendencies section always visible with placeholder text
+- Emotional Profiles section always visible with placeholder text
+- Natural Strengths section added (new) with placeholder text
+- Worker v6: `/analytics` endpoint adds `byNatural` query (GROUP BY natural_strength)
+
+### Section 3 — Reference Tab Full Content
+- Full `REFERENCE_CONTENT` constant (168KB, 576 lines) with verbatim body text:
+  - 15 Ministry Giftings with full bodyPT + bodyEN
+  - 4 DISC Profiles with Brazilian/American/Cultural subsections (3-tab expanded view)
+  - 4 Natural Strengths with full body text
+  - 4 Leadership Tendencies with full body text + optional pastoral notes
+  - 4 Emotional Profiles with full body text + optional pastoral notes
+  - 20 Gifting+DISC Pairings with full body text
+  - Team Building Guidance (building-healthy-teams)
+  - 11 Footnotes
+- New `RefCard` expandable component (collapsed = name+summary, expanded = full body)
+- DISC cards show 3-tab subsection selector (Brazilian/American/Cultural)
+- Pastoral notes rendered with amber left border
+- `ReferenceTab` accepts `anchor` prop + `onAnchorConsumed` — scrolls to `id="anchor-{anchorId}"` when navigated from PersonCard tags
+- Old REFERENCE constant replaced; all content now in REFERENCE_CONTENT
+
+### Section 4 — Previously Pending
+- PlacedCard WA button: confirmed working with `skipTemplate=true` (opens empty chat)
+- langSplit labels corrected (included in Section 2 above)
+
+### New Module-Level Constants Added
+- `GIFTING_TO_ANCHOR` — maps gifting name to anchorId
+- `SHORT_TO_FULL` — moved to module level (was local to PersonPanel)
+- `NATURAL_STRENGTH_MAP` — PT/EN/anchor lookup
+- `LEADERSHIP_MAP` — PT/EN/anchor lookup
+- `EMOTIONAL_MAP` — PT/EN/anchor lookup
+- `DISC_TO_ANCHOR` — maps D/I/S/C letter to DISC anchorId
+
+### Output Files
+- `/tmp/App-session6.txt` — full App.jsx (~3700 lines)
+- `/tmp/worker-v6.txt` — Cloudflare Worker v6
+
+### Commits
+- `445d665` — ltc-dashboard App.jsx + Worker v6
+
+_Last updated: 2026-05-27 — Session 6 complete._

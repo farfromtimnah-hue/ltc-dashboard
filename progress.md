@@ -697,3 +697,66 @@ Dashboard toggle buttons support all four values.
 - `445d665` — ltc-dashboard App.jsx + Worker v6
 
 _Last updated: 2026-05-27 — Session 6 complete._
+
+---
+
+## Session 7 — Reference Tab Crash Fix + PersonCard Preferred Name
+
+### Objective
+Three targeted fixes:
+1. Reference tab white-page crash (168KB inline JS constant)
+2. PersonCard preferred name display  
+3. Verification of previously pending items
+
+### FIX 1 — Reference Tab Crash (resolved)
+
+**Root cause:** `REFERENCE_CONTENT` was a 168KB inline JS constant in App.jsx causing parse/runtime crash. Additionally, `ReferenceTab` still referenced `REFERENCE` (the old Session 5 constant, which no longer existed).
+
+**Fix:**
+- Created `public/reference-content.json` (168KB) via Node.js extraction from `/tmp/reference_content.js`
+- Removed entire REFERENCE_CONTENT constant from App.jsx (576 lines)
+- Added `React` as default import to support class component
+- Added `RefErrorBoundary` class component before RefCard:
+  - Catches any render error inside ReferenceTab
+  - PT: "Algo deu errado nesta pagina" / EN: "Something went wrong on this page"
+  - Back button navigates to People tab
+  - PT: "Voltar ao painel" / EN: "Back to dashboard"
+- Rewrote `ReferenceTab` completely:
+  - Always-visible back button at top (teal style, navigates to People tab)
+  - `fetch(import.meta.env.BASE_URL + "reference-content.json")` on mount
+  - Loading state: shows 8 collapsed placeholder section headings at 45% opacity
+  - Loading text: PT "Carregando guia de referencia..." / EN "Loading reference guide..."
+  - Error state: PT "Nao foi possivel carregar o conteudo. Tente novamente." / EN "Could not load content. Please try again."
+  - Error state includes retry button
+  - Once loaded: renders all 8 sections with RefCard components
+- `RefCard` component kept unchanged (was already correct)
+- App render: ReferenceTab wrapped in `<RefErrorBoundary>` with `onBack` prop
+
+**Build result:** 424 kB → 262 kB (gzip: 127 kB → 73 kB)
+
+### FIX 2 — PersonCard Preferred Name Display
+
+**Change:** When `preferred_name` exists AND differs from `name`:
+- Primary name (existing style): `person.preferred_name`
+- Secondary text added below name row: PT "Nome completo: {name}" / EN "Full name: {name}" in muted JetBrains Mono
+- If `preferred_name` is null or equals `name`: display unchanged
+
+**Note:** PersonCard profile fields (DISC row, Natural Strength, Leadership, Emotional Profile, Pairing Labels, Ministry Fit, collapsible gifting bars) were already correctly implemented in Session 6. They should now display properly since the crash-causing REFERENCE_CONTENT constant has been removed.
+
+### FIX 3 — Verification (both confirmed already in place)
+
+- PlacedCard WA: `buildWhatsAppURL(..., true)` → `https://wa.me/{phone}` (no `?text=`)
+- `langSplit` label: PT "Idioma Preferido" / EN "Preferred Language"
+
+### Files changed
+- `src/App.jsx` — import, REFERENCE_CONTENT removal, ErrorBoundary, new ReferenceTab, PersonCard preferred name
+- `public/reference-content.json` — new file (168KB), 15 giftings, 4 DISC profiles, 4 natural strengths, 4 leadership tendencies, 4 emotional profiles, 20 pairings, team building, 11 footnotes
+
+### Output files
+- `/tmp/App-session7.txt` — full App.jsx
+- `/tmp/reference-content.json` — full JSON data file
+
+### Commits
+- `c057869` — Session 7 fixes
+
+_Last updated: 2026-05-28 — Session 7 complete._

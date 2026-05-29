@@ -760,3 +760,192 @@ Three targeted fixes:
 - `c057869` — Session 7 fixes
 
 _Last updated: 2026-05-28 — Session 7 complete._
+
+---
+
+## Session 8 — Assessment App: Five UX Fixes
+
+[see below for Session 8 notes — in assessment app repo only]
+
+---
+
+## Session 9 — Bug Fix Pass: Labels, Card Layout, Reference Tab
+
+### Files Modified
+- `src/App.jsx` — PersonCard cleanup, PersonPanel improvements, new lookup constants
+- `public/reference-content.json` — brazilEN DISC content, footnoteCitations, paragraph breaks
+- Assessment app: `/Users/nicolel/ministry-gifting/index.html` — deriveDISC canonical values
+
+### Bug 9 + Bug 6 (index.html) — Fixed source of wrong stored values + pairing logic
+
+**Root cause:** `deriveDISC` was storing Portuguese strings to D1 instead of canonical English values.
+
+**New lookup tables in index.html:**
+- `DISC_NATURAL_STR`: D=Mobilizer, I=Connector, S=Sustainer, C=Architect
+- `DISC_LEADERSHIP`: D=Visionary Leader, I=Relational Leader, S=Structural Leader, C=Supporting Influencer (primary-only, no combo logic)
+- `DISC_EMOTIONAL`: D=Driven Processor, I=Expressive Processor, S=Steady Carrier, C=Analytical Processor (primary-only)
+- `DISC_MINISTRY_FIT`: D/I/S/S_prophetic/C each stores a single canonical English string
+- `DISC_PAIRING`: Replaced DISC-type pairs with 28-rule gifting+DISC combination array
+
+**deriveDISC updated to:**
+- Accept `g1, g2, g3` (top gifting names) for pairing + ministry_fit logic
+- Store canonical English values for `natural_strength`, `leadership_tendency`, `emotional_profile`
+- Store canonical English string (not JSON array) for `ministry_fit`
+- Pairing logic checks both `disc_primary` AND `disc_secondary` against each rule
+- S type with Intercession or Discernment and Prophetic in top 3 giftings gets prophetic ministry_fit
+
+**handleSubmit updated:**
+- Passes `g1, g2, g3` to `deriveDISC`
+- Sends `ministry_fit` as plain string (was JSON.parse of array)
+
+### Bug 1 (App.jsx) — Translation lookups now work
+
+The existing `NATURAL_STRENGTH_MAP`, `LEADERSHIP_MAP`, `EMOTIONAL_MAP` constants already had the correct canonical EN keys. After Bug 9 fix, stored values will now match and Analytics + PersonPanel will translate correctly.
+
+### Bug 2 (App.jsx) — Ministry Fit translation
+
+Added `MINISTRY_FIT_MAP` constant: maps 5 canonical EN strings to PT display versions.
+PersonPanel behavioral profile section uses this map for PT display.
+Handles both new single-string format and old JSON-array format gracefully.
+
+### Bug 3 (App.jsx) — PersonCard cleaned up
+
+**Removed from PersonCard:**
+- "View all giftings" toggle + collapsible bar chart
+- Natural Strength tag row
+- Leadership Tendency tag row
+- Emotional Profile tag row
+- Pairing Labels row
+- Ministry Fit text
+
+**PersonCard now shows:** avatar, preferred+full name, top 3 gifting tags (static, no click nav), DISC primary+secondary badges, stage badge, ministry badge, footer + WA button.
+
+**PersonPanel updated:**
+- DISC type badges remain (now clickable to Reference tab)
+- New "Behavioral Profile" section heading
+- Natural Strength (translated via NATURAL_STRENGTH_MAP, clickable to Reference)
+- Leadership Tendency (translated via LEADERSHIP_MAP, clickable, amber dot if pastoral_flag)
+- Emotional Profile (translated via EMOTIONAL_MAP, clickable)
+- Pairing Labels (translated via PAIRING_LABEL_MAP, clickable via PAIRING_TO_ANCHOR)
+- Ministry Fit as small italic text (translated via MINISTRY_FIT_MAP)
+
+### Bug 4 (App.jsx) — Already implemented (Sessions 6/7)
+
+PersonCard shows full name below preferred name. PersonPanel header uses preferred_name. No changes needed.
+
+### Bug 5 (App.jsx) — PersonPanel labels now clickable
+
+Added `onNavigate` prop to PersonPanel. All trait tags in Behavioral Profile section use `panelNavTo(anchorId)` to navigate to Reference tab. PersonPanel now wired to `handleNavigate` in PeopleTab and GiftingTab.
+
+New constants added:
+- `PAIRING_LABEL_MAP` — maps 20 EN pairing labels to PT display
+- `PAIRING_TO_ANCHOR` — maps 20 EN pairing labels to reference-content.json anchorId
+
+### Bug 7 (reference-content.json + App.jsx) — Brazilian Expression content fixed
+
+**Root cause:** `item.brazilEN` did not exist in reference-content.json. RefCard showed `item.usaEN` as fallback.
+
+**Fix:**
+- Added `brazilEN` to all 4 DISC profiles in reference-content.json (full English translation of Brazilian-specific content for each profile)
+- Updated RefCard: `{lang==="PT" ? item.brazilPT : (item.brazilEN || item.brazilPT || "")}` — now uses `brazilEN` correctly
+
+### Bug 8 (App.jsx + reference-content.json) — Paragraph breaks + footnote numbers
+
+**Paragraph breaks:**
+- Added `renderParagraphs(text, footnoteCitations)` helper function before RefCard
+- All body text rendering in RefCard (brazil/usa/cult tabs and non-DISC body) now uses `renderParagraphs` which splits on `\n\n` and renders each segment as `<p>`
+- Added `\n\n` at natural section transition points in body text via Python processing
+
+**Footnote superscripts:**
+- Added `footnoteCitations` array to items in reference-content.json:
+  - Worship and Music, Evangelism, Teaching, Administration, Discernment and Prophetic: [1]
+  - Deep Teacher (pairing): [1]
+  - Visionary Leader (leadership tendency): [9]
+  - All 4 Emotional Profiles: [10, 11]
+- `renderParagraphs` renders `<sup>` tags at end of last paragraph for each citation number
+
+### Pending Items from previous sessions — Already done (confirmed)
+- PlacedCard WA: `skipTemplate=true` already in place (Session 7)
+- langSplit labels: "Idioma Preferido" / "Preferred Language" already correct
+
+### New Constants Added to App.jsx
+- `MINISTRY_FIT_MAP` — 5 EN strings to PT translations
+- `PAIRING_LABEL_MAP` — 20 EN pairing labels to PT display
+- `PAIRING_TO_ANCHOR` — 20 EN pairing labels to reference anchorId
+
+### Critical Rules Carried Forward
+- Canonical D1 values are always English. Only display labels translate.
+- PersonCard is intentionally kept minimal (no profile sections visible before opening)
+- PersonPanel is the detail view for all behavioral profile data
+- No dashes in user-facing strings
+- iOS Safari event rules apply to assessment app only; App.jsx is React
+
+### Output Files
+- `/tmp/App-session9.txt` — full App.jsx
+- `/tmp/index-session9.txt` — full index.html (assessment app)
+
+### Commits
+- ministry-gifting: Bug 9 + 6 fix (deriveDISC canonical values + gifting-based pairing)
+- ltc-dashboard: Bugs 1, 2, 3, 5, 7, 8 fix pass
+
+_Last updated: 2026-05-28 — Session 9 complete._
+
+---
+
+### Scope
+`/Users/nicolel/ministry-gifting/index.html` only. No App.jsx changes.
+
+### FIX 1 — Scale Level 5 Label
+- PT: `"Isso arde dentro de mim"` → `"Isso fala muito de mim"`
+- EN: `"This burns in me"` → `"This is deeply me"`
+- Levels 1-4 unchanged
+
+### FIX 2 — Level 5 Confirmation Overlay
+- Tapping scale button index 4 (level 5) no longer records immediately
+- Shows `position:fixed` overlay (z-index 500) above the question card
+- PT heading: "Isso fala muito de mim" / EN: "This is deeply me"
+- PT body: "Marcar isso mostra que essa qualidade e profundamente enraizada em quem voce e."
+- EN body: "Selecting this shows that this quality is deeply rooted in who you are."
+- Confirm button (teal): PT "Sim, com certeza" / EN "Yes, absolutely" → records answer as 5 (index 4)
+- Back button (dark): PT "Na verdade, mais um 4" / EN "Actually, more like a 4" → records answer as 4 (index 3)
+- Outside tap: does nothing; overlay stays open (no backdrop dismiss)
+- Both buttons use addEventListener + IIFE closures; no onclick attributes
+
+### FIX 3 — DISC Section Visual Changes
+- First DISC card only: teal pill label above question text ("Como voce funciona naturalmente" / "How you naturally operate"; class `disc-section-pill`)
+- First DISC card only: scale buttons fade in (`@keyframes scaleFadeIn` 0.4s, applied via `.scale-wrap.disc-first .scale-btn`)
+- All DISC cards: `border-top: 2px solid rgba(42,191,191,0.7)` instead of full teal
+- First DISC detection: `isDisc && (current===0 || ALL_QUESTIONS[current-1].type !== 'disc')` — no hardcoded index
+
+### FIX 4 — DISC Removed from Results Screen
+- `discSection` div emptied in `renderResults` (`discEl.innerHTML=''`)
+- DISC data still calculated, stored, and sent to Worker — only display removed
+
+### FIX 5 — Learn More Modal Content
+- Added `GIFTING_LEARN_MORE` JS constant (keyed by gifting EN name, 15 entries, each has `pt` and `en` properties with full theological body text)
+- Modal close button moved to VERY TOP of modal; id `closeSaibaMaisBtn`; class `modal-back-btn`; PT "Voltar aos meus resultados" / EN "Back to my results"
+- Modal shows `GIFTING_LEARN_MORE[g.en.name][lang]` as description instead of brief `g[lang].desc`
+- No ministry tags or DISC info shown in modal
+
+### CSS added
+```css
+.disc-section-pill { ... }
+@keyframes scaleFadeIn { from{opacity:0} to{opacity:1} }
+.scale-wrap.disc-first .scale-btn { animation: scaleFadeIn 0.4s ease forwards }
+.modal-back-btn { ... }
+```
+
+### Key implementation rules carried forward
+- iOS Safari: addEventListener('touchstart', fn, {passive:false}) + addEventListener('click', fn); no onclick attributes
+- IIFE closures for all dynamically created buttons
+- No dashes (hyphens as punctuation) in any user-facing string
+- `ALL_QUESTIONS` = CAL_QUESTIONS (2) + QUESTIONS (45) + DISC_QUESTIONS (12) = 59 total
+- DISC starts at index 47 (0-based); first detection via prev-question type check
+
+### Output files
+- `/tmp/index-session8.txt` — full index.html (193KB)
+
+### Commits (ministry-gifting repo)
+- `7843749` — Five UX fixes: scale label, level-5 confirm overlay, DISC section styling, remove DISC from results, learn-more modal content
+
+_Last updated: 2026-05-28 — Session 8 complete._

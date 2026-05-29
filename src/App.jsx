@@ -1348,6 +1348,7 @@ function AnalyticsTab({ token, t, lang }) {
 
 // ─── PERSON CARD ──────────────────────────────────────────────────
 function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
+  const [showPastoralTip, setShowPastoralTip] = useState(false);
   const ministries = parseJSON(person.current_ministries);
   const groups = parseJSON(person.special_groups);
   const langs = parseJSON(person.languages_spoken);
@@ -1373,14 +1374,24 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
             <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
               <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
               {person.pastoral_flag==1 && (
-                <span title={lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential"} style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#fbd590",fontWeight:700}}>★</span>
+                <div style={{position:"relative",display:"inline-block"}}
+                  onMouseEnter={()=>setShowPastoralTip(true)}
+                  onMouseLeave={()=>setShowPastoralTip(false)}>
+                  <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#fbd590",fontWeight:700,cursor:"default"}}>★</span>
+                  {showPastoralTip && (
+                    <div style={{position:"absolute",bottom:"125%",left:"50%",transform:"translateX(-50%)",background:"#1a2a2a",color:"#e6f1f0",fontSize:12,lineHeight:1.5,padding:"8px 12px",borderRadius:6,border:"1px solid #2ABFBF",zIndex:999,width:220,pointerEvents:"none",whiteSpace:"normal"}}>
+                      {lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential"}
+                    </div>
+                  )}
+                </div>
               )}
               <CarismaBadge levels={carisma} lang={lang} />
             </div>
-            {person.preferred_name && person.preferred_name !== person.name && (
-              <div style={{fontSize:10.5,color:"#6b7a82",marginTop:1}}>
-                <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{lang==="PT" ? "Nome completo:" : "Full name:"}</span>
-                {" "}{person.name}
+            {person.full_name && person.preferred_name &&
+              person.preferred_name.trim() !== person.full_name.trim() && (
+              <div style={{marginTop:2}}>
+                <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{lang==="PT" ? "Nome completo: " : "Full name: "}</span>
+                <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{person.full_name}</span>
               </div>
             )}
             <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || t.noContact}</div>
@@ -1657,10 +1668,11 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
                   <CarismaBadge levels={carisma} lang={lang} />
                 </div>
-                {person.preferred_name && person.preferred_name !== person.name && (
+                {person.full_name && person.preferred_name &&
+                  person.preferred_name.trim() !== person.full_name.trim() && (
                   <div style={{fontSize:11,color:"#6b7a82",marginBottom:3}}>
-                    <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{lang==="PT"?"Nome completo:":"Full name:"}</span>
-                    {" "}{person.name}
+                    <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{lang==="PT"?"Nome completo: ":"Full name: "}</span>
+                    <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{person.full_name}</span>
                   </div>
                 )}
                 <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",fontSize:12,color:"#6b7a82"}}>
@@ -1883,7 +1895,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           </div>
 
           {/* DISC Profile + Behavioral Profile */}
-          {(person.disc_primary || person.natural_strength) && (function(){
+          {(person.disc_primary || person.natural_strength || person.ministry_fit) && (function(){
             var nsEntry2 = person.natural_strength ? (NATURAL_STRENGTH_MAP[person.natural_strength] || null) : null;
             var ldEntry2 = person.leadership_tendency ? (LEADERSHIP_MAP[person.leadership_tendency] || null) : null;
             var emEntry2 = person.emotional_profile ? (EMOTIONAL_MAP[person.emotional_profile] || null) : null;

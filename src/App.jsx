@@ -250,7 +250,22 @@ const MINISTRY_PT = {
   "Setup & Teardown":"Montagem",
   "GC Leader":"Líder de GC",
   "Legacy":"Legacy",
-  "English Service":"Culto em Inglês"
+  "English Service":"Culto em Inglês",
+  "Choir":"Coral",
+  "Instrumental Ministry":"Ministerio Instrumental",
+  "Setup and Teardown":"Montagem e Desmontagem",
+  "Parking Ministry":"Ministerio de Estacionamento",
+  "Facilities Support":"Suporte as Instalacoes",
+  "Video Editing":"Edicao de Video",
+  "Photography":"Fotografia",
+  "Graphics Team":"Equipe de Design",
+  "Camera Operation":"Camera",
+  "Social Media Team":"Equipe de Redes Sociais",
+  "Kids Ministry":"Ministerio Infantil",
+  "Youth Ministry":"Ministerio de Jovens",
+  "Ushers":"Recepcao",
+  "Intercessors":"Intercessores",
+  "GC":"GC"
 };
 
 function ministryLabel(name, lang, personLang) {
@@ -624,7 +639,14 @@ function buildWhatsAppURL(person, templatePT, templateEN, skipTemplate) {
 
 // ─── CARISMA BADGE COMPONENT ──────────────────────────────────────
 // Used in PersonCard (size="sm") and PersonPanel (size="lg")
-function CarismaBadge({ levels }) {
+function carismaLevelDisplay(lv, lang) {
+  if (!lv) return lv;
+  if (lv === "Masters") return "Masters";
+  if (lv === "1st Year" || lv === "1 Ano") return lang === "PT" ? "1o Ano" : "1st Year";
+  if (lv === "Level 5") return "Masters";
+  return lv;
+}
+function CarismaBadge({ levels, lang }) {
   if (!levels || levels.length === 0) return null;
   return (
     <>
@@ -636,7 +658,7 @@ function CarismaBadge({ levels }) {
           fontSize:"10px", color:"#b46968", fontWeight:700, whiteSpace:"nowrap"
         }}>
           <img src={CARISMA_LOGO} alt="Carisma" style={{ width:13, height:13, objectFit:"contain", verticalAlign:"middle" }} />
-          {lv}
+          {carismaLevelDisplay(lv, lang)}
         </span>
       ))}
     </>
@@ -944,7 +966,7 @@ function AnalyticsTab({ token, t, lang }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API}/analytics?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(setData).catch(() => {});
   }, [token]);
 
@@ -1353,7 +1375,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
               {person.pastoral_flag==1 && (
                 <span title={lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential"} style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#fbd590",fontWeight:700}}>★</span>
               )}
-              <CarismaBadge levels={carisma} />
+              <CarismaBadge levels={carisma} lang={lang} />
             </div>
             {person.preferred_name && person.preferred_name !== person.name && (
               <div style={{fontSize:10.5,color:"#6b7a82",marginTop:1}}>
@@ -1379,7 +1401,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
                 background:i===0?"rgba(94,234,212,0.1)":"rgba(255,255,255,0.03)",
                 color:i===0?"#c5f5ec":"#aebac0",
                 borderRadius:999,border:"1px solid " + (i===0?"rgba(94,234,212,0.25)":"rgba(255,255,255,0.05)")}}>
-              {GIFTING_ICONS[g]||"◆"} {giftingLabel(g, person.language)}
+              {GIFTING_ICONS[g]||"◆"} {giftingLabel(g, lang)}
             </span>
           );
         })}
@@ -1464,7 +1486,7 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
                 {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
               </span>
             )}
-            <CarismaBadge levels={carisma} />
+            <CarismaBadge levels={carisma} lang={lang} />
           </div>
           {person.gifting_1 && (
             <span style={{fontSize:11,padding:"3px 9px",background:"rgba(94,234,212,0.1)",color:"#c5f5ec",borderRadius:999,border:"1px solid rgba(94,234,212,0.25)"}}>
@@ -1513,6 +1535,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [newMinistry, setNewMinistry] = useState("");
   const [showMinistryInput, setShowMinistryInput] = useState(false);
   const [labelPopup, setLabelPopup] = useState(null); // {type, value} or null
+  const [showAllGiftings, setShowAllGiftings] = useState(false);
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1632,7 +1655,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                   <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
-                  <CarismaBadge levels={carisma} />
+                  <CarismaBadge levels={carisma} lang={lang} />
                 </div>
                 {person.preferred_name && person.preferred_name !== person.name && (
                   <div style={{fontSize:11,color:"#6b7a82",marginBottom:3}}>
@@ -1825,29 +1848,37 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               ))}
             </div>
             {sortedScores.length > 0 && (
-              <div style={{background:"rgba(8,16,22,0.6)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:12,padding:"16px 18px"}}>
-                {sortedScores.map(([gifting,score],idx)=>{
-                  const pct = Math.min(Math.round(Number(score)),100);
-                  return (
-                    <div key={gifting} style={{marginBottom:idx<sortedScores.length-1?12:0}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                        <span style={{fontSize:12.5,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
-                          <span>{GIFTING_ICONS[gifting]||"◆"}</span> {giftingLabel(gifting, lang)}
-                        </span>
-                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:idx===0?"#5eead4":"#e6f1f0",fontWeight:500}}>{pct}%</span>
-                      </div>
-                      <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
-                        <div style={{height:"100%",width:`${pct}%`,
-                          background:idx===0
-                            ?"linear-gradient(90deg, #5eead4, #2dd4bf)"
-                            :"linear-gradient(90deg, rgba(94,234,212,0.55), rgba(94,234,212,0.3))",
-                          borderRadius:999,
-                          boxShadow:idx===0?"0 0 10px rgba(94,234,212,0.45)":"none"}}/>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                <button onClick={()=>setShowAllGiftings(p=>!p)}
+                  style={{fontSize:11.5,color:"#5eead4",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom:showAllGiftings?10:0,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.04em"}}>
+                  {showAllGiftings ? (lang==="PT" ? "Ocultar dons" : "Hide giftings") : (lang==="PT" ? "Ver todos os dons" : "View all giftings")}
+                </button>
+                {showAllGiftings && (
+                  <div style={{background:"rgba(8,16,22,0.6)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:12,padding:"16px 18px"}}>
+                    {sortedScores.map(([gifting,score],idx)=>{
+                      const pct = Math.min(Math.round(Number(score)),100);
+                      return (
+                        <div key={gifting} style={{marginBottom:idx<sortedScores.length-1?12:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
+                            <span style={{fontSize:12.5,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
+                              <span>{GIFTING_ICONS[gifting]||"◆"}</span> {giftingLabel(gifting, lang)}
+                            </span>
+                            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:idx===0?"#5eead4":"#e6f1f0",fontWeight:500}}>{pct}%</span>
+                          </div>
+                          <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
+                            <div style={{height:"100%",width:`${pct}%`,
+                              background:idx===0
+                                ?"linear-gradient(90deg, #5eead4, #2dd4bf)"
+                                :"linear-gradient(90deg, rgba(94,234,212,0.55), rgba(94,234,212,0.3))",
+                              borderRadius:999,
+                              boxShadow:idx===0?"0 0 10px rgba(94,234,212,0.45)":"none"}}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

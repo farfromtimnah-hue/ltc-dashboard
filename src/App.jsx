@@ -1637,6 +1637,21 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     return carisma.includes(val);
   }
 
+  // Behavioral Profile pre-calculations (moved out of IIFE for reliable React rendering)
+  var nsDisplay = person.natural_strength ? (NATURAL_STRENGTH_MAP[person.natural_strength] || null) : null;
+  var ldDisplay = person.leadership_tendency ? (LEADERSHIP_MAP[person.leadership_tendency] || null) : null;
+  var emDisplay = person.emotional_profile ? (EMOTIONAL_MAP[person.emotional_profile] || null) : null;
+  var bpPairingLabels = parseJSON(person.pairing_labels, []);
+  var bpClickableTag = {display:"inline-flex",alignItems:"center",gap:4,fontSize:12,padding:"4px 11px",borderRadius:999,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",cursor:"pointer",whiteSpace:"nowrap",transition:"border-color 0.15s"};
+  var ministryFitDisplay = null;
+  if (person.ministry_fit && typeof person.ministry_fit === "string" && !person.ministry_fit.startsWith("[")) {
+    ministryFitDisplay = lang === "PT" ? (MINISTRY_FIT_MAP[person.ministry_fit] || person.ministry_fit) : person.ministry_fit;
+  } else if (person.ministry_fit) {
+    var mfParsed = parseJSON(person.ministry_fit, null);
+    if (Array.isArray(mfParsed) && mfParsed.length > 0) ministryFitDisplay = mfParsed[0];
+  }
+  var showBehavioralProfile = !!(person.disc_primary || person.natural_strength || person.ministry_fit);
+
   return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",justifyContent:"flex-end"}}>
       {labelPopup && (
@@ -1895,125 +1910,109 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           </div>
 
           {/* DISC Profile + Behavioral Profile */}
-          {(person.disc_primary || person.natural_strength || person.ministry_fit) && (function(){
-            var nsEntry2 = person.natural_strength ? (NATURAL_STRENGTH_MAP[person.natural_strength] || null) : null;
-            var ldEntry2 = person.leadership_tendency ? (LEADERSHIP_MAP[person.leadership_tendency] || null) : null;
-            var emEntry2 = person.emotional_profile ? (EMOTIONAL_MAP[person.emotional_profile] || null) : null;
-            var pairingLabels2 = parseJSON(person.pairing_labels, []);
-            var ministryFitDisplay = null;
-            if (person.ministry_fit && typeof person.ministry_fit === "string" && !person.ministry_fit.startsWith("[")) {
-              ministryFitDisplay = lang === "PT" ? (MINISTRY_FIT_MAP[person.ministry_fit] || person.ministry_fit) : person.ministry_fit;
-            } else if (person.ministry_fit) {
-              var mfArr = parseJSON(person.ministry_fit, null);
-              if (Array.isArray(mfArr) && mfArr.length > 0) {
-                ministryFitDisplay = mfArr[0];
-              }
-            }
-            var clickableTag = {display:"inline-flex",alignItems:"center",gap:4,fontSize:12,padding:"4px 11px",borderRadius:999,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",cursor:"pointer",whiteSpace:"nowrap",transition:"border-color 0.15s"};
-            return (
-              <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.discProfile}</div>
-                {/* DISC type badges — tap to open description popup */}
-                {person.disc_primary && (
-                  <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-                    <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_primary}); }}
-                      style={{fontSize:12,padding:"6px 12px",borderRadius:8,
-                        background:`${DISC_COLORS[person.disc_primary]}18`,
-                        border:`1px solid ${DISC_COLORS[person.disc_primary]}50`,
-                        color:DISC_COLORS[person.disc_primary],fontWeight:700,
+          {showBehavioralProfile && (
+            <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.discProfile}</div>
+              {/* DISC type badges — tap to open description popup */}
+              {person.disc_primary && (
+                <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+                  <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_primary}); }}
+                    style={{fontSize:12,padding:"6px 12px",borderRadius:8,
+                      background:`${DISC_COLORS[person.disc_primary]}18`,
+                      border:`1px solid ${DISC_COLORS[person.disc_primary]}50`,
+                      color:DISC_COLORS[person.disc_primary],fontWeight:700,
+                      display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#1</span>
+                    {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
+                  </span>
+                  {person.disc_secondary && (
+                    <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_secondary}); }}
+                      style={{fontSize:11,padding:"5px 10px",borderRadius:8,
+                        background:`${DISC_COLORS[person.disc_secondary]}0e`,
+                        border:`1px solid ${DISC_COLORS[person.disc_secondary]}30`,
+                        color:DISC_COLORS[person.disc_secondary],fontWeight:600,
                         display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#1</span>
-                      {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#2</span>
+                      {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_secondary]}
                     </span>
-                    {person.disc_secondary && (
-                      <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_secondary}); }}
-                        style={{fontSize:11,padding:"5px 10px",borderRadius:8,
-                          background:`${DISC_COLORS[person.disc_secondary]}0e`,
-                          border:`1px solid ${DISC_COLORS[person.disc_secondary]}30`,
-                          color:DISC_COLORS[person.disc_secondary],fontWeight:600,
-                          display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
-                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,opacity:0.7}}>#2</span>
-                        {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_secondary]}
-                      </span>
-                    )}
-                    {person.pastoral_flag==1 && (
-                      <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
-                        background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
-                        color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
-                        {"★ "}{t.pastoralAlert}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {/* Behavioral Profile section — all tags tap to open description popup */}
-                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500,marginTop:4}}>
-                  {lang==="PT" ? "Perfil Comportamental" : "Behavioral Profile"}
+                  )}
+                  {person.pastoral_flag==1 && (
+                    <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
+                      background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
+                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                      {"★ "}{t.pastoralAlert}
+                    </span>
+                  )}
                 </div>
-                {(nsEntry2 || ldEntry2 || emEntry2 || pairingLabels2.length > 0) && (
-                  <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
-                    {/* Natural Strength */}
-                    {nsEntry2 && (
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.naturalStr}</span>
-                        <span onClick={function(){ setLabelPopup({type:"natural_strength",value:person.natural_strength}); }}
-                          style={clickableTag}>
-                          {lang==="PT" ? nsEntry2.PT : nsEntry2.EN}
-                        </span>
-                      </div>
-                    )}
-                    {/* Leadership Tendency */}
-                    {ldEntry2 && (
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.leadership}</span>
-                        <span onClick={function(){ setLabelPopup({type:"leadership_tendency",value:person.leadership_tendency}); }}
-                          style={clickableTag}>
-                          {lang==="PT" ? ldEntry2.PT : ldEntry2.EN}
-                        </span>
-                        {person.pastoral_flag==1 && (
-                          <span title={lang==="PT"?"Potencial Pastoral":"Pastoral Potential"} style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",boxShadow:"0 0 6px #f59e0b",flexShrink:0,display:"inline-block"}} />
-                        )}
-                      </div>
-                    )}
-                    {/* Emotional Profile */}
-                    {emEntry2 && (
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.emotional}</span>
-                        <span onClick={function(){ setLabelPopup({type:"emotional_profile",value:person.emotional_profile}); }}
-                          style={clickableTag}>
-                          {lang==="PT" ? emEntry2.PT : emEntry2.EN}
-                        </span>
-                      </div>
-                    )}
-                    {/* Pairing Labels */}
-                    {pairingLabels2.length > 0 && (
-                      <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
-                        <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em",paddingTop:4}}>{t.pairing}</span>
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                          {pairingLabels2.map(function(pl,pi){
-                            var displayLabel = lang==="PT" ? (PAIRING_LABEL_MAP[pl]||pl) : pl;
-                            return (
-                              <span key={pi} onClick={function(){ setLabelPopup({type:"pairing",value:pl}); }}
-                                style={{fontSize:11,padding:"4px 10px",borderRadius:999,
-                                  background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",
-                                  color:"#c4b5fd",cursor:"pointer"}}>
-                                {displayLabel}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* Ministry Fit */}
-                {ministryFitDisplay && (
-                  <div style={{fontSize:12,color:"#6b7a82",fontStyle:"italic",lineHeight:1.6,marginTop:4}}>
-                    {ministryFitDisplay}
-                  </div>
-                )}
+              )}
+              {/* Behavioral Profile section */}
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500,marginTop:4}}>
+                {lang==="PT" ? "Perfil Comportamental" : "Behavioral Profile"}
               </div>
-            );
-          })()}
+              {(nsDisplay || ldDisplay || emDisplay || bpPairingLabels.length > 0) && (
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
+                  {/* Natural Strength */}
+                  {nsDisplay && (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.naturalStr}</span>
+                      <span onClick={function(){ setLabelPopup({type:"natural_strength",value:person.natural_strength}); }}
+                        style={bpClickableTag}>
+                        {lang==="PT" ? nsDisplay.PT : nsDisplay.EN}
+                      </span>
+                    </div>
+                  )}
+                  {/* Leadership Tendency */}
+                  {ldDisplay && (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.leadership}</span>
+                      <span onClick={function(){ setLabelPopup({type:"leadership_tendency",value:person.leadership_tendency}); }}
+                        style={bpClickableTag}>
+                        {lang==="PT" ? ldDisplay.PT : ldDisplay.EN}
+                      </span>
+                      {person.pastoral_flag==1 && (
+                        <span title={lang==="PT"?"Potencial Pastoral":"Pastoral Potential"} style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",boxShadow:"0 0 6px #f59e0b",flexShrink:0,display:"inline-block"}} />
+                      )}
+                    </div>
+                  )}
+                  {/* Emotional Profile */}
+                  {emDisplay && (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.emotional}</span>
+                      <span onClick={function(){ setLabelPopup({type:"emotional_profile",value:person.emotional_profile}); }}
+                        style={bpClickableTag}>
+                        {lang==="PT" ? emDisplay.PT : emDisplay.EN}
+                      </span>
+                    </div>
+                  )}
+                  {/* Pairing Labels */}
+                  {bpPairingLabels.length > 0 && (
+                    <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em",paddingTop:4}}>{t.pairing}</span>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {bpPairingLabels.map(function(pl,pi){
+                          var displayLabel = lang==="PT" ? (PAIRING_LABEL_MAP[pl]||pl) : pl;
+                          return (
+                            <span key={pi} onClick={function(){ setLabelPopup({type:"pairing",value:pl}); }}
+                              style={{fontSize:11,padding:"4px 10px",borderRadius:999,
+                                background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",
+                                color:"#c4b5fd",cursor:"pointer"}}>
+                              {displayLabel}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Ministry Fit */}
+              {ministryFitDisplay && (
+                <div style={{fontSize:12,color:"#6b7a82",fontStyle:"italic",lineHeight:1.6,marginTop:4}}>
+                  {ministryFitDisplay}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>

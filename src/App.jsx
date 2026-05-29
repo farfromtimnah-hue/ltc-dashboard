@@ -1232,13 +1232,15 @@ function AnalyticsTab({ token, t, lang }) {
                 const label=ldEntry2?(lang==="PT"?ldEntry2.PT:ldEntry2.EN):(row.leadership_tendency||"Outro");
                 return (
                   <div key={row.leadership_tendency||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
                       <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:500}}>{row.count}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
+                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
+                      </span>
                     </div>
-                    <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
                       <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,transition:"width 0.8s"}}/>
+                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
                     </div>
                   </div>
                 );
@@ -1265,13 +1267,15 @@ function AnalyticsTab({ token, t, lang }) {
                 const label=emEntry2?(lang==="PT"?emEntry2.PT:emEntry2.EN):(row.emotional_profile||"Outro");
                 return (
                   <div key={row.emotional_profile||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
                       <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:500}}>{row.count}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
+                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
+                      </span>
                     </div>
-                    <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
                       <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,transition:"width 0.8s"}}/>
+                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
                     </div>
                   </div>
                 );
@@ -1298,13 +1302,15 @@ function AnalyticsTab({ token, t, lang }) {
                 const label=nsEntry2?(lang==="PT"?nsEntry2.PT:nsEntry2.EN):(row.natural_strength||"Outro");
                 return (
                   <div key={row.natural_strength||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
                       <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:500}}>{row.count}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
+                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
+                      </span>
                     </div>
-                    <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
+                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
                       <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,transition:"width 0.8s"}}/>
+                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
                     </div>
                   </div>
                 );
@@ -1506,6 +1512,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [pastorName, setPastorName] = useState("");
   const [newMinistry, setNewMinistry] = useState("");
   const [showMinistryInput, setShowMinistryInput] = useState(false);
+  const [labelPopup, setLabelPopup] = useState(null); // {type, value} or null
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1562,10 +1569,14 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     updateConnection({ special_groups: next });
   }
 
-  function toggleCarisma(level) {
-    const next = carisma.includes(level)
-      ? carisma.filter(x => x !== level)
-      : [...carisma, level];
+  function toggleCarisma(value) {
+    // Remove all equivalent legacy values for this slot, then toggle canonical value
+    var equivalents = { "1st Year":["1st Year","1 Ano"], "Masters":["Masters","Level 5"] };
+    var toRemove = equivalents[value] || [value];
+    var current = parseJSON(person.carisma_completed);
+    var hadAny = toRemove.some(function(v){ return current.includes(v); });
+    var cleaned = current.filter(function(x){ return !toRemove.includes(x); });
+    var next = hadAny ? cleaned : [...cleaned, value];
     updateConnection({ carisma_completed: next });
   }
 
@@ -1581,10 +1592,27 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
   const sortedScores = Object.entries(scores).map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
 
-  const CARISMA_LEVELS = ["1 Ano", "1st Year", "Masters", "Level 5"];
+  // Canonical Carisma options. Legacy stored values: "1 Ano" maps to "1st Year", "Level 5" maps to "Masters"
+  const CARISMA_OPTIONS = [
+    { value:"Masters",  displayPT:"Masters",   displayEN:"Masters" },
+    { value:"1st Year", displayPT:"1o Ano",    displayEN:"1st Year" }
+  ];
+  function carismaOptionActive(val) {
+    if (val === "1st Year") return carisma.includes("1st Year") || carisma.includes("1 Ano");
+    if (val === "Masters")  return carisma.includes("Masters")  || carisma.includes("Level 5");
+    return carisma.includes(val);
+  }
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",justifyContent:"flex-end"}}>
+      {labelPopup && (
+        <LabelDescriptionPopup
+          type={labelPopup.type}
+          value={labelPopup.value}
+          lang={lang}
+          onClose={function(){ setLabelPopup(null); }}
+        />
+      )}
       <div onClick={onClose} style={{position:"absolute",inset:0,background:"rgba(2,6,12,0.65)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}} />
       <div className="drawer-panel" style={{width:"min(560px,100vw)",height:"100vh",background:"linear-gradient(180deg, rgba(12,24,32,0.96), rgba(6,14,20,0.96))",backdropFilter:"blur(30px) saturate(140%)",WebkitBackdropFilter:"blur(30px) saturate(140%)",borderLeft:"1px solid rgba(94,234,212,0.18)",boxShadow:"-30px 0 80px -20px rgba(0,0,0,0.7), -1px 0 30px -10px rgba(94,234,212,0.15)",overflowY:"auto",display:"flex",flexDirection:"column",position:"relative"}}>
         {/* Top accent line */}
@@ -1606,6 +1634,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
                   <CarismaBadge levels={carisma} />
                 </div>
+                {person.preferred_name && person.preferred_name !== person.name && (
+                  <div style={{fontSize:11,color:"#6b7a82",marginBottom:3}}>
+                    <span style={{color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{lang==="PT"?"Nome completo:":"Full name:"}</span>
+                    {" "}{person.name}
+                  </div>
+                )}
                 <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",fontSize:12,color:"#6b7a82"}}>
                   <span>{person.language === "PT" ? "🇧🇷 Português" : "🇺🇸 English"}</span>
                   {person.submitted_at && <span>· {timeAgo(person.submitted_at)}</span>}
@@ -1676,7 +1710,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
               {ministries.map(m=>(
                 <span key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,padding:"6px 11px",background:"rgba(94,234,212,0.08)",color:"#c5f5ec",borderRadius:8,border:"1px solid rgba(94,234,212,0.22)"}}>
-                  {ministryLabel(m, lang, person.language)}
+                  {ministryLabel(m, lang)}
                   <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#5eead4",cursor:"pointer",fontSize:14,lineHeight:1,padding:0,opacity:0.7}}>×</button>
                 </span>
               ))}
@@ -1710,10 +1744,11 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               {t.carismaLabel}
             </div>
             <div style={{display:"flex",gap:8}}>
-              {CARISMA_LEVELS.map(level => {
-                const active = carisma.includes(level);
+              {CARISMA_OPTIONS.map(function(opt){
+                var active = carismaOptionActive(opt.value);
+                var label = lang === "PT" ? opt.displayPT : opt.displayEN;
                 return (
-                  <button key={level} onClick={() => toggleCarisma(level)} disabled={saving}
+                  <button key={opt.value} onClick={function(){ toggleCarisma(opt.value); }} disabled={saving}
                     style={{
                       display:"flex", alignItems:"center", gap:5,
                       padding:"8px 14px", borderRadius:8,
@@ -1725,7 +1760,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                       boxShadow:active?"0 0 14px rgba(180,105,104,0.18)":"none"
                     }}>
                     {active && <img src={CARISMA_LOGO} alt="" style={{width:13,height:13,objectFit:"contain"}} />}
-                    {level}
+                    {label}
                   </button>
                 );
               })}
@@ -1785,7 +1820,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   border:`1px solid ${i===0?"rgba(94,234,212,0.3)":"rgba(255,255,255,0.05)"}`,
                   display:"inline-flex",alignItems:"center",gap:5}}>
                   <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,opacity:0.6}}>#{i+1}</span>
-                  {GIFTING_ICONS[g]||""} {giftingLabel(g, person.language)}
+                  {GIFTING_ICONS[g]||""} {giftingLabel(g, lang)}
                 </span>
               ))}
             </div>
@@ -1797,7 +1832,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     <div key={gifting} style={{marginBottom:idx<sortedScores.length-1?12:0}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
                         <span style={{fontSize:12.5,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
-                          <span>{GIFTING_ICONS[gifting]||"◆"}</span> {giftingLabel(gifting, person.language)}
+                          <span>{GIFTING_ICONS[gifting]||"◆"}</span> {giftingLabel(gifting, lang)}
                         </span>
                         <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:idx===0?"#5eead4":"#e6f1f0",fontWeight:500}}>{pct}%</span>
                       </div>
@@ -1832,16 +1867,13 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               }
             }
             var clickableTag = {display:"inline-flex",alignItems:"center",gap:4,fontSize:12,padding:"4px 11px",borderRadius:999,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",cursor:"pointer",whiteSpace:"nowrap",transition:"border-color 0.15s"};
-            function panelNavTo(anchor) {
-              if (onNavigate) onNavigate("reference", anchor);
-            }
             return (
               <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
                 <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.discProfile}</div>
-                {/* DISC type badges */}
+                {/* DISC type badges — tap to open description popup */}
                 {person.disc_primary && (
                   <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-                    <span onClick={function(){panelNavTo(DISC_TO_ANCHOR[person.disc_primary]||"executor");}}
+                    <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_primary}); }}
                       style={{fontSize:12,padding:"6px 12px",borderRadius:8,
                         background:`${DISC_COLORS[person.disc_primary]}18`,
                         border:`1px solid ${DISC_COLORS[person.disc_primary]}50`,
@@ -1851,7 +1883,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                       {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
                     </span>
                     {person.disc_secondary && (
-                      <span onClick={function(){panelNavTo(DISC_TO_ANCHOR[person.disc_secondary]||"executor");}}
+                      <span onClick={function(){ setLabelPopup({type:"disc",value:person.disc_secondary}); }}
                         style={{fontSize:11,padding:"5px 10px",borderRadius:8,
                           background:`${DISC_COLORS[person.disc_secondary]}0e`,
                           border:`1px solid ${DISC_COLORS[person.disc_secondary]}30`,
@@ -1870,7 +1902,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     )}
                   </div>
                 )}
-                {/* Behavioral Profile section */}
+                {/* Behavioral Profile section — all tags tap to open description popup */}
                 <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500,marginTop:4}}>
                   {lang==="PT" ? "Perfil Comportamental" : "Behavioral Profile"}
                 </div>
@@ -1880,7 +1912,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     {nsEntry2 && (
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.naturalStr}</span>
-                        <span onClick={function(){panelNavTo(nsEntry2.anchorId);}} style={clickableTag}>
+                        <span onClick={function(){ setLabelPopup({type:"natural_strength",value:person.natural_strength}); }}
+                          style={clickableTag}>
                           {lang==="PT" ? nsEntry2.PT : nsEntry2.EN}
                         </span>
                       </div>
@@ -1889,7 +1922,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     {ldEntry2 && (
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.leadership}</span>
-                        <span onClick={function(){panelNavTo(ldEntry2.anchorId);}} style={clickableTag}>
+                        <span onClick={function(){ setLabelPopup({type:"leadership_tendency",value:person.leadership_tendency}); }}
+                          style={clickableTag}>
                           {lang==="PT" ? ldEntry2.PT : ldEntry2.EN}
                         </span>
                         {person.pastoral_flag==1 && (
@@ -1901,7 +1935,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     {emEntry2 && (
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:10.5,color:"#6b7a82",flexShrink:0,minWidth:90,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>{t.emotional}</span>
-                        <span onClick={function(){panelNavTo(emEntry2.anchorId);}} style={clickableTag}>
+                        <span onClick={function(){ setLabelPopup({type:"emotional_profile",value:person.emotional_profile}); }}
+                          style={clickableTag}>
                           {lang==="PT" ? emEntry2.PT : emEntry2.EN}
                         </span>
                       </div>
@@ -1913,12 +1948,11 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {pairingLabels2.map(function(pl,pi){
                             var displayLabel = lang==="PT" ? (PAIRING_LABEL_MAP[pl]||pl) : pl;
-                            var anchor2 = PAIRING_TO_ANCHOR[pl] || null;
                             return (
-                              <span key={pi} onClick={anchor2?function(){panelNavTo(anchor2);}:undefined}
+                              <span key={pi} onClick={function(){ setLabelPopup({type:"pairing",value:pl}); }}
                                 style={{fontSize:11,padding:"4px 10px",borderRadius:999,
                                   background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",
-                                  color:"#c4b5fd",cursor:anchor2?"pointer":"default"}}>
+                                  color:"#c4b5fd",cursor:"pointer"}}>
                                 {displayLabel}
                               </span>
                             );
@@ -2585,6 +2619,120 @@ class RefErrorBoundary extends React.Component {
 }
 
 // ─── EXPANDABLE REFERENCE CARD ────────────────────────────────────
+// ─── LABEL DESCRIPTION POPUP ────────────────────────────────────
+// Overlay rendered inside PersonPanel; shows Reference content for a label tag.
+// type: "disc" | "natural_strength" | "leadership_tendency" | "emotional_profile" | "pairing"
+// value: canonical English value, e.g. "Sustainer", "D", "Deep Worshiper"
+function LabelDescriptionPopup({ type, value, lang, onClose }) {
+  const [refContent, setRefContent] = useState(null);
+  const [discTab, setDiscTab] = useState("brazil");
+
+  useEffect(function(){
+    fetch(import.meta.env.BASE_URL + "reference-content.json")
+      .then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
+      .then(setRefContent)
+      .catch(function(){});
+  }, []);
+
+  var item = null;
+  if (refContent) {
+    var discIdMap = {D:"executor",I:"comunicador",S:"planejador",C:"analista"};
+    if (type === "disc") {
+      item = (refContent.discProfiles||[]).find(function(p){ return p.id === discIdMap[value]; });
+    } else if (type === "natural_strength") {
+      item = (refContent.naturalStrengths||[]).find(function(p){ return p.labelEN === value; });
+    } else if (type === "leadership_tendency") {
+      item = (refContent.leadershipTendencies||[]).find(function(p){ return p.labelEN === value; });
+    } else if (type === "emotional_profile") {
+      item = (refContent.emotionalProfiles||[]).find(function(p){ return p.labelEN === value; });
+    } else if (type === "pairing") {
+      item = (refContent.pairings||[]).find(function(p){ return p.labelEN === value; });
+    }
+  }
+
+  var isDisc = type === "disc";
+  var headingLabel = item ? (lang === "PT" ? item.labelPT : item.labelEN) : value;
+  var body = item ? (lang === "PT" ? item.bodyPT : item.bodyEN) : null;
+
+  function tabBtnStyle(active) {
+    return {fontSize:10,padding:"4px 10px",borderRadius:999,
+      fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.08em",cursor:"pointer",
+      background:active?"rgba(94,234,212,0.12)":"rgba(255,255,255,0.03)",
+      border:active?"1px solid rgba(94,234,212,0.3)":"1px solid rgba(255,255,255,0.05)",
+      color:active?"#5eead4":"#6b7a82",transition:"all 0.15s"};
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",justifyContent:"flex-end"}}>
+      <div onClick={onClose} style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)"}} />
+      <div style={{width:"min(540px,100vw)",height:"100vh",
+        background:"linear-gradient(180deg,rgba(8,14,22,0.99),rgba(4,10,16,0.99))",
+        borderLeft:"1px solid rgba(94,234,212,0.2)",
+        boxShadow:"-20px 0 60px rgba(0,0,0,0.65)",
+        overflowY:"auto",display:"flex",flexDirection:"column",
+        position:"relative",zIndex:1}}>
+
+        {/* Sticky header */}
+        <div style={{padding:"18px 24px",borderBottom:"1px solid rgba(255,255,255,0.06)",
+          position:"sticky",top:0,background:"rgba(4,10,16,0.97)",zIndex:10,
+          display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,
+            color:"#e6f1f0",lineHeight:1.3}}>
+            {headingLabel}
+          </div>
+          <button onClick={onClose} style={{
+            padding:"6px 16px",borderRadius:8,flexShrink:0,
+            background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+            color:"#aebac0",cursor:"pointer",fontSize:12,
+            fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.08em"}}>
+            {lang === "PT" ? "Fechar" : "Close"}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{padding:"20px 24px",flex:1}}>
+          {!refContent ? (
+            <div style={{fontSize:11,color:"#475a64",fontFamily:"'JetBrains Mono',monospace",
+              textAlign:"center",paddingTop:32,letterSpacing:"0.1em"}}>
+              {lang === "PT" ? "Carregando..." : "Loading..."}
+            </div>
+          ) : !item ? (
+            <div style={{fontSize:13,color:"#475a64"}}>
+              {lang === "PT" ? "Conteudo nao encontrado." : "Content not found."}
+            </div>
+          ) : isDisc ? (
+            <div>
+              <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+                {[
+                  {key:"brazil",labelPT:"Expressao Brasileira",labelEN:"Brazilian Expression"},
+                  {key:"usa",   labelPT:"Expressao Americana", labelEN:"American Expression"},
+                  {key:"cult",  labelPT:"Diferencas Culturais",labelEN:"Cultural Differences"},
+                ].map(function(tab){
+                  return (
+                    <button key={tab.key} onClick={function(){ setDiscTab(tab.key); }}
+                      style={tabBtnStyle(discTab===tab.key)}>
+                      {lang==="PT"?tab.labelPT:tab.labelEN}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{fontSize:13,color:"#aebac0",lineHeight:1.75}}>
+                {discTab==="brazil" && renderParagraphs(lang==="PT"?item.brazilPT:(item.brazilEN||item.brazilPT||""))}
+                {discTab==="usa"    && renderParagraphs(lang==="PT"?item.usaPT:item.usaEN)}
+                {discTab==="cult"   && renderParagraphs(lang==="PT"?item.culturalPT:item.culturalEN)}
+              </div>
+            </div>
+          ) : (
+            <div style={{fontSize:13,color:"#aebac0",lineHeight:1.75}}>
+              {renderParagraphs(body, item.footnoteCitations)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Renders body text with paragraph breaks (split on \n\n) and optional inline footnote superscripts
 function renderParagraphs(text, footnoteCitations) {
   if (!text) return null;

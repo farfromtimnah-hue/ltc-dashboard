@@ -892,6 +892,110 @@ _Last updated: 2026-05-28 — Session 9 complete._
 
 ---
 
+## Session 10 — Comprehensive Bug Fix Pass (16 bugs)
+
+### D1 Operations (Bugs 1 + 2)
+- **Bug 1**: Deleted submission 10 (Luana) — removed from connections, notes, and submissions tables
+- **Bug 2**: Fixed submission 15 (Prefer name, disc S/C, Worship+Encouragement+Administration giftings):
+  - natural_strength: "Consistencia e cuidado" → "Sustainer"
+  - leadership_tendency: "Equilibrado" → "Structural Leader"
+  - emotional_profile: "Calmo e constante" → "Steady Carrier"
+  - ministry_fit: JSON array → "Natural relational gifting. Position at entry points and care roles."
+  - pairing_labels: old DISC pairs → ["Consistent Worshiper","Deep Worshiper","Systems Architect","Structure Builder"]
+- Submission 16 already had correct canonical EN values from Session 9
+
+### Bug 3 — Translation lookups
+No new code changes needed. NATURAL_STRENGTH_MAP, LEADERSHIP_MAP, EMOTIONAL_MAP already existed and are applied correctly in Analytics and PersonPanel. After D1 fix, lookups now resolve correctly.
+
+### Bug 4 — Gifting labels in PersonPanel
+Fixed: `giftingLabel(g, person.language)` → `giftingLabel(g, lang)` in PersonPanel (two locations: top 3 gifting tags and full score bar list). Now follows dashboard language toggle instead of person's assessment language.
+
+### Bug 5 — Ministry serving labels in PersonPanel
+Fixed: `ministryLabel(m, lang, person.language)` → `ministryLabel(m, lang)` for displayed ministry chips. Now follows dashboard language toggle. Existing MINISTRY_PT lookup already has all translations.
+
+### Bug 6 — Ministry Fit in PersonModal
+Already implemented from Session 9. The ministryFitDisplay logic at lines 1858-1868 handles both single-string (new) and JSON-array (legacy) formats. Works correctly after D1 fix.
+
+### Bug 7 — Carisma certification options
+**Before**: CARISMA_LEVELS = ["1 Ano", "1st Year", "Masters", "Level 5"] (4 options, some duplicates)
+**After**: CARISMA_OPTIONS = [{Masters/Masters/Masters}, {1st Year/1o Ano/1st Year}] (2 canonical options)
+
+Added `carismaOptionActive(val)` helper: maps legacy "1 Ano" → "1st Year" and "Level 5" → "Masters" for display. Updated `toggleCarisma` to remove all equivalents of a slot before toggling canonical value. Display labels now translate: PT shows "Masters" + "1o Ano", EN shows "Masters" + "1st Year".
+
+### Bug 8 — PersonCard too much
+Already done in Session 9. PersonCard shows: avatar, preferred+full name, top 3 gifting tags, DISC primary/secondary badges, stage badge, ministry badge, footer + WA button. No profile sections.
+
+### Bug 9 — Behavioral Profile section in PersonModal
+Already implemented from Session 9. Section heading "Perfil Comportamental" / "Behavioral Profile" with all 5 fields (Natural Strength, Leadership, Emotional, Pairing Labels, Ministry Fit). Updated in Session 10 to use popup triggers instead of Reference tab navigation.
+
+### Bug 10 — Pairing label translation
+PAIRING_LABEL_MAP and PAIRING_TO_ANCHOR already existed from Session 9. Now used via popup (Bug 11) instead of Reference navigation. Trigger logic (gifting+primary/secondary DISC) was fixed in Session 9 via index.html deriveDISC.
+
+### Bug 11 — Label description popups (NEW FEATURE)
+Added `LabelDescriptionPopup` component (placed before renderParagraphs / RefCard):
+- Renders as `position:fixed, zIndex:200` on top of PersonPanel (zIndex:100)
+- Slides in from right as full-height panel
+- Sticky header: label name + "Fechar" / "Close" button
+- Fetches reference-content.json on first open
+- Content lookup by type:
+  - "disc": finds in discProfiles by id (via DISC_TO_ANCHOR map)
+  - "natural_strength": finds in naturalStrengths by labelEN
+  - "leadership_tendency": finds in leadershipTendencies by labelEN
+  - "emotional_profile": finds in emotionalProfiles by labelEN
+  - "pairing": finds in pairings by labelEN
+- DISC type shows 3-tab view (Expressao Brasileira / Expressao Americana / Diferencas Culturais)
+- Non-DISC types show body text via renderParagraphs with footnoteCitations
+- Click outside (backdrop) closes popup
+
+PersonPanel changes for Bug 11:
+- Added `const [labelPopup, setLabelPopup] = useState(null)` state
+- Popup rendered above backdrop/drawer when labelPopup !== null
+- All Behavioral Profile label tags now call `setLabelPopup({type, value})` instead of `panelNavTo`
+- DISC type badges (#1 and #2) also open popup
+- `panelNavTo` function removed from Behavioral Profile IIFE
+
+### Bug 12 — Brazilian Expression in EN mode
+Already fixed in Session 9. `brazilEN` added to all 4 DISC profiles in reference-content.json. RefCard uses `item.brazilEN` for EN mode.
+
+### Bug 13 — Paragraph breaks on Reference page
+`renderParagraphs` helper already existed from Session 9 (splits on \n\n). Session 10 added more paragraph break coverage to reference-content.json:
+- Round 1: Added \n\n before 15+ common transition phrases (18 fields updated)
+- Round 2: Added \n\n before "They feel/serve/are/often/tend/thrive/lead", "This person/gift", "In a church/ministry", "Pastoral guidance/Team suggestion", DISC type names, etc. (13 more fields)
+- Final coverage: 14/15 giftings, 30/32 other sections
+
+### Bug 14 — Footnote numbers on Reference page
+Already implemented in Session 9. `footnoteCitations` arrays added to applicable items in reference-content.json. `renderParagraphs` renders `<sup>` tags in teal (#5eead4) at end of last paragraph.
+
+### Bug 15 — Analytics chart styles unified
+Updated Leadership Tendencies, Emotional Profiles, and Natural Strengths distribution charts to match DISC chart style:
+- Added `{count} ({pct}%)` display (was showing count only)
+- Bar height: 5px → 6px (matches DISC)
+- Added `boxShadow` on bar fill (matches DISC)
+- Transition: `0.8s` → `0.8s cubic-bezier(0.16,1,0.3,1)` (matches DISC)
+
+### Bug 16 — Full name in PersonPanel header
+Added full name display below preferred name in PersonPanel header (same as existing PersonCard logic):
+- When preferred_name exists and differs from name: shows "Nome completo:" / "Full name:" + name field
+- PersonCard already had this from Session 9
+
+### New/Changed Constants
+None — LabelDescriptionPopup is a new component, no new module-level constants.
+
+### Output Files
+- `/tmp/App-session10.txt` — full App.jsx
+- No Worker changes (derivation is in assessment app, fixed in Session 9)
+
+### Commits
+- `ltc-dashboard`: Bugs 4, 5, 7, 9, 11, 13, 15, 16 + D1 cleanup
+
+### Current version
+App.jsx: Session 10
+Worker: v6 (unchanged, last deployed Session 6)
+
+_Last updated: 2026-05-29 — Session 10 complete._
+
+---
+
 ### Scope
 `/Users/nicolel/ministry-gifting/index.html` only. No App.jsx changes.
 

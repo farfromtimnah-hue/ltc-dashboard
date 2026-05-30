@@ -2844,8 +2844,9 @@ function renderParagraphs(text, footnoteCitations) {
         {para}
         {isLast && footnoteCitations && footnoteCitations.map(function(num) {
           return (
-            <sup key={num} style={{color:"#5eead4",fontSize:"0.7em",marginLeft:2,cursor:"default"}}
-              title={"Footnote " + num}>
+            <sup key={num}
+              style={{color:"#2ABFBF",fontSize:"0.7rem",marginLeft:1,cursor:"pointer",verticalAlign:"super"}}
+              onClick={function(){ var el=document.getElementById("reference-footnotes"); if(el) el.scrollIntoView({behavior:"smooth"}); }}>
               {num}
             </sup>
           );
@@ -3117,7 +3118,7 @@ function ReferenceTab({ t, lang, anchor, onAnchorConsumed, onBack }) {
       </div>
 
       {/* Footnotes */}
-      <div>
+      <div id="reference-footnotes">
         {SectionHead("Notas e Fontes", "Notes and Sources")}
         <div className="glass" style={{padding:20,borderRadius:12}}>
           <ol style={{margin:0,paddingLeft:18,display:"flex",flexDirection:"column",gap:8}}>

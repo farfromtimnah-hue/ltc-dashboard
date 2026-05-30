@@ -639,6 +639,41 @@ function buildWhatsAppURL(person, templatePT, templateEN, skipTemplate) {
 
 // ─── CARISMA BADGE COMPONENT ──────────────────────────────────────
 // Used in PersonCard (size="sm") and PersonPanel (size="lg")
+function getMinistryRecommendations(person) {
+  if (!person.gifting_1) return [];
+  var top3 = [person.gifting_1, person.gifting_2, person.gifting_3].filter(Boolean);
+  var discPrimary = person.disc_primary || "";
+  var discSecondary = person.disc_secondary || "";
+  var ministryScores = {};
+  function addScore(ministry, points) {
+    ministryScores[ministry] = (ministryScores[ministry] || 0) + points;
+  }
+  if (top3.includes("Worship & Music")) { addScore("Worship Team",10); addScore("Sound",5); addScore("Lighting",4); addScore("Streaming",4); addScore("Legacy",3); }
+  if (top3.includes("Gift of Helps")) { addScore("Setup & Teardown",10); addScore("Parking",8); addScore("Volunteer Coffee",7); addScore("Service Experience",6); addScore("Hospitality - Welcome",5); }
+  if (top3.includes("Technical Arts") || top3.includes("Visual Storytelling")) { addScore("Sound",10); addScore("Lighting",10); addScore("Projection",10); addScore("Streaming",9); addScore("Photo & Video",9); }
+  if (top3.includes("Creativity")) { addScore("Photo & Video",10); addScore("Social Media",10); addScore("Service Experience",7); addScore("Lighting",5); }
+  if (top3.includes("Administration")) { addScore("GC Leader",10); addScore("Setup & Teardown",8); addScore("Service Experience",8); addScore("Lagoinha Kids",6); addScore("Legacy",6); }
+  if (top3.includes("Intercession")) { addScore("Intercession",10); addScore("Translation",5); addScore("English Service",4); }
+  if (top3.includes("Hospitality")) { addScore("Hospitality - Welcome",10); addScore("Volunteer Coffee",9); addScore("Consolidation",8); addScore("Service Experience",7); addScore("Lagoinha Kids",5); }
+  if (top3.includes("Evangelism")) { addScore("Consolidation",10); addScore("English Service",8); addScore("Hospitality - Welcome",6); addScore("Legacy",5); }
+  if (top3.includes("Encouragement")) { addScore("Consolidation",9); addScore("Hospitality - Welcome",8); addScore("Lagoinha Kids",8); addScore("Volunteer Coffee",7); addScore("GC Leader",6); }
+  if (top3.includes("Teaching")) { addScore("Lagoinha Kids",10); addScore("Legacy",9); addScore("GC Leader",8); addScore("English Service",6); addScore("Translation",5); }
+  if (top3.includes("Influence & Servant Leadership")) { addScore("GC Leader",10); addScore("Legacy",9); addScore("Service Experience",7); addScore("Lagoinha Kids",7); addScore("English Service",6); }
+  if (top3.includes("Discernment & Prophetic")) { addScore("Intercession",10); addScore("GC Leader",7); addScore("Translation",6); addScore("Legacy",5); }
+  if (top3.includes("Faith")) { addScore("Intercession",9); addScore("Consolidation",8); addScore("GC Leader",7); addScore("Legacy",6); }
+  var discTypes = [discPrimary, discSecondary].filter(Boolean);
+  if (discTypes.includes("I") || discTypes.includes("Comunicador")) { addScore("Hospitality - Welcome",4); addScore("Consolidation",4); addScore("Social Media",3); addScore("English Service",3); addScore("Volunteer Coffee",3); }
+  if (discTypes.includes("D") || discTypes.includes("Executor")) { addScore("GC Leader",4); addScore("Service Experience",4); addScore("Setup & Teardown",3); addScore("Legacy",3); }
+  if (discTypes.includes("S") || discTypes.includes("Planejador")) { addScore("Projection",4); addScore("Streaming",4); addScore("Volunteer Coffee",4); addScore("Parking",3); addScore("Lagoinha Kids",3); }
+  if (discTypes.includes("C") || discTypes.includes("Analista")) { addScore("Sound",4); addScore("Lighting",4); addScore("Projection",4); addScore("Streaming",3); addScore("Photo & Video",3); }
+  if (person.language === "EN") { addScore("English Service",5); addScore("Translation",4); }
+  return Object.keys(ministryScores)
+    .map(function(m){ return {ministry:m, score:ministryScores[m]}; })
+    .sort(function(a,b){ return b.score - a.score; })
+    .slice(0,5)
+    .map(function(item){ return item.ministry; });
+}
+
 function carismaLevelDisplay(lv, lang) {
   if (!lv) return lv;
   if (lv === "Masters") return "Masters";
@@ -1651,6 +1686,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     if (Array.isArray(mfParsed) && mfParsed.length > 0) ministryFitDisplay = mfParsed[0];
   }
   var showBehavioralProfile = !!(person.disc_primary || person.natural_strength || person.ministry_fit);
+  var ministryRecs = getMinistryRecommendations(person);
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",justifyContent:"flex-end"}}>
@@ -2007,8 +2043,30 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               )}
               {/* Ministry Fit */}
               {ministryFitDisplay && (
-                <div style={{fontSize:12,color:"#6b7a82",fontStyle:"italic",lineHeight:1.6,marginTop:4}}>
-                  {ministryFitDisplay}
+                <div style={{marginTop:8}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4}}>
+                    {lang==="PT" ? "Orientacao Pastoral" : "Pastoral Guidance"}
+                  </div>
+                  <p style={{fontStyle:"italic",fontSize:12,color:"#6b7a82",lineHeight:1.6,margin:0}}>
+                    {ministryFitDisplay}
+                  </p>
+                </div>
+              )}
+              {/* Suggested Placements */}
+              {ministryRecs.length > 0 && (
+                <div style={{marginTop:10}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>
+                    {lang==="PT" ? "Encaixes Sugeridos" : "Suggested Placements"}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {ministryRecs.map(function(m,i){
+                      return (
+                        <span key={i} style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"rgba(42,191,191,0.08)",border:"1px solid rgba(42,191,191,0.25)",color:"#2ABFBF",whiteSpace:"nowrap"}}>
+                          {lang==="PT" ? (MINISTRY_PT[m]||m) : m}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

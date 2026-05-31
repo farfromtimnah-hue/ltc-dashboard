@@ -2728,7 +2728,7 @@ function LabelDescriptionPopup({ type, value, lang, onClose }) {
   const [discTab, setDiscTab] = useState("brazil");
 
   useEffect(function(){
-    fetch(import.meta.env.BASE_URL + "reference-content.json")
+    fetch(import.meta.env.BASE_URL + "reference-content.json?v=" + Date.now())
       .then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
       .then(setRefContent)
       .catch(function(){});
@@ -2943,7 +2943,7 @@ function ReferenceTab({ t, lang, anchor, onAnchorConsumed, onBack }) {
   const [loadErr, setLoadErr] = useState(false);
 
   function doFetch(setC, setE) {
-    fetch(import.meta.env.BASE_URL + "reference-content.json")
+    fetch(import.meta.env.BASE_URL + "reference-content.json?v=" + Date.now())
       .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function(data){ setC(data); })
       .catch(function(){ setE(true); });

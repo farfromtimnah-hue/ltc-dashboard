@@ -1768,6 +1768,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     if (Array.isArray(mfParsed) && mfParsed.length > 0) ministryFitDisplay = mfParsed[0];
   }
   var showBehavioralProfile = !!(person.disc_primary || person.natural_strength || person.ministry_fit);
+  var discBars = [
+    { key: 'D', field: person.disc_d, ptLabel: 'Executor', enLabel: 'Executor' },
+    { key: 'I', field: person.disc_i, ptLabel: 'Comunicador', enLabel: 'Communicator' },
+    { key: 'S', field: person.disc_s, ptLabel: 'Planejador', enLabel: 'Planner' },
+    { key: 'C', field: person.disc_c, ptLabel: 'Analista', enLabel: 'Analyst' }
+  ].filter(function(b){ return b.field !== null && b.field !== undefined; });
   var ministryRecs = getMinistryRecommendations(person);
 
   return (
@@ -1981,12 +1987,13 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.giftingProfile}</div>
             <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
               {[person.gifting_1,person.gifting_2,person.gifting_3].map(g=>typeof g==="object"?null:(g||null)).filter(Boolean).map((g,i)=>(
-                <span key={i} style={{fontSize:12,padding:"6px 11px",
+                <span key={i} onClick={function(){ setLabelPopup({type:'gifting',value:g}); }}
+                  style={{fontSize:12,padding:"6px 11px",
                   background:i===0?"rgba(94,234,212,0.12)":"rgba(255,255,255,0.03)",
                   color:i===0?"#5eead4":"#aebac0",
                   borderRadius:8,
                   border:`1px solid ${i===0?"rgba(94,234,212,0.3)":"rgba(255,255,255,0.05)"}`,
-                  display:"inline-flex",alignItems:"center",gap:5}}>
+                  display:"inline-flex",alignItems:"center",gap:5,cursor:"pointer"}}>
                   <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,opacity:0.6}}>#{i+1}</span>
                   {GIFTING_ICONS[g]||""} {giftingLabel(g, lang)}
                 </span>
@@ -2055,12 +2062,35 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     </span>
                   )}
                   {person.pastoral_flag==1 && (
-                    <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
+                    <span onClick={function(){ setLabelPopup({type:'pastoral',value:'pastoral-potential'}); }}
+                      style={{fontSize:10,padding:"4px 10px",borderRadius:6,
                       background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
-                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
                       {"★ "}{t.pastoralAlert}
                     </span>
                   )}
+                </div>
+              )}
+              {discBars.length > 0 && (
+                <div style={{marginTop:12,marginBottom:4}}>
+                  {discBars.map(function(bar) {
+                    var pct = Math.round((bar.field / 15) * 100);
+                    var color = DISC_COLORS[bar.key] || '#2ABFBF';
+                    return (
+                      <div key={bar.key} style={{marginBottom:6}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <span style={{color:color,fontWeight:700,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{bar.key}</span>
+                            <span style={{color:'#6b7a82',fontSize:11}}>{lang==='PT' ? bar.ptLabel : bar.enLabel}</span>
+                          </div>
+                          <span style={{color:'#6b7a82',fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{bar.field}/15</span>
+                        </div>
+                        <div style={{background:'rgba(255,255,255,0.06)',height:4,borderRadius:2}}>
+                          <div style={{width:`${pct}%`,background:color,height:'100%',borderRadius:2}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {/* Behavioral Profile section */}
@@ -2803,8 +2833,8 @@ class RefErrorBoundary extends React.Component {
 // ─── EXPANDABLE REFERENCE CARD ────────────────────────────────────
 // ─── LABEL DESCRIPTION POPUP ────────────────────────────────────
 // Overlay rendered inside PersonPanel; shows Reference content for a label tag.
-// type: "disc" | "natural_strength" | "leadership_tendency" | "emotional_profile" | "pairing"
-// value: canonical English value, e.g. "Sustainer", "D", "Deep Worshiper"
+// type: "disc" | "natural_strength" | "leadership_tendency" | "emotional_profile" | "pairing" | "gifting" | "pastoral"
+// value: canonical English value, e.g. "Sustainer", "D", "Deep Worshiper", "pastoral-potential"
 function LabelDescriptionPopup({ type, value, lang, onClose }) {
   const [refContent, setRefContent] = useState(null);
   const [discTab, setDiscTab] = useState("brazil");
@@ -2829,6 +2859,10 @@ function LabelDescriptionPopup({ type, value, lang, onClose }) {
       item = (refContent.emotionalProfiles||[]).find(function(p){ return p.labelEN === value; });
     } else if (type === "pairing") {
       item = (refContent.pairings||[]).find(function(p){ return p.labelEN === value; });
+    } else if (type === "gifting") {
+      item = (refContent.giftings||[]).find(function(p){ return p.labelEN === value; });
+    } else if (type === "pastoral") {
+      item = (refContent.leadershipTendencies||[]).find(function(p){ return p.id === value; });
     }
   }
 

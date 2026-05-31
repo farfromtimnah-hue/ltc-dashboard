@@ -2394,7 +2394,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     {ministryRecs.map(function(rec,i){
                       return (
                         <span key={i}
-                          onClick={function(){ setMinistryPopup(rec); }}
+                          onClick={() => setMinistryPopup(rec)}
                           style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"rgba(42,191,191,0.08)",border:"1px solid rgba(42,191,191,0.25)",color:"#2ABFBF",whiteSpace:"nowrap",cursor:"pointer"}}>
                           {recLabel(rec.ministry)}
                         </span>
@@ -2408,12 +2408,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               {ministryPopup && (
                 <div
                   style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}
-                  onClick={function(){ setMinistryPopup(null); }}>
+                  onClick={() => setMinistryPopup(null)}>
                   <div
                     style={{background:"#0f1e24",borderRadius:"12px",maxWidth:"400px",width:"100%",padding:"24px",position:"relative"}}
-                    onClick={function(e){ e.stopPropagation(); }}>
+                    onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={function(){ setMinistryPopup(null); }}
+                      onClick={() => setMinistryPopup(null)}
                       style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"#6b7a82",cursor:"pointer",fontSize:13}}>
                       {lang==="PT" ? "Fechar" : "Close"}
                     </button>

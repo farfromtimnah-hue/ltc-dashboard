@@ -996,6 +996,151 @@ _Last updated: 2026-05-29 — Session 10 complete._
 
 ---
 
+## Session A — Person Modal + Card Fixes
+
+### Changes Made to App.jsx
+
+**Bug A1 — Analytics cache-busting (App.jsx)**
+- Line 947: `fetch(\`${API}/analytics\`, ...)` -> `fetch(\`${API}/analytics?t=${Date.now()}\`, ...)`
+- Ensures every analytics fetch gets fresh data from D1 instead of a cached response.
+- Worker Part 1 (Cache-Control header): Worker file not found locally. Must be applied manually in the Cloudflare dashboard or via wrangler — add `'Cache-Control': 'no-store, no-cache, must-revalidate'` to the GET /analytics route response headers.
+
+**Bug A2 — Gifting labels in PersonPanel**
+- Already fixed from Session 10. Lines 1823 and 1835 use `giftingLabel(g, lang)` which correctly applies GIFTING_PT when lang === "PT". No code changes needed.
+
+**Bug A3 — Ministry serving labels in PersonPanel**
+- Added 11 missing ministry keys to MINISTRY_PT (lines 234+): Choir, Instrumental Ministry, Setup and Teardown, Parking Ministry, Facilities Support, Video Editing, Photography, Graphics Team, Camera Operation, Social Media Team, Kids Ministry, Youth Ministry, Ushers, Intercessors, GC.
+- Existing `ministryLabel(m, lang)` call at PersonPanel line 1713 now picks up these translations automatically.
+
+**Bug A4 — Ministry Fit in PersonPanel**
+- Already implemented from Sessions 9/10. MINISTRY_FIT_MAP + MINISTRY_FIT_LABEL_PT display logic at lines 1860-1968. No code changes needed.
+
+**Bug A5 — Carisma certification options**
+- Already fixed from Session 10. CARISMA_OPTIONS with exactly 2 entries (Masters / 1o Ano/1st Year). carismaOptionActive() maps legacy values. No code changes needed.
+
+**Bug A6 — Full name in PersonCard and PersonPanel**
+- Already done from Sessions 7/9/10. PersonCard line 1358-1363, PersonPanel line 1637-1641. No code changes needed.
+
+**Bug A7 — Expand/collapse giftings in PersonPanel**
+- Added `const [showAllGiftings, setShowAllGiftings] = useState(false)` state to PersonPanel.
+- Gifting score bars (sortedScores) now collapsed by default behind a toggle button.
+- Toggle labels: PT "Ver todos os dons" / "Ocultar dons", EN "View all giftings" / "Hide giftings".
+- Only renders toggle if sortedScores.length > 0.
+
+### Worker — Pending
+Worker v6 at `ltc-api` was not found locally. The Cache-Control header fix for GET /analytics must be applied manually.
+
+### Output Files
+- `/tmp/checkpoint_A1.txt` — App.jsx after A1+A2+A3
+- `/tmp/checkpoint_A2.txt` — App.jsx after A4+A5+A6 (same, as those were already done)
+- `/tmp/ltc_dashboard_App_SessionA.txt` — final App.jsx for Session A
+
+### Current version
+App.jsx: Session A (3170 lines)
+Worker: v6 (unchanged — Cache-Control fix pending manual deploy)
+
+---
+
+## Session A Re-run — CarismaBadge Translation Fix
+
+### Single code change made
+- Added `carismaLevelDisplay(lv, lang)` helper function before `CarismaBadge`
+- Added `lang` prop to `CarismaBadge`; renders `carismaLevelDisplay(lv, lang)` instead of raw `{lv}`
+- Translation rules: Masters->Masters (both), 1st Year/1 Ano->1o Ano (PT)/1st Year (EN), Level 5->Masters (both)
+- Passed `lang={lang}` at all 3 call sites: PersonCard, PlacedCard, PersonPanel
+
+### Already-implemented (confirmed, no changes needed)
+- Fix 1: Analytics cache-busting `?t=${Date.now()}` already at line 962
+- Fix 2: Ministry Fit display in PersonPanel — MINISTRY_FIT_MAP + render at lines 1990-1994
+- Fix 4: Full name below preferred name — PersonCard lines 1373-1376, PersonPanel lines 1653-1656
+- Fix 5: Expand/collapse giftings in PersonPanel — showAllGiftings state + toggle at lines 1843-1869
+
+### Worker — still pending
+Worker Cache-Control header fix must be applied manually (no local ltc-api directory found).
+
+### Output files
+- `/tmp/ltc_dashboard_App_SessionA2.txt` — final App.jsx (3177 lines)
+
+### Current version
+App.jsx: Session A2 (3177 lines)
+Worker: v6 (unchanged)
+
+_Last updated: 2026-05-29 — Session A complete._
+
+---
+
+## Session A2 Direct Edit — PersonCard gifting language fix
+
+### Code change
+- **Fix 5**: `PersonCard` line 1404 — `giftingLabel(g, person.language)` → `giftingLabel(g, lang)`
+  - Top 3 gifting tags on the Person Card face now follow the dashboard PT/EN toggle
+  - Previously used `person.language` (the person's assessment language) instead of `lang` (the dashboard toggle)
+
+### Already confirmed in place — no code changes needed
+- Fix 1 (App.jsx part): analytics fetch already has `?t=${Date.now()}` at line 962
+- Fix 2: `MINISTRY_FIT_MAP` + render at lines 1997-2001 in PersonPanel Behavioral Profile section
+- Fix 3: `carismaLevelDisplay()` helper + `lang` prop in `CarismaBadge` at all 3 call sites
+- Fix 4: Full name below preferred name at PersonCard lines 1380-1383 and PersonPanel lines 1660-1663
+- Fix 6: `showAllGiftings` state + toggle in PersonPanel at lines 1538, 1853-1876
+
+### Worker — still pending manual action
+No local `ltc-api` directory. The Cache-Control header `'no-store, no-cache, must-revalidate'` must be added to GET /analytics response in the Cloudflare Worker manually via dashboard or wrangler.
+
+### Commit
+- `7323c1f` — Fix Person Card and Modal display bugs
+
+### Current version
+App.jsx: Session A2 deployed (3177 lines)
+Worker: v6 (unchanged — Cache-Control fix pending)
+
+_Last updated: 2026-05-29 — Session A2 direct edit complete._
+
+---
+
+## Session C — Reference Page Cleanup
+
+### Confirmed architecture
+- Reference content fetched from `public/reference-content.json` (not inline constant)
+- Body text stored as single strings; `renderParagraphs()` splits on `\n\n`
+- `RefCard` component (line 2858) renders Reference page cards
+- DISC tabs inside both `LabelDescriptionPopup` and `RefCard` — already correctly mapped: brazil/usa/cult keys to brazilPT/EN, usaPT/EN, culturalPT/EN fields
+
+### Bug C1 — Paragraph breaks (reference-content.json)
+Added `\n\n` at natural sentence boundaries in:
+- DISC Executor `usaPT` (3 breaks): before "Como se comunicam:", "Como lidam com conflitos:", "Exemplos reais"
+- DISC Executor `usaEN` (3 breaks): before "How they communicate:", "How they handle conflict:", "Real-life examples"
+- DISC Executor `culturalPT` (5 breaks): before "Em ambientes de equipe", "O que essa pessoa precisa primeiro:", "O dom por baixo do desafio:", "Nota sobre dados:", "Nota sobre as questoes:"
+- DISC Executor `culturalEN` (5 breaks): before "In team settings", "What this person needs first:", "The gift underneath the challenge:", "On data:", "Note on questions:"
+- Creativity `bodyPT` (4 breaks): before "Alguem com o dom", "Sua contribuicao", "Precisa de ambientes", "Fundamentacao biblica:"
+- Creativity `bodyEN` (4 breaks): before "Someone with the Creativity gifting", "Their contribution", "They need environments", "Biblically grounded in:"
+- teamBuilding `bodyPT`/`bodyEN` (5 breaks each): at each major section transition
+- teamBuilding: stripped "====SECTION 8: FOOTNOTES AND SOURCES===..." marker and all content after it from both bodyPT and bodyEN
+
+### Bug C2 — Footnote superscripts (App.jsx)
+- `renderParagraphs` line ~2845: `<sup>` elements now clickable, color `#2ABFBF`, `cursor:"pointer"`, `onClick` scrolls to `#reference-footnotes`
+- Footnotes `<div>` in `ReferenceTab` (line ~3121): added `id="reference-footnotes"`
+- Existing `footnoteCitations` array usage in `renderParagraphs` was already correct — inline superscripts at end of last paragraph per item
+
+### Files changed
+- `src/App.jsx` — `renderParagraphs` footnote sup style + onClick; footnotes div id
+- `public/reference-content.json` — paragraph breaks added, SECTION 8 marker removed
+
+### Commit
+- `186ce0b` — Session C: fix reference page paragraph breaks and footnote links
+
+### Output files
+- `/tmp/checkpoint_C1.txt` — App.jsx after Bug C1
+- `/tmp/checkpoint_C2.txt` — App.jsx after Bug C2
+- `/tmp/ltc_dashboard_App_SessionC.txt` — final App.jsx (3247 lines)
+
+### Current version
+App.jsx: Session C (3247 lines)
+reference-content.json: updated (paragraph breaks + SECTION 8 removed)
+
+_Last updated: 2026-05-29 — Session C complete._
+
+---
+
 ### Scope
 `/Users/nicolel/ministry-gifting/index.html` only. No App.jsx changes.
 
@@ -1053,3 +1198,93 @@ _Last updated: 2026-05-29 — Session 10 complete._
 - `7843749` — Five UX fixes: scale label, level-5 confirm overlay, DISC section styling, remove DISC from results, learn-more modal content
 
 _Last updated: 2026-05-28 — Session 8 complete._
+
+---
+
+## Session 1 (2026-05-31) — DISC Bars, Clickable Gifting Tags, Pastoral Potential Reference
+
+### Files Changed
+- `src/App.jsx`
+- `public/reference-content.json`
+
+### Fix 1 — DISC Score Bars in PersonPanel
+
+**Variables added (~line 1771):**
+- `discBars` array: maps `person.disc_d/disc_i/disc_s/disc_c` with key D/I/S/C and PT/EN labels
+- Filtered to exclude null/undefined values
+
+**JSX added after DISC type badges row (~line 2085):**
+- Renders 4 horizontal bars (D/I/S/C) with colored letter label, PT/EN name, raw score (x/15)
+- Bar width = `(field / 15) * 100%`; color from `DISC_COLORS[key]`
+- Only renders if `discBars.length > 0`
+
+### Fix 2 — Clickable Gifting Tags in PersonPanel
+
+**JSX change (~line 1993):**
+- Added `onClick={function(){ setLabelPopup({type:'gifting',value:g}); }}` and `cursor:"pointer"` to each gifting badge span
+
+**LabelDescriptionPopup change (~line 2840):**
+- Added `type === "gifting"` case: finds entry in `refContent.giftings` by `labelEN === value`
+- Renders `bodyPT` or `bodyEN` via `renderParagraphs` (no tabs)
+
+### Fix 3 — Pastoral Potential Reference
+
+**reference-content.json:**
+- Added entry to `leadershipTendencies` array with `id: "pastoral-potential"`, `labelPT: "Potencial Pastoral"`, `labelEN: "Pastoral Potential"`, full `bodyPT` and `bodyEN`
+
+**JSX change (~line 2068):**
+- Pastoral flag badge (`★ {t.pastoralAlert}`) now has `onClick={function(){ setLabelPopup({type:'pastoral',value:'pastoral-potential'}); }}` and `cursor:"pointer"`
+
+**LabelDescriptionPopup change (~line 2841):**
+- Added `type === "pastoral"` case: finds entry in `refContent.leadershipTendencies` by `id === value`
+- Renders `bodyPT` or `bodyEN` via `renderParagraphs` (no tabs)
+
+### Current version
+App.jsx: Session 1 (2026-05-31)
+reference-content.json: updated (pastoral-potential entry added)
+
+_Last updated: 2026-05-31 — Session 1 complete._
+
+---
+
+## Session 2 (2026-05-31) — Ministry Recommendations Rebuild
+
+### Files Changed
+- `src/App.jsx`
+
+### Change 1 — getMinistryRecommendations replaced (lines 642–875)
+- Old function returned `string[]`; new function returns `{ministry: string, reasons: string[]}[]`
+- Added `lang` parameter (unused in scoring, passed through)
+- Added `isBilingual` detection from `person.languages_spoken`
+- New `ministryData` accumulator tracks score + reasons per ministry
+- New `giftingReason(name)` helper: returns "Name (#1) — 72%" style reason string
+- GIFTING_MINISTRY_MAP updated: removed Legacy references, added WE CARE - Helps and WE CARE - Evangelism entries
+- MINISTRY_PRIMARY_GIFTING updated: added WE CARE - Helps and WE CARE - Evangelism entries
+- DISC modifiers now call `add(ministry, points, reason)` with DISC reason strings
+- Combination bonuses updated: replaced old combinations, added WE CARE combinations, removed Legacy combos
+- Bilingual bonus replaces old `person.language === 'EN'` check
+- Top 5 returned as objects with `.ministry` and `.reasons` (up to 3)
+
+### Change 2 — MINISTRY_PT additions (line ~272)
+- Added `"Hospitality - Welcome": "Recepção"` (hyphen key, matching function usage)
+- Added `"WE CARE - Helps": "WE CARE - Ajuda Pratica"`
+- Added `"WE CARE - Evangelism": "WE CARE - Evangelismo"`
+
+### Change 3 — PersonPanel state (line ~1669)
+- Added `const [ministryPopup, setMinistryPopup] = useState(null)`
+
+### Change 4 — ministryRecs call + recLabel helper (lines ~1986–2000)
+- `getMinistryRecommendations(person)` → `getMinistryRecommendations(person, lang)`
+- Added `recLabel(m)` function: handles WE CARE names explicitly, then falls back to MINISTRY_PT
+
+### Change 5 — Suggested Placements render (lines ~2387–2440)
+- Badges now iterate over `rec` objects (not strings)
+- Each badge: `onClick` sets `ministryPopup(rec)`, `cursor:"pointer"`
+- Badge label: `recLabel(rec.ministry)`
+- Added Ministry Reason Popup: `position:fixed` modal, shows ministry name + reasons list
+- Popup closes on backdrop click or Close button
+
+### Current version
+App.jsx: Session 2 (2026-05-31)
+
+_Last updated: 2026-05-31 — Session 2 complete._

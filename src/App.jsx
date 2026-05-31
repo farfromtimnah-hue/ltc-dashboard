@@ -641,37 +641,119 @@ function buildWhatsAppURL(person, templatePT, templateEN, skipTemplate) {
 // Used in PersonCard (size="sm") and PersonPanel (size="lg")
 function getMinistryRecommendations(person) {
   if (!person.gifting_1) return [];
-  var top3 = [person.gifting_1, person.gifting_2, person.gifting_3].filter(Boolean);
-  var discPrimary = person.disc_primary || "";
-  var discSecondary = person.disc_secondary || "";
+
+  var allScores = {};
+  try { allScores = JSON.parse(person.scores || '{}'); } catch(e) { allScores = {}; }
+
+  var discPrimary = person.disc_primary || '';
+  var discSecondary = person.disc_secondary || '';
+  var discTypes = [discPrimary, discSecondary].filter(Boolean);
+
   var ministryScores = {};
-  function addScore(ministry, points) {
+  function add(ministry, points) {
     ministryScores[ministry] = (ministryScores[ministry] || 0) + points;
   }
-  if (top3.includes("Worship & Music")) { addScore("Worship Team",10); addScore("Sound",5); addScore("Lighting",4); addScore("Streaming",4); addScore("Legacy",3); }
-  if (top3.includes("Gift of Helps")) { addScore("Setup & Teardown",10); addScore("Parking",8); addScore("Volunteer Coffee",7); addScore("Service Experience",6); addScore("Hospitality - Welcome",5); }
-  if (top3.includes("Technical Arts") || top3.includes("Visual Storytelling")) { addScore("Sound",10); addScore("Lighting",10); addScore("Projection",10); addScore("Streaming",9); addScore("Photo & Video",9); }
-  if (top3.includes("Creativity")) { addScore("Photo & Video",10); addScore("Social Media",10); addScore("Service Experience",7); addScore("Lighting",5); }
-  if (top3.includes("Administration")) { addScore("GC Leader",10); addScore("Setup & Teardown",8); addScore("Service Experience",8); addScore("Lagoinha Kids",6); addScore("Legacy",6); }
-  if (top3.includes("Intercession")) { addScore("Intercession",10); addScore("Translation",5); addScore("English Service",4); }
-  if (top3.includes("Hospitality")) { addScore("Hospitality - Welcome",10); addScore("Volunteer Coffee",9); addScore("Consolidation",8); addScore("Service Experience",7); addScore("Lagoinha Kids",5); }
-  if (top3.includes("Evangelism")) { addScore("Consolidation",10); addScore("English Service",8); addScore("Hospitality - Welcome",6); addScore("Legacy",5); }
-  if (top3.includes("Encouragement")) { addScore("Consolidation",9); addScore("Hospitality - Welcome",8); addScore("Lagoinha Kids",8); addScore("Volunteer Coffee",7); addScore("GC Leader",6); }
-  if (top3.includes("Teaching")) { addScore("Lagoinha Kids",10); addScore("Legacy",9); addScore("GC Leader",8); addScore("English Service",6); addScore("Translation",5); }
-  if (top3.includes("Influence & Servant Leadership")) { addScore("GC Leader",10); addScore("Legacy",9); addScore("Service Experience",7); addScore("Lagoinha Kids",7); addScore("English Service",6); }
-  if (top3.includes("Discernment & Prophetic")) { addScore("Intercession",10); addScore("GC Leader",7); addScore("Translation",6); addScore("Legacy",5); }
-  if (top3.includes("Faith")) { addScore("Intercession",9); addScore("Consolidation",8); addScore("GC Leader",7); addScore("Legacy",6); }
-  var discTypes = [discPrimary, discSecondary].filter(Boolean);
-  if (discTypes.includes("I") || discTypes.includes("Comunicador")) { addScore("Hospitality - Welcome",4); addScore("Consolidation",4); addScore("Social Media",3); addScore("English Service",3); addScore("Volunteer Coffee",3); }
-  if (discTypes.includes("D") || discTypes.includes("Executor")) { addScore("GC Leader",4); addScore("Service Experience",4); addScore("Setup & Teardown",3); addScore("Legacy",3); }
-  if (discTypes.includes("S") || discTypes.includes("Planejador")) { addScore("Projection",4); addScore("Streaming",4); addScore("Volunteer Coffee",4); addScore("Parking",3); addScore("Lagoinha Kids",3); }
-  if (discTypes.includes("C") || discTypes.includes("Analista")) { addScore("Sound",4); addScore("Lighting",4); addScore("Projection",4); addScore("Streaming",3); addScore("Photo & Video",3); }
-  if (person.language === "EN") { addScore("English Service",5); addScore("Translation",4); }
+
+  function rankWeight(giftingName) {
+    if (giftingName === person.gifting_1) return 3;
+    if (giftingName === person.gifting_2) return 2;
+    if (giftingName === person.gifting_3) return 1;
+    var pct = allScores[giftingName] || 0;
+    if (pct >= 70) return 1.5;
+    if (pct >= 50) return 0.75;
+    return 0;
+  }
+
+  var MINISTRY_PRIMARY_GIFTING = {
+    'Worship Team': 'Worship & Music',
+    'Sound': 'Technical Arts',
+    'Lighting': 'Technical Arts',
+    'Projection': 'Technical Arts',
+    'Streaming': 'Technical Arts',
+    'Photo & Video': 'Visual Storytelling',
+    'Social Media': 'Digital Communication',
+    'Intercession': 'Intercession',
+    'Lagoinha Kids': 'Teaching',
+    'GC Leader': 'Influence & Servant Leadership',
+    'Legacy': 'Influence & Servant Leadership',
+    'Translation': 'Teaching',
+    'Consolidation': 'Evangelism',
+    'English Service': 'Evangelism',
+    'Service Experience': 'Administration',
+    'Setup & Teardown': 'Gift of Helps',
+    'Parking': 'Gift of Helps',
+    'Volunteer Coffee': 'Hospitality',
+    'Hospitality - Welcome': 'Hospitality'
+  };
+
+  function isSuppressed(ministry) {
+    var primaryGifting = MINISTRY_PRIMARY_GIFTING[ministry];
+    if (!primaryGifting) return false;
+    var inTop3 = (primaryGifting === person.gifting_1 ||
+                  primaryGifting === person.gifting_2 ||
+                  primaryGifting === person.gifting_3);
+    return !inTop3 && (allScores[primaryGifting] || 0) < 40;
+  }
+
+  var GIFTING_MINISTRY_MAP = {
+    'Worship & Music':               [['Worship Team',10],['Sound',4],['Lighting',3],['Streaming',3],['Legacy',3]],
+    'Gift of Helps':                 [['Setup & Teardown',10],['Parking',8],['Volunteer Coffee',7],['Service Experience',6],['Hospitality - Welcome',5]],
+    'Technical Arts':                [['Sound',10],['Lighting',10],['Projection',10],['Streaming',9],['Photo & Video',7],['Service Experience',5]],
+    'Visual Storytelling':           [['Photo & Video',10],['Streaming',8],['Social Media',7],['Lighting',5],['Service Experience',4]],
+    'Digital Communication':         [['Social Media',10],['Streaming',5],['Photo & Video',4]],
+    'Creativity':                    [['Photo & Video',10],['Social Media',8],['Service Experience',7],['Lighting',5],['Streaming',4]],
+    'Administration':                [['Service Experience',10],['GC Leader',9],['Setup & Teardown',7],['Lagoinha Kids',5],['Legacy',5]],
+    'Intercession':                  [['Intercession',10],['Translation',5],['English Service',4]],
+    'Hospitality':                   [['Hospitality - Welcome',10],['Volunteer Coffee',9],['Consolidation',8],['Service Experience',6],['Lagoinha Kids',5]],
+    'Evangelism':                    [['Consolidation',10],['English Service',8],['Hospitality - Welcome',6],['Legacy',5]],
+    'Encouragement':                 [['Consolidation',9],['Hospitality - Welcome',8],['Lagoinha Kids',8],['Volunteer Coffee',7],['GC Leader',6]],
+    'Teaching':                      [['Lagoinha Kids',10],['Legacy',9],['GC Leader',8],['English Service',6],['Translation',5]],
+    'Influence & Servant Leadership':[['GC Leader',10],['Legacy',9],['Service Experience',7],['Lagoinha Kids',7],['English Service',6]],
+    'Discernment & Prophetic':       [['Intercession',10],['GC Leader',7],['Translation',6],['Legacy',5]],
+    'Faith':                         [['Intercession',9],['Consolidation',8],['GC Leader',7],['Legacy',6]]
+  };
+
+  Object.keys(GIFTING_MINISTRY_MAP).forEach(function(gifting) {
+    var weight = rankWeight(gifting);
+    if (weight === 0) return;
+    GIFTING_MINISTRY_MAP[gifting].forEach(function(pair) { add(pair[0], pair[1] * weight); });
+  });
+
+  if (discTypes.some(function(d){ return d==='I'||d==='Comunicador'; })) {
+    add('Hospitality - Welcome',4); add('Consolidation',4); add('Social Media',3); add('English Service',3); add('Volunteer Coffee',3);
+  }
+  if (discTypes.some(function(d){ return d==='D'||d==='Executor'; })) {
+    add('GC Leader',4); add('Service Experience',4); add('Setup & Teardown',3); add('Legacy',3);
+  }
+  if (discTypes.some(function(d){ return d==='S'||d==='Planejador'; })) {
+    add('Projection',4); add('Streaming',4); add('Volunteer Coffee',4); add('Parking',3); add('Lagoinha Kids',3);
+  }
+  if (discTypes.some(function(d){ return d==='C'||d==='Analista'; })) {
+    add('Sound',4); add('Lighting',4); add('Projection',4); add('Streaming',3); add('Photo & Video',3);
+  }
+
+  function isStrong(gifting) {
+    return (gifting === person.gifting_1 || gifting === person.gifting_2 ||
+            gifting === person.gifting_3 || (allScores[gifting] || 0) >= 70);
+  }
+
+  if (isStrong('Worship & Music') && isStrong('Administration'))            { add('Service Experience',15); add('Worship Team',8); }
+  if (isStrong('Worship & Music') && isStrong('Technical Arts'))             { add('Sound',10); add('Lighting',8); add('Streaming',8); add('Worship Team',6); }
+  if (isStrong('Administration') && isStrong('Influence & Servant Leadership')){ add('GC Leader',12); add('Legacy',8); }
+  if (isStrong('Teaching') && isStrong('Encouragement'))                    { add('Lagoinha Kids',12); add('Legacy',8); }
+  if (isStrong('Evangelism') && isStrong('Hospitality'))                    { add('Consolidation',10); add('Hospitality - Welcome',8); add('English Service',6); }
+  if (isStrong('Technical Arts') && isStrong('Visual Storytelling'))        { add('Photo & Video',10); add('Streaming',8); add('Projection',8); }
+
+  if (person.language === 'EN') { add('English Service',5); add('Translation',4); }
+
+  Object.keys(ministryScores).forEach(function(ministry) {
+    if (isSuppressed(ministry)) ministryScores[ministry] = -999;
+  });
+
   return Object.keys(ministryScores)
-    .map(function(m){ return {ministry:m, score:ministryScores[m]}; })
-    .sort(function(a,b){ return b.score - a.score; })
-    .slice(0,5)
-    .map(function(item){ return item.ministry; });
+    .filter(function(m) { return ministryScores[m] > 0; })
+    .sort(function(a, b) { return ministryScores[b] - ministryScores[a]; })
+    .slice(0, 5);
 }
 
 function carismaLevelDisplay(lv, lang) {

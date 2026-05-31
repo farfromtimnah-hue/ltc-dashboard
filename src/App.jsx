@@ -650,6 +650,7 @@ function getMinistryRecommendations(person, lang) {
     allScores = JSON.parse(person.scores || '{}');
   } catch(e) { allScores = {}; }
   console.log('DEBUG scores type:', typeof person.scores, 'allScores keys:', Object.keys(allScores).length, 'gifting1:', person.gifting_1);
+  console.log('DEBUG worship score:', allScores['Worship & Music'], 'techarts:', allScores['Technical Arts'], 'worship rankweight:', person.gifting_1 === 'Worship & Music' ? 3 : 'NOT GIFTING 1');
 
   var discPrimary = person.disc_primary || '';
   var discSecondary = person.disc_secondary || '';
@@ -961,6 +962,7 @@ function getMinistryRecommendations(person, lang) {
         reasons: ministryData[m].reasons.slice(0, 3)
       };
     });
+  console.log('DEBUG top ministries:', sorted.map(function(m){ return m.ministry + ':' + ministryData[m.ministry].score; }));
 
   return sorted;
 }

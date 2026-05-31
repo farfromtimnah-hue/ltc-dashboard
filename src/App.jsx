@@ -649,6 +649,7 @@ function getMinistryRecommendations(person, lang) {
   try {
     allScores = JSON.parse(person.scores || '{}');
   } catch(e) { allScores = {}; }
+  console.log('DEBUG scores type:', typeof person.scores, 'allScores keys:', Object.keys(allScores).length, 'gifting1:', person.gifting_1);
 
   var discPrimary = person.disc_primary || '';
   var discSecondary = person.disc_secondary || '';

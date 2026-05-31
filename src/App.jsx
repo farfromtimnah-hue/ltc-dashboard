@@ -2006,6 +2006,31 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           onClose={function(){ setLabelPopup(null); }}
         />
       )}
+      {ministryPopup && (
+        <>
+          <div
+            style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:999}}
+            onClick={() => setMinistryPopup(null)} />
+          <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%, -50%)",zIndex:1000,background:"#0f1e24",borderRadius:"12px",width:"90%",maxWidth:"400px",padding:"24px"}}>
+            <button
+              onClick={() => setMinistryPopup(null)}
+              style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"#6b7a82",cursor:"pointer",fontSize:13}}>
+              {lang==="PT" ? "Fechar" : "Close"}
+            </button>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
+              {lang==="PT" ? "Por que esta sugestao?" : "Why this suggestion?"}
+            </div>
+            <div style={{fontSize:15,fontWeight:600,color:"#2ABFBF",marginBottom:12}}>
+              {recLabel(ministryPopup.ministry)}
+            </div>
+            <ul style={{margin:0,padding:"0 0 0 16px",color:"#aebac0",fontSize:12,lineHeight:1.7}}>
+              {ministryPopup.reasons.map(function(r,i){
+                return <li key={i}>{r}</li>;
+              })}
+            </ul>
+          </div>
+        </>
+      )}
       <div onClick={onClose} style={{position:"absolute",inset:0,background:"rgba(2,6,12,0.65)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}} />
       <div className="drawer-panel" style={{width:"min(560px,100vw)",height:"100vh",background:"linear-gradient(180deg, rgba(12,24,32,0.96), rgba(6,14,20,0.96))",backdropFilter:"blur(30px) saturate(140%)",WebkitBackdropFilter:"blur(30px) saturate(140%)",borderLeft:"1px solid rgba(94,234,212,0.18)",boxShadow:"-30px 0 80px -20px rgba(0,0,0,0.7), -1px 0 30px -10px rgba(94,234,212,0.15)",overflowY:"auto",display:"flex",flexDirection:"column",position:"relative"}}>
         {/* Top accent line */}
@@ -2404,33 +2429,6 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                 </div>
               )}
 
-              {/* Ministry Reason Popup */}
-              {ministryPopup && (
-                <div
-                  style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}
-                  onClick={() => setMinistryPopup(null)}>
-                  <div
-                    style={{background:"#0f1e24",borderRadius:"12px",maxWidth:"400px",width:"100%",padding:"24px",position:"relative"}}
-                    onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setMinistryPopup(null)}
-                      style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"#6b7a82",cursor:"pointer",fontSize:13}}>
-                      {lang==="PT" ? "Fechar" : "Close"}
-                    </button>
-                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
-                      {lang==="PT" ? "Por que esta sugestao?" : "Why this suggestion?"}
-                    </div>
-                    <div style={{fontSize:15,fontWeight:600,color:"#2ABFBF",marginBottom:12}}>
-                      {recLabel(ministryPopup.ministry)}
-                    </div>
-                    <ul style={{margin:0,padding:"0 0 0 16px",color:"#aebac0",fontSize:12,lineHeight:1.7}}>
-                      {ministryPopup.reasons.map(function(r,i){
-                        return <li key={i}>{r}</li>;
-                      })}
-                    </ul>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

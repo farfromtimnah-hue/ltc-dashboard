@@ -265,7 +265,10 @@ const MINISTRY_PT = {
   "Youth Ministry":"Ministerio de Jovens",
   "Ushers":"Recepcao",
   "Intercessors":"Intercessores",
-  "GC":"GC"
+  "GC":"GC",
+  "Hospitality - Welcome":"Recepção",
+  "WE CARE - Helps":"WE CARE - Ajuda Pratica",
+  "WE CARE - Evangelism":"WE CARE - Evangelismo"
 };
 
 function ministryLabel(name, lang, personLang) {
@@ -639,21 +642,41 @@ function buildWhatsAppURL(person, templatePT, templateEN, skipTemplate) {
 
 // ─── CARISMA BADGE COMPONENT ──────────────────────────────────────
 // Used in PersonCard (size="sm") and PersonPanel (size="lg")
-function getMinistryRecommendations(person) {
+function getMinistryRecommendations(person, lang) {
   if (!person.gifting_1) return [];
 
   var allScores = {};
-  try { allScores = JSON.parse(person.scores || '{}'); } catch(e) { allScores = {}; }
+  try {
+    allScores = JSON.parse(person.scores || '{}');
+  } catch(e) { allScores = {}; }
 
   var discPrimary = person.disc_primary || '';
   var discSecondary = person.disc_secondary || '';
   var discTypes = [discPrimary, discSecondary].filter(Boolean);
 
-  var ministryScores = {};
-  function add(ministry, points) {
-    ministryScores[ministry] = (ministryScores[ministry] || 0) + points;
+  // Parse languages spoken
+  var langsSpoken = [];
+  try {
+    var ls = person.languages_spoken;
+    if (typeof ls === 'string') langsSpoken = JSON.parse(ls);
+    else if (Array.isArray(ls)) langsSpoken = ls;
+  } catch(e) { langsSpoken = []; }
+  var isBilingual = langsSpoken.indexOf('Both') > -1;
+
+  // Ministry score and reason accumulator
+  var ministryData = {};
+  function add(ministry, points, reason) {
+    if (!ministryData[ministry]) {
+      ministryData[ministry] = { score: 0, reasons: [] };
+    }
+    ministryData[ministry].score += points;
+    if (reason && ministryData[ministry].reasons.indexOf(reason) === -1) {
+      ministryData[ministry].reasons.push(reason);
+    }
   }
 
+  // Rank weight: gifting_1=3x, gifting_2=2x, gifting_3=1x
+  // Strong non-top3 (>=70%) = 1.5x, moderate (50-69%) = 0.75x
   function rankWeight(giftingName) {
     if (giftingName === person.gifting_1) return 3;
     if (giftingName === person.gifting_2) return 2;
@@ -662,6 +685,16 @@ function getMinistryRecommendations(person) {
     if (pct >= 70) return 1.5;
     if (pct >= 50) return 0.75;
     return 0;
+  }
+
+  // Reason label for a gifting
+  function giftingReason(giftingName) {
+    var pct = allScores[giftingName] || 0;
+    var rank = '';
+    if (giftingName === person.gifting_1) rank = ' (#1)';
+    else if (giftingName === person.gifting_2) rank = ' (#2)';
+    else if (giftingName === person.gifting_3) rank = ' (#3)';
+    return giftingName + rank + ' — ' + pct + '%';
   }
 
   var MINISTRY_PRIMARY_GIFTING = {
@@ -675,7 +708,6 @@ function getMinistryRecommendations(person) {
     'Intercession': 'Intercession',
     'Lagoinha Kids': 'Teaching',
     'GC Leader': 'Influence & Servant Leadership',
-    'Legacy': 'Influence & Servant Leadership',
     'Translation': 'Teaching',
     'Consolidation': 'Evangelism',
     'English Service': 'Evangelism',
@@ -683,7 +715,9 @@ function getMinistryRecommendations(person) {
     'Setup & Teardown': 'Gift of Helps',
     'Parking': 'Gift of Helps',
     'Volunteer Coffee': 'Hospitality',
-    'Hospitality - Welcome': 'Hospitality'
+    'Hospitality - Welcome': 'Hospitality',
+    'WE CARE - Helps': 'Gift of Helps',
+    'WE CARE - Evangelism': 'Evangelism'
   };
 
   function isSuppressed(ministry) {
@@ -692,68 +726,242 @@ function getMinistryRecommendations(person) {
     var inTop3 = (primaryGifting === person.gifting_1 ||
                   primaryGifting === person.gifting_2 ||
                   primaryGifting === person.gifting_3);
-    return !inTop3 && (allScores[primaryGifting] || 0) < 40;
+    if (inTop3) return false;
+    var pct = allScores[primaryGifting] || 0;
+    return pct < 40;
   }
 
+  // Strong gifting check (top 3 OR >=70%)
+  function isStrong(giftingName) {
+    return (giftingName === person.gifting_1 ||
+            giftingName === person.gifting_2 ||
+            giftingName === person.gifting_3 ||
+            (allScores[giftingName] || 0) >= 70);
+  }
+
+  // GIFTING TO MINISTRY SCORING
   var GIFTING_MINISTRY_MAP = {
-    'Worship & Music':               [['Worship Team',10],['Sound',4],['Lighting',3],['Streaming',3],['Legacy',3]],
-    'Gift of Helps':                 [['Setup & Teardown',10],['Parking',8],['Volunteer Coffee',7],['Service Experience',6],['Hospitality - Welcome',5]],
-    'Technical Arts':                [['Sound',10],['Lighting',10],['Projection',10],['Streaming',9],['Photo & Video',7],['Service Experience',5]],
-    'Visual Storytelling':           [['Photo & Video',10],['Streaming',8],['Social Media',7],['Lighting',5],['Service Experience',4]],
-    'Digital Communication':         [['Social Media',10],['Streaming',5],['Photo & Video',4]],
-    'Creativity':                    [['Photo & Video',10],['Social Media',8],['Service Experience',7],['Lighting',5],['Streaming',4]],
-    'Administration':                [['Service Experience',10],['GC Leader',9],['Setup & Teardown',7],['Lagoinha Kids',5],['Legacy',5]],
-    'Intercession':                  [['Intercession',10],['Translation',5],['English Service',4]],
-    'Hospitality':                   [['Hospitality - Welcome',10],['Volunteer Coffee',9],['Consolidation',8],['Service Experience',6],['Lagoinha Kids',5]],
-    'Evangelism':                    [['Consolidation',10],['English Service',8],['Hospitality - Welcome',6],['Legacy',5]],
-    'Encouragement':                 [['Consolidation',9],['Hospitality - Welcome',8],['Lagoinha Kids',8],['Volunteer Coffee',7],['GC Leader',6]],
-    'Teaching':                      [['Lagoinha Kids',10],['Legacy',9],['GC Leader',8],['English Service',6],['Translation',5]],
-    'Influence & Servant Leadership':[['GC Leader',10],['Legacy',9],['Service Experience',7],['Lagoinha Kids',7],['English Service',6]],
-    'Discernment & Prophetic':       [['Intercession',10],['GC Leader',7],['Translation',6],['Legacy',5]],
-    'Faith':                         [['Intercession',9],['Consolidation',8],['GC Leader',7],['Legacy',6]]
+    'Worship & Music': [
+      ['Worship Team', 10],
+      ['Sound', 4],
+      ['Lighting', 3],
+      ['Streaming', 3]
+    ],
+    'Gift of Helps': [
+      ['Setup & Teardown', 10],
+      ['Parking', 8],
+      ['Volunteer Coffee', 7],
+      ['Service Experience', 6],
+      ['Hospitality - Welcome', 5],
+      ['WE CARE - Helps', 9]
+    ],
+    'Technical Arts': [
+      ['Sound', 10],
+      ['Lighting', 10],
+      ['Projection', 10],
+      ['Streaming', 9],
+      ['Photo & Video', 7],
+      ['Service Experience', 5]
+    ],
+    'Visual Storytelling': [
+      ['Photo & Video', 10],
+      ['Streaming', 8],
+      ['Social Media', 7],
+      ['Lighting', 5],
+      ['Service Experience', 4]
+    ],
+    'Digital Communication': [
+      ['Social Media', 10],
+      ['Streaming', 5],
+      ['Photo & Video', 4]
+    ],
+    'Creativity': [
+      ['Photo & Video', 10],
+      ['Social Media', 8],
+      ['Service Experience', 7],
+      ['Lighting', 5],
+      ['Streaming', 4]
+    ],
+    'Administration': [
+      ['Service Experience', 10],
+      ['GC Leader', 9],
+      ['Setup & Teardown', 7],
+      ['Lagoinha Kids', 5]
+    ],
+    'Intercession': [
+      ['Intercession', 10],
+      ['Translation', 4]
+    ],
+    'Hospitality': [
+      ['Hospitality - Welcome', 10],
+      ['Volunteer Coffee', 9],
+      ['Consolidation', 8],
+      ['Service Experience', 6],
+      ['Lagoinha Kids', 5],
+      ['WE CARE - Evangelism', 6]
+    ],
+    'Evangelism': [
+      ['Consolidation', 10],
+      ['English Service', 8],
+      ['Hospitality - Welcome', 6],
+      ['WE CARE - Evangelism', 10]
+    ],
+    'Encouragement': [
+      ['Consolidation', 9],
+      ['Hospitality - Welcome', 8],
+      ['Lagoinha Kids', 8],
+      ['Volunteer Coffee', 7],
+      ['GC Leader', 6],
+      ['WE CARE - Evangelism', 7]
+    ],
+    'Teaching': [
+      ['Lagoinha Kids', 10],
+      ['GC Leader', 8],
+      ['English Service', 6],
+      ['Translation', 5]
+    ],
+    'Influence & Servant Leadership': [
+      ['GC Leader', 10],
+      ['Service Experience', 7],
+      ['Lagoinha Kids', 7],
+      ['English Service', 6]
+    ],
+    'Discernment & Prophetic': [
+      ['Intercession', 10],
+      ['GC Leader', 7],
+      ['Translation', 6]
+    ],
+    'Faith': [
+      ['Intercession', 9],
+      ['Consolidation', 8],
+      ['GC Leader', 7]
+    ]
   };
 
+  // Apply gifting scores with rank weighting and reasons
   Object.keys(GIFTING_MINISTRY_MAP).forEach(function(gifting) {
     var weight = rankWeight(gifting);
     if (weight === 0) return;
-    GIFTING_MINISTRY_MAP[gifting].forEach(function(pair) { add(pair[0], pair[1] * weight); });
+    var mappings = GIFTING_MINISTRY_MAP[gifting];
+    mappings.forEach(function(pair) {
+      add(pair[0], pair[1] * weight, giftingReason(gifting));
+    });
   });
 
-  if (discTypes.some(function(d){ return d==='I'||d==='Comunicador'; })) {
-    add('Hospitality - Welcome',4); add('Consolidation',4); add('Social Media',3); add('English Service',3); add('Volunteer Coffee',3);
+  // DISC MODIFIER SCORES
+  if (discTypes.some(function(d){
+    return d==='I'||d==='Comunicador';
+  })) {
+    add('Hospitality - Welcome', 4, 'DISC: Comunicador/I');
+    add('Consolidation', 4, 'DISC: Comunicador/I');
+    add('Social Media', 3, 'DISC: Comunicador/I');
+    add('English Service', 3, 'DISC: Comunicador/I');
+    add('Volunteer Coffee', 3, 'DISC: Comunicador/I');
   }
-  if (discTypes.some(function(d){ return d==='D'||d==='Executor'; })) {
-    add('GC Leader',4); add('Service Experience',4); add('Setup & Teardown',3); add('Legacy',3);
+  if (discTypes.some(function(d){
+    return d==='D'||d==='Executor';
+  })) {
+    add('GC Leader', 4, 'DISC: Executor/D');
+    add('Service Experience', 4, 'DISC: Executor/D');
+    add('Setup & Teardown', 3, 'DISC: Executor/D');
   }
-  if (discTypes.some(function(d){ return d==='S'||d==='Planejador'; })) {
-    add('Projection',4); add('Streaming',4); add('Volunteer Coffee',4); add('Parking',3); add('Lagoinha Kids',3);
+  if (discTypes.some(function(d){
+    return d==='S'||d==='Planejador';
+  })) {
+    add('Projection', 4, 'DISC: Planejador/S');
+    add('Streaming', 4, 'DISC: Planejador/S');
+    add('Volunteer Coffee', 4, 'DISC: Planejador/S');
+    add('Parking', 3, 'DISC: Planejador/S');
+    add('Lagoinha Kids', 3, 'DISC: Planejador/S');
   }
-  if (discTypes.some(function(d){ return d==='C'||d==='Analista'; })) {
-    add('Sound',4); add('Lighting',4); add('Projection',4); add('Streaming',3); add('Photo & Video',3);
+  if (discTypes.some(function(d){
+    return d==='C'||d==='Analista';
+  })) {
+    add('Sound', 4, 'DISC: Analista/C');
+    add('Lighting', 4, 'DISC: Analista/C');
+    add('Projection', 4, 'DISC: Analista/C');
+    add('Streaming', 3, 'DISC: Analista/C');
+    add('Photo & Video', 3, 'DISC: Analista/C');
   }
 
-  function isStrong(gifting) {
-    return (gifting === person.gifting_1 || gifting === person.gifting_2 ||
-            gifting === person.gifting_3 || (allScores[gifting] || 0) >= 70);
+  // COMBINATION BONUSES
+  if (isStrong('Worship & Music') && isStrong('Administration')) {
+    add('Service Experience', 15,
+      'Combination: Worship & Music + Administration');
+    add('Worship Team', 8,
+      'Combination: Worship & Music + Administration');
+  }
+  if (isStrong('Worship & Music') && isStrong('Technical Arts')) {
+    add('Sound', 10,
+      'Combination: Worship & Music + Technical Arts');
+    add('Lighting', 8,
+      'Combination: Worship & Music + Technical Arts');
+    add('Streaming', 8,
+      'Combination: Worship & Music + Technical Arts');
+  }
+  if (isStrong('Administration') &&
+      isStrong('Influence & Servant Leadership')) {
+    add('GC Leader', 12,
+      'Combination: Administration + Influence & Servant Leadership');
+  }
+  if (isStrong('Teaching') && isStrong('Encouragement')) {
+    add('Lagoinha Kids', 12,
+      'Combination: Teaching + Encouragement');
+  }
+  if (isStrong('Evangelism') && isStrong('Hospitality')) {
+    add('Consolidation', 10,
+      'Combination: Evangelism + Hospitality');
+    add('Hospitality - Welcome', 8,
+      'Combination: Evangelism + Hospitality');
+    add('WE CARE - Evangelism', 10,
+      'Combination: Evangelism + Hospitality');
+  }
+  if (isStrong('Technical Arts') &&
+      isStrong('Visual Storytelling')) {
+    add('Photo & Video', 10,
+      'Combination: Technical Arts + Visual Storytelling');
+    add('Streaming', 8,
+      'Combination: Technical Arts + Visual Storytelling');
+    add('Projection', 8,
+      'Combination: Technical Arts + Visual Storytelling');
+  }
+  if (isStrong('Gift of Helps') && isStrong('Evangelism')) {
+    add('WE CARE - Helps', 10,
+      'Combination: Gift of Helps + Evangelism');
+    add('WE CARE - Evangelism', 8,
+      'Combination: Gift of Helps + Evangelism');
   }
 
-  if (isStrong('Worship & Music') && isStrong('Administration'))            { add('Service Experience',15); add('Worship Team',8); }
-  if (isStrong('Worship & Music') && isStrong('Technical Arts'))             { add('Sound',10); add('Lighting',8); add('Streaming',8); add('Worship Team',6); }
-  if (isStrong('Administration') && isStrong('Influence & Servant Leadership')){ add('GC Leader',12); add('Legacy',8); }
-  if (isStrong('Teaching') && isStrong('Encouragement'))                    { add('Lagoinha Kids',12); add('Legacy',8); }
-  if (isStrong('Evangelism') && isStrong('Hospitality'))                    { add('Consolidation',10); add('Hospitality - Welcome',8); add('English Service',6); }
-  if (isStrong('Technical Arts') && isStrong('Visual Storytelling'))        { add('Photo & Video',10); add('Streaming',8); add('Projection',8); }
+  // TRANSLATION -- bilingual speakers only
+  if (isBilingual) {
+    add('Translation', 8, 'Bilingual (Both languages)');
+    add('English Service', 5, 'Bilingual (Both languages)');
+  }
 
-  if (person.language === 'EN') { add('English Service',5); add('Translation',4); }
-
-  Object.keys(ministryScores).forEach(function(ministry) {
-    if (isSuppressed(ministry)) ministryScores[ministry] = -999;
+  // NEGATIVE FILTER
+  Object.keys(ministryData).forEach(function(ministry) {
+    if (isSuppressed(ministry)) {
+      ministryData[ministry].score = -999;
+    }
   });
 
-  return Object.keys(ministryScores)
-    .filter(function(m) { return ministryScores[m] > 0; })
-    .sort(function(a, b) { return ministryScores[b] - ministryScores[a]; })
-    .slice(0, 5);
+  // SORT AND RETURN TOP 5 as objects
+  var sorted = Object.keys(ministryData)
+    .filter(function(m) {
+      return ministryData[m].score > 0;
+    })
+    .sort(function(a, b) {
+      return ministryData[b].score - ministryData[a].score;
+    })
+    .slice(0, 5)
+    .map(function(m) {
+      return {
+        ministry: m,
+        reasons: ministryData[m].reasons.slice(0, 3)
+      };
+    });
+
+  return sorted;
 }
 
 function carismaLevelDisplay(lv, lang) {
@@ -1664,6 +1872,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [showMinistryInput, setShowMinistryInput] = useState(false);
   const [labelPopup, setLabelPopup] = useState(null); // {type, value} or null
   const [showAllGiftings, setShowAllGiftings] = useState(false);
+  const [ministryPopup, setMinistryPopup] = useState(null); // {ministry, reasons} or null
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1774,7 +1983,18 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     { key: 'S', field: person.disc_s, ptLabel: 'Planejador', enLabel: 'Planner' },
     { key: 'C', field: person.disc_c, ptLabel: 'Analista', enLabel: 'Analyst' }
   ].filter(function(b){ return b.field !== null && b.field !== undefined; });
-  var ministryRecs = getMinistryRecommendations(person);
+  var ministryRecs = getMinistryRecommendations(person, lang);
+
+  function recLabel(m) {
+    if (m === 'WE CARE - Helps') {
+      return lang === 'PT' ? 'WE CARE - Ajuda Pratica' : 'WE CARE - Helps';
+    }
+    if (m === 'WE CARE - Evangelism') {
+      return lang === 'PT' ? 'WE CARE - Evangelismo' : 'WE CARE - Evangelism';
+    }
+    if (lang === 'PT') return (MINISTRY_PT[m] || m);
+    return m;
+  }
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",justifyContent:"flex-end"}}>
@@ -2171,13 +2391,43 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     {lang==="PT" ? "Encaixes Sugeridos" : "Suggested Placements"}
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {ministryRecs.map(function(m,i){
+                    {ministryRecs.map(function(rec,i){
                       return (
-                        <span key={i} style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"rgba(42,191,191,0.08)",border:"1px solid rgba(42,191,191,0.25)",color:"#2ABFBF",whiteSpace:"nowrap"}}>
-                          {lang==="PT" ? (MINISTRY_PT[m]||m) : m}
+                        <span key={i}
+                          onClick={function(){ setMinistryPopup(rec); }}
+                          style={{fontSize:11,padding:"3px 10px",borderRadius:999,background:"rgba(42,191,191,0.08)",border:"1px solid rgba(42,191,191,0.25)",color:"#2ABFBF",whiteSpace:"nowrap",cursor:"pointer"}}>
+                          {recLabel(rec.ministry)}
                         </span>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Ministry Reason Popup */}
+              {ministryPopup && (
+                <div
+                  style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}
+                  onClick={function(){ setMinistryPopup(null); }}>
+                  <div
+                    style={{background:"#0f1e24",borderRadius:"12px",maxWidth:"400px",width:"100%",padding:"24px",position:"relative"}}
+                    onClick={function(e){ e.stopPropagation(); }}>
+                    <button
+                      onClick={function(){ setMinistryPopup(null); }}
+                      style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"#6b7a82",cursor:"pointer",fontSize:13}}>
+                      {lang==="PT" ? "Fechar" : "Close"}
+                    </button>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
+                      {lang==="PT" ? "Por que esta sugestao?" : "Why this suggestion?"}
+                    </div>
+                    <div style={{fontSize:15,fontWeight:600,color:"#2ABFBF",marginBottom:12}}>
+                      {recLabel(ministryPopup.ministry)}
+                    </div>
+                    <ul style={{margin:0,padding:"0 0 0 16px",color:"#aebac0",fontSize:12,lineHeight:1.7}}>
+                      {ministryPopup.reasons.map(function(r,i){
+                        return <li key={i}>{r}</li>;
+                      })}
+                    </ul>
                   </div>
                 </div>
               )}

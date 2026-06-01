@@ -1247,7 +1247,34 @@ _Last updated: 2026-05-31 — Session 1 complete._
 
 ---
 
-## Session 2 (2026-05-31) — Ministry Recommendations Rebuild
+## Session 2 Redux (2026-05-31) — Ministry Recommendations Complete Rewrite
+
+### Files Changed
+- `src/App.jsx`
+
+### Change 1 — getMinistryRecommendations fully replaced (lines 645–968)
+- Removed 3 DEBUG console.log lines (old lines 652, 653, 965)
+- New function: same signature `(person, lang)`, returns `{ministry, reasons}[]`
+- Added `isReliable = person.reliability_flag === 1` check
+- New GIFTING_MINISTRY_MAP: rebalanced scores, removed Legacy/English Service entries, added WE CARE entries, Worship & Music now scores 20 for Worship Team
+- MINISTRY_PRIMARY_GIFTING updated: Consolidation primary = Encouragement (not Evangelism), Translation primary = Bilingual (special check), Volunteer Coffee primary = Gift of Helps
+- isSuppressed: Translation now suppressed unless bilingual; Consolidation requires Encouragement in top3 or >=40%
+- DISC modifier strings simplified (no "/D" "/I" etc suffixes)
+- Combination bonuses rebalanced (smaller numbers, removed Worship+Admin→Worship Team boost)
+- Added BILINGUAL BONUS section (WE CARE + Consolidation)
+- Translation: only appears if `isBilingual && isReliable` (score 20)
+- GUARANTEED SLOT RULE: ensures gifting_1's canonical ministry always appears in top 5 (boosted to score 30 if below)
+
+### Change 2 — Reliability indicator in PersonPanel
+- Added `{person.reliability_flag === 1 && ...}` block before "Suggested Placements" section
+- Shows teal checkmark + "Comprometimento confirmado" / "Reliability confirmed"
+
+### Commit
+- `46b1002`
+
+---
+
+## Session 2 (2026-05-31) — Ministry Recommendations Rebuild (superseded by Session 2 Redux)
 
 ### Files Changed
 - `src/App.jsx`

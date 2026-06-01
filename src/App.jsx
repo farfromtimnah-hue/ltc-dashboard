@@ -285,6 +285,20 @@ function ministryLabel(name, lang, personLang) {
 const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other","CRIE","Gerações","Carisma Serve Team"];
 const LANGUAGES = ["English","Português","Both"];
 
+const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE"];
+const GROUP_ROLE_MAP_DASH = {
+  "Legacy":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Kids","Translation"],
+  "Rocket":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "SHINE":           ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation","Cafe/Food"],
+  "HERO":            ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "Link":            ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "Culto Hope":      ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "Culto Fe":        ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "English Service": ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "CRIE":            ["Welcome","Set Up","Sound","Projection","Streaming","Photo & Video","Social Media","Service Experience","Intercession"],
+  "Carisma Serve Team": ["Welcome","Set Up","Sound","Projection","Photo & Video","Social Media","Kids","Cafe/Food"]
+};
+
 const DEFAULT_TEMPLATE_PT = "Oi, {{name}}! Tudo bem? 😊 Que alegria ter você conosco! Vi que você tem o dom de {{gifting}} e isso é incrível! Adoraria marcar um tempo com você para te conhecer melhor e ver como podemos servir os seus dons aqui na Lagoinha Tampa. Quando seria um bom momento?";
 const DEFAULT_TEMPLATE_EN = "Hi {{name}}! So glad you are here with us! I saw that you have the gifting of {{gifting}} and that is amazing! I would love to find a time to meet with you and see how we can best serve your giftings here at Lagoinha Tampa. When would be a good time?";
 
@@ -303,7 +317,7 @@ const L = {
     connStage:"Estágio de Conexão",assignedPastor:"Pastor Responsável",
     orType:"Ou digite outro nome…",currentMin:"Ministérios Atuais",
     langSpoken:"Idiomas Falados",specialGroups:"Grupos Especiais",
-    giftingProfile:"Perfil de Dons",notesAudit:"Notas e Histórico",
+    groupRolesHd:"Funcoes nos Grupos",groupsAttendedHd:"Grupos que frequenta",giftingProfile:"Perfil de Dons",notesAudit:"Notas e Histórico",
     yourName:"Seu nome (pastor)…",addNote:"Adicionar nota…",saveNote:"Salvar Nota",
     noNotes:"Sem notas ainda.",loading:"Carregando…",available:"Disponível",
     selectGifting:"Selecione um dom para ver pessoas disponíveis — ordenado por carga ministerial",
@@ -376,7 +390,7 @@ const L = {
     connStage:"Connection Stage",assignedPastor:"Assigned Pastor",
     orType:"Or type another pastor name…",currentMin:"Current Ministries",
     langSpoken:"Languages Spoken",specialGroups:"Special Groups",
-    giftingProfile:"Gifting Profile",notesAudit:"Notes & Audit Trail",
+    groupRolesHd:"Group Roles",groupsAttendedHd:"Groups Attended",giftingProfile:"Gifting Profile",notesAudit:"Notes & Audit Trail",
     yourName:"Your name (pastor)…",addNote:"Add a note…",saveNote:"Save Note",
     noNotes:"No notes yet.",loading:"Loading…",available:"Available",
     selectGifting:"Select a gifting to find available people — sorted by ministry load",
@@ -1934,6 +1948,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [pastoralAction, setPastoralAction] = useState(null); // "confirm" | "flag" | null
   const [pastoralPastorName, setPastoralPastorName] = useState("");
   const [pastoralCustomName, setPastoralCustomName] = useState("");
+  const [editGroupRoles, setEditGroupRoles] = useState({}); // {groupName: [role,...]}
+  const [groupRolesDirty, setGroupRolesDirty] = useState(false);
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1941,6 +1957,14 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   }, [personId, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!person || !person.group_roles) return;
+    const map = {};
+    person.group_roles.forEach(function(r){ if(!map[r.group_name]) map[r.group_name]=[]; map[r.group_name].push(r.role); });
+    setEditGroupRoles(map);
+    setGroupRolesDirty(false);
+  }, [person]);
 
   if (!person) return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
@@ -2290,6 +2314,95 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             </div>
           </div>
 
+          {/* Group Attendance (edit) */}
+          <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.groupsAttendedHd||"Groups Attended"}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+              {ATTENDANCE_GROUPS_DASH.map(g => {
+                const curAttend = parseJSON(person.group_attendance) || [];
+                const active = curAttend.includes(g);
+                return (
+                  <button key={g} onClick={()=>{ const next = active ? curAttend.filter(x=>x!==g) : [...curAttend,g]; updateConnection({group_attendance:next}); }} disabled={saving}
+                    style={{padding:"7px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                      border:active?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.04)",
+                      background:active?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                      color:active?"#5eead4":"#aebac0",
+                      boxShadow:active?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
+                    {g}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Group Roles (edit) */}
+          <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>{t.groupRolesHd||"Group Roles"}</div>
+              {groupRolesDirty && (
+                <button onClick={()=>{
+                  const flat = [];
+                  Object.entries(editGroupRoles).forEach(([gn,roles])=>roles.forEach(r=>flat.push({group_name:gn,role:r})));
+                  updateConnection({group_roles:flat}).then(()=>setGroupRolesDirty(false)).catch(()=>{});
+                }} disabled={saving}
+                  style={{padding:"5px 12px",borderRadius:6,background:"#2abfbf",color:"#000",border:"none",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                  Save
+                </button>
+              )}
+            </div>
+            {Object.keys(GROUP_ROLE_MAP_DASH).map(groupName => {
+              const roles = GROUP_ROLE_MAP_DASH[groupName];
+              const isOpen = !!(editGroupRoles[groupName] && editGroupRoles[groupName].length >= 0) || Object.prototype.hasOwnProperty.call(editGroupRoles, groupName);
+              const groupSelected = Object.prototype.hasOwnProperty.call(editGroupRoles, groupName);
+              return (
+                <div key={groupName} style={{marginBottom:8}}>
+                  <button onClick={()=>{
+                    setEditGroupRoles(prev => {
+                      const next = Object.assign({}, prev);
+                      if(Object.prototype.hasOwnProperty.call(next, groupName)) { delete next[groupName]; }
+                      else { next[groupName] = []; }
+                      return next;
+                    });
+                    setGroupRolesDirty(true);
+                  }} disabled={saving}
+                    style={{padding:"7px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                      border:groupSelected?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.04)",
+                      background:groupSelected?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                      color:groupSelected?"#5eead4":"#aebac0",
+                      boxShadow:groupSelected?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
+                    {groupName}
+                  </button>
+                  {groupSelected && (
+                    <div style={{marginTop:6,paddingLeft:12,display:"flex",flexWrap:"wrap",gap:5}}>
+                      {roles.map(role => {
+                        const checked = (editGroupRoles[groupName]||[]).includes(role);
+                        return (
+                          <button key={role} onClick={()=>{
+                            setEditGroupRoles(prev => {
+                              const next = Object.assign({}, prev);
+                              const cur = next[groupName] ? [...next[groupName]] : [];
+                              const idx = cur.indexOf(role);
+                              if(idx>-1) cur.splice(idx,1); else cur.push(role);
+                              next[groupName] = cur;
+                              return next;
+                            });
+                            setGroupRolesDirty(true);
+                          }} disabled={saving}
+                            style={{padding:"4px 9px",borderRadius:5,fontSize:11,fontWeight:500,cursor:"pointer",transition:"all 0.15s",
+                              border:checked?"1px solid rgba(42,191,191,0.4)":"1px solid rgba(255,255,255,0.06)",
+                              background:checked?"rgba(42,191,191,0.1)":"rgba(255,255,255,0.02)",
+                              color:checked?"#2abfbf":"#6b7a82"}}>
+                            {role}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           {/* Gifting Profile */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.giftingProfile}</div>
@@ -2615,6 +2728,45 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
             </div>
           )}
+
+          {/* Group Attendance */}
+          {(() => {
+            const attended = parseJSON(person.group_attendance);
+            if (!attended || attended.length === 0) return null;
+            return (
+              <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.groupsAttendedHd||"Groups Attended"}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {attended.map(g => (
+                    <span key={g} style={{fontSize:12,padding:"4px 10px",borderRadius:6,background:"rgba(255,255,255,0.04)",color:"#aebac0",border:"1px solid rgba(255,255,255,0.07)"}}>{g}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Group Roles */}
+          {(() => {
+            const gr = person.group_roles;
+            if (!gr || gr.length === 0) return null;
+            const byGroup = {};
+            gr.forEach(function(r){ if(!byGroup[r.group_name]) byGroup[r.group_name]=[]; byGroup[r.group_name].push(r.role); });
+            return (
+              <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.groupRolesHd||"Group Roles"}</div>
+                {Object.entries(byGroup).map(([gname, roles]) => (
+                  <div key={gname} style={{marginBottom:12}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#5eead4",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:6}}>{gname}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {roles.map(role => (
+                        <span key={role} style={{fontSize:12,padding:"3px 9px",borderRadius:5,border:"1px solid rgba(42,191,191,0.35)",color:"#2abfbf",background:"rgba(42,191,191,0.06)"}}>{role}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Notes */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>

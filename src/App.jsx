@@ -649,8 +649,6 @@ function getMinistryRecommendations(person, lang) {
   try {
     allScores = JSON.parse(person.scores || '{}');
   } catch(e) { allScores = {}; }
-  console.log('DEBUG scores type:', typeof person.scores, 'allScores keys:', Object.keys(allScores).length, 'gifting1:', person.gifting_1);
-  console.log('DEBUG worship score:', allScores['Worship & Music'], 'techarts:', allScores['Technical Arts'], 'worship rankweight:', person.gifting_1 === 'Worship & Music' ? 3 : 'NOT GIFTING 1');
 
   var discPrimary = person.disc_primary || '';
   var discSecondary = person.disc_secondary || '';
@@ -665,6 +663,9 @@ function getMinistryRecommendations(person, lang) {
   } catch(e) { langsSpoken = []; }
   var isBilingual = langsSpoken.indexOf('Both') > -1;
 
+  // Reliability flag
+  var isReliable = person.reliability_flag === 1;
+
   // Ministry score and reason accumulator
   var ministryData = {};
   function add(ministry, points, reason) {
@@ -672,13 +673,17 @@ function getMinistryRecommendations(person, lang) {
       ministryData[ministry] = { score: 0, reasons: [] };
     }
     ministryData[ministry].score += points;
-    if (reason && ministryData[ministry].reasons.indexOf(reason) === -1) {
+    if (reason &&
+        ministryData[ministry].reasons.indexOf(reason) === -1) {
       ministryData[ministry].reasons.push(reason);
     }
   }
 
-  // Rank weight: gifting_1=3x, gifting_2=2x, gifting_3=1x
-  // Strong non-top3 (>=70%) = 1.5x, moderate (50-69%) = 0.75x
+  // Rank weight multipliers
+  // gifting_1=3x, gifting_2=2x, gifting_3=1x
+  // Strong non-top3 (>=70%) = 1.5x
+  // Moderate (50-69%) = 0.75x
+  // Below 50% and not in top 3 = 0 (no contribution)
   function rankWeight(giftingName) {
     if (giftingName === person.gifting_1) return 3;
     if (giftingName === person.gifting_2) return 2;
@@ -696,41 +701,7 @@ function getMinistryRecommendations(person, lang) {
     if (giftingName === person.gifting_1) rank = ' (#1)';
     else if (giftingName === person.gifting_2) rank = ' (#2)';
     else if (giftingName === person.gifting_3) rank = ' (#3)';
-    return giftingName + rank + ' — ' + pct + '%';
-  }
-
-  var MINISTRY_PRIMARY_GIFTING = {
-    'Worship Team': 'Worship & Music',
-    'Sound': 'Technical Arts',
-    'Lighting': 'Technical Arts',
-    'Projection': 'Technical Arts',
-    'Streaming': 'Technical Arts',
-    'Photo & Video': 'Visual Storytelling',
-    'Social Media': 'Digital Communication',
-    'Intercession': 'Intercession',
-    'Lagoinha Kids': 'Teaching',
-    'GC Leader': 'Influence & Servant Leadership',
-    'Translation': 'Teaching',
-    'Consolidation': 'Evangelism',
-    'English Service': 'Evangelism',
-    'Service Experience': 'Administration',
-    'Setup & Teardown': 'Gift of Helps',
-    'Parking': 'Gift of Helps',
-    'Volunteer Coffee': 'Hospitality',
-    'Hospitality - Welcome': 'Hospitality',
-    'WE CARE - Helps': 'Gift of Helps',
-    'WE CARE - Evangelism': 'Evangelism'
-  };
-
-  function isSuppressed(ministry) {
-    var primaryGifting = MINISTRY_PRIMARY_GIFTING[ministry];
-    if (!primaryGifting) return false;
-    var inTop3 = (primaryGifting === person.gifting_1 ||
-                  primaryGifting === person.gifting_2 ||
-                  primaryGifting === person.gifting_3);
-    if (inTop3) return false;
-    var pct = allScores[primaryGifting] || 0;
-    return pct < 40;
+    return giftingName + rank + ' - ' + pct + '%';
   }
 
   // Strong gifting check (top 3 OR >=70%)
@@ -741,102 +712,117 @@ function getMinistryRecommendations(person, lang) {
             (allScores[giftingName] || 0) >= 70);
   }
 
+  // PRIMARY GIFTING DOMINANCE RULE
+  var MINISTRY_PRIMARY_GIFTING = {
+    'Worship Team': 'Worship & Music',
+    'Sound': 'Technical Arts',
+    'Lighting': 'Technical Arts',
+    'Projection': 'Technical Arts',
+    'Streaming': 'Technical Arts',
+    'Photo & Video': 'Visual Storytelling',
+    'Social Media': 'Digital Communication',
+    'Service Experience': 'Administration',
+    'Hospitality - Welcome': 'Hospitality',
+    'Volunteer Coffee': 'Gift of Helps',
+    'Parking': 'Gift of Helps',
+    'Setup & Teardown': 'Gift of Helps',
+    'GC Leader': 'Influence & Servant Leadership',
+    'Lagoinha Kids': 'Teaching',
+    'Consolidation': 'Encouragement',
+    'Intercession': 'Intercession',
+    'WE CARE - Helps': 'Gift of Helps',
+    'WE CARE - Evangelism': 'Evangelism',
+    'Translation': 'Bilingual'
+  };
+
+  function isSuppressed(ministry) {
+    var primaryGifting = MINISTRY_PRIMARY_GIFTING[ministry];
+    if (!primaryGifting) return false;
+    // Translation uses bilingual check not gifting
+    if (primaryGifting === 'Bilingual') return !isBilingual;
+    var inTop3 = (primaryGifting === person.gifting_1 ||
+                  primaryGifting === person.gifting_2 ||
+                  primaryGifting === person.gifting_3);
+    if (!inTop3 && (allScores[primaryGifting] || 0) < 40) {
+      return true;
+    }
+    return false;
+  }
+
   // GIFTING TO MINISTRY SCORING
   var GIFTING_MINISTRY_MAP = {
     'Worship & Music': [
-      ['Worship Team', 10],
-      ['Sound', 4],
-      ['Lighting', 3],
-      ['Streaming', 3]
+      ['Worship Team', 20],
+      ['Sound', 3],
+      ['Lighting', 1]
     ],
     'Gift of Helps': [
       ['Setup & Teardown', 10],
-      ['Parking', 8],
-      ['Volunteer Coffee', 7],
-      ['Service Experience', 6],
-      ['Hospitality - Welcome', 5],
-      ['WE CARE - Helps', 9]
+      ['Parking', 9],
+      ['Volunteer Coffee', 9],
+      ['WE CARE - Helps', 10]
     ],
     'Technical Arts': [
-      ['Sound', 10],
-      ['Lighting', 10],
-      ['Projection', 10],
-      ['Streaming', 9],
-      ['Photo & Video', 7],
-      ['Service Experience', 5]
+      ['Sound', 12],
+      ['Lighting', 12],
+      ['Projection', 12],
+      ['Streaming', 11],
+      ['Photo & Video', 5],
+      ['Service Experience', 3]
     ],
     'Visual Storytelling': [
-      ['Photo & Video', 10],
-      ['Streaming', 8],
-      ['Social Media', 7],
-      ['Lighting', 5],
-      ['Service Experience', 4]
+      ['Photo & Video', 12],
+      ['Streaming', 7],
+      ['Social Media', 5]
     ],
     'Digital Communication': [
-      ['Social Media', 10],
-      ['Streaming', 5],
-      ['Photo & Video', 4]
+      ['Social Media', 12],
+      ['Streaming', 3]
     ],
     'Creativity': [
-      ['Photo & Video', 10],
-      ['Social Media', 8],
-      ['Service Experience', 7],
-      ['Lighting', 5],
-      ['Streaming', 4]
+      ['Photo & Video', 5],
+      ['Social Media', 4]
     ],
     'Administration': [
-      ['Service Experience', 10],
-      ['GC Leader', 9],
-      ['Setup & Teardown', 7],
-      ['Lagoinha Kids', 5]
+      ['Service Experience', 12],
+      ['GC Leader', 6],
+      ['Setup & Teardown', 4]
     ],
     'Intercession': [
-      ['Intercession', 10],
-      ['Translation', 4]
+      ['Intercession', 15]
     ],
     'Hospitality': [
-      ['Hospitality - Welcome', 10],
-      ['Volunteer Coffee', 9],
-      ['Consolidation', 8],
-      ['Service Experience', 6],
-      ['Lagoinha Kids', 5],
-      ['WE CARE - Evangelism', 6]
+      ['Hospitality - Welcome', 12],
+      ['Volunteer Coffee', 4],
+      ['Consolidation', 5],
+      ['WE CARE - Evangelism', 5]
     ],
     'Evangelism': [
-      ['Consolidation', 10],
-      ['English Service', 8],
-      ['Hospitality - Welcome', 6],
-      ['WE CARE - Evangelism', 10]
+      ['Consolidation', 7],
+      ['WE CARE - Evangelism', 12],
+      ['Hospitality - Welcome', 4]
     ],
     'Encouragement': [
-      ['Consolidation', 9],
-      ['Hospitality - Welcome', 8],
+      ['Consolidation', 12],
+      ['Hospitality - Welcome', 6],
       ['Lagoinha Kids', 8],
-      ['Volunteer Coffee', 7],
-      ['GC Leader', 6],
-      ['WE CARE - Evangelism', 7]
+      ['GC Leader', 5],
+      ['WE CARE - Evangelism', 6]
     ],
     'Teaching': [
-      ['Lagoinha Kids', 10],
-      ['GC Leader', 8],
-      ['English Service', 6],
+      ['Lagoinha Kids', 12],
+      ['GC Leader', 7],
       ['Translation', 5]
     ],
     'Influence & Servant Leadership': [
-      ['GC Leader', 10],
-      ['Service Experience', 7],
-      ['Lagoinha Kids', 7],
-      ['English Service', 6]
-    ],
-    'Discernment & Prophetic': [
-      ['Intercession', 10],
-      ['GC Leader', 7],
-      ['Translation', 6]
+      ['GC Leader', 12],
+      ['Service Experience', 5],
+      ['Lagoinha Kids', 5]
     ],
     'Faith': [
-      ['Intercession', 9],
-      ['Consolidation', 8],
-      ['GC Leader', 7]
+      ['Intercession', 4],
+      ['GC Leader', 3],
+      ['Lagoinha Kids', 3]
     ]
   };
 
@@ -854,104 +840,134 @@ function getMinistryRecommendations(person, lang) {
   if (discTypes.some(function(d){
     return d==='I'||d==='Comunicador';
   })) {
-    add('Hospitality - Welcome', 4, 'DISC: Comunicador/I');
-    add('Consolidation', 4, 'DISC: Comunicador/I');
-    add('Social Media', 3, 'DISC: Comunicador/I');
-    add('English Service', 3, 'DISC: Comunicador/I');
-    add('Volunteer Coffee', 3, 'DISC: Comunicador/I');
+    add('Hospitality - Welcome', 4, 'DISC: Comunicador');
+    add('Consolidation', 4, 'DISC: Comunicador');
+    add('WE CARE - Evangelism', 3, 'DISC: Comunicador');
   }
   if (discTypes.some(function(d){
     return d==='D'||d==='Executor';
   })) {
-    add('GC Leader', 4, 'DISC: Executor/D');
-    add('Service Experience', 4, 'DISC: Executor/D');
-    add('Setup & Teardown', 3, 'DISC: Executor/D');
+    add('GC Leader', 4, 'DISC: Executor');
+    add('Service Experience', 5, 'DISC: Executor');
+    add('Setup & Teardown', 3, 'DISC: Executor');
   }
   if (discTypes.some(function(d){
     return d==='S'||d==='Planejador';
   })) {
-    add('Projection', 4, 'DISC: Planejador/S');
-    add('Streaming', 4, 'DISC: Planejador/S');
-    add('Volunteer Coffee', 4, 'DISC: Planejador/S');
-    add('Parking', 3, 'DISC: Planejador/S');
-    add('Lagoinha Kids', 3, 'DISC: Planejador/S');
+    add('Projection', 3, 'DISC: Planejador');
+    add('Streaming', 3, 'DISC: Planejador');
+    add('Volunteer Coffee', 3, 'DISC: Planejador');
+    add('Parking', 3, 'DISC: Planejador');
+    add('Lagoinha Kids', 3, 'DISC: Planejador');
   }
   if (discTypes.some(function(d){
     return d==='C'||d==='Analista';
   })) {
-    add('Sound', 4, 'DISC: Analista/C');
-    add('Lighting', 4, 'DISC: Analista/C');
-    add('Projection', 4, 'DISC: Analista/C');
-    add('Streaming', 3, 'DISC: Analista/C');
-    add('Photo & Video', 3, 'DISC: Analista/C');
+    add('Sound', 4, 'DISC: Analista');
+    add('Lighting', 4, 'DISC: Analista');
+    add('Projection', 5, 'DISC: Analista');
+    add('Streaming', 3, 'DISC: Analista');
+    add('Photo & Video', 3, 'DISC: Analista');
   }
 
   // COMBINATION BONUSES
   if (isStrong('Worship & Music') && isStrong('Administration')) {
-    add('Service Experience', 15,
-      'Combination: Worship & Music + Administration');
-    add('Worship Team', 8,
+    add('Service Experience', 10,
       'Combination: Worship & Music + Administration');
   }
   if (isStrong('Worship & Music') && isStrong('Technical Arts')) {
-    add('Sound', 10,
+    add('Sound', 8,
       'Combination: Worship & Music + Technical Arts');
-    add('Lighting', 8,
+    add('Lighting', 6,
       'Combination: Worship & Music + Technical Arts');
-    add('Streaming', 8,
+    add('Streaming', 5,
       'Combination: Worship & Music + Technical Arts');
   }
   if (isStrong('Administration') &&
       isStrong('Influence & Servant Leadership')) {
-    add('GC Leader', 12,
+    add('GC Leader', 10,
       'Combination: Administration + Influence & Servant Leadership');
   }
   if (isStrong('Teaching') && isStrong('Encouragement')) {
-    add('Lagoinha Kids', 12,
+    add('Lagoinha Kids', 10,
       'Combination: Teaching + Encouragement');
   }
   if (isStrong('Evangelism') && isStrong('Hospitality')) {
-    add('Consolidation', 10,
+    add('Consolidation', 8,
       'Combination: Evangelism + Hospitality');
-    add('Hospitality - Welcome', 8,
-      'Combination: Evangelism + Hospitality');
-    add('WE CARE - Evangelism', 10,
+    add('WE CARE - Evangelism', 8,
       'Combination: Evangelism + Hospitality');
   }
   if (isStrong('Technical Arts') &&
       isStrong('Visual Storytelling')) {
-    add('Photo & Video', 10,
+    add('Photo & Video', 8,
       'Combination: Technical Arts + Visual Storytelling');
-    add('Streaming', 8,
+    add('Streaming', 6,
       'Combination: Technical Arts + Visual Storytelling');
-    add('Projection', 8,
+    add('Projection', 6,
       'Combination: Technical Arts + Visual Storytelling');
   }
   if (isStrong('Gift of Helps') && isStrong('Evangelism')) {
-    add('WE CARE - Helps', 10,
+    add('WE CARE - Helps', 8,
       'Combination: Gift of Helps + Evangelism');
-    add('WE CARE - Evangelism', 8,
+    add('WE CARE - Evangelism', 6,
       'Combination: Gift of Helps + Evangelism');
   }
 
-  // TRANSLATION -- bilingual speakers only
+  // BILINGUAL BONUS
   if (isBilingual) {
-    add('Translation', 8, 'Bilingual (Both languages)');
-    add('English Service', 5, 'Bilingual (Both languages)');
+    add('WE CARE - Helps', 4, 'Bilingual');
+    add('WE CARE - Evangelism', 5, 'Bilingual');
+    add('Consolidation', 3, 'Bilingual');
   }
 
-  // NEGATIVE FILTER
+  // TRANSLATION -- bilingual + reliable only
+  if (isBilingual && isReliable) {
+    add('Translation', 20,
+      'Bilingual + Reliability commitment');
+  }
+
+  // GUARANTEED SLOT RULE
+  var GUARANTEED = {
+    'Worship & Music': 'Worship Team',
+    'Intercession': 'Intercession',
+    'Gift of Helps': 'Setup & Teardown',
+    'Technical Arts': 'Sound',
+    'Administration': 'Service Experience',
+    'Encouragement': 'Consolidation',
+    'Teaching': 'Lagoinha Kids',
+    'Influence & Servant Leadership': 'GC Leader',
+    'Hospitality': 'Hospitality - Welcome',
+    'Visual Storytelling': 'Photo & Video',
+    'Digital Communication': 'Social Media',
+    'Evangelism': 'WE CARE - Evangelism'
+  };
+  var guaranteed = GUARANTEED[person.gifting_1];
+  if (guaranteed && !isSuppressed(guaranteed)) {
+    if (!ministryData[guaranteed]) {
+      ministryData[guaranteed] = { score: 0, reasons: [] };
+    }
+    var currentScore = ministryData[guaranteed].score;
+    if (currentScore < 30) {
+      ministryData[guaranteed].score = 30;
+      if (ministryData[guaranteed].reasons.length === 0) {
+        ministryData[guaranteed].reasons.push(
+          'Primary gifting: ' + person.gifting_1
+        );
+      }
+    }
+  }
+
+  // APPLY PRIMARY GIFTING DOMINANCE SUPPRESSION
   Object.keys(ministryData).forEach(function(ministry) {
     if (isSuppressed(ministry)) {
       ministryData[ministry].score = -999;
     }
   });
 
-  // SORT AND RETURN TOP 5 as objects
+  // SORT AND RETURN TOP 5
   var sorted = Object.keys(ministryData)
-    .filter(function(m) {
-      return ministryData[m].score > 0;
-    })
+    .filter(function(m) { return ministryData[m].score > 0; })
     .sort(function(a, b) {
       return ministryData[b].score - ministryData[a].score;
     })
@@ -962,7 +978,6 @@ function getMinistryRecommendations(person, lang) {
         reasons: ministryData[m].reasons.slice(0, 3)
       };
     });
-  console.log('DEBUG top ministries:', sorted.map(function(m){ return m.ministry + ':' + ministryData[m.ministry].score; }));
 
   return sorted;
 }
@@ -2410,6 +2425,23 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   <p style={{fontStyle:"italic",fontSize:12,color:"#6b7a82",lineHeight:1.6,margin:0}}>
                     {ministryFitDisplay}
                   </p>
+                </div>
+              )}
+              {/* Reliability indicator */}
+              {person.reliability_flag === 1 && (
+                <div style={{
+                  display:'inline-flex',
+                  alignItems:'center',
+                  gap:4,
+                  fontSize:11,
+                  color:'#2ABFBF',
+                  fontFamily:"'JetBrains Mono',monospace",
+                  marginTop:4
+                }}>
+                  <span>✓</span>
+                  <span>{lang==='PT'
+                    ? 'Comprometimento confirmado'
+                    : 'Reliability confirmed'}</span>
                 </div>
               )}
               {/* Suggested Placements */}

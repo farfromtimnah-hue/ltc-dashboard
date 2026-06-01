@@ -46,7 +46,7 @@ function giftingLabel(name, personLang) {
 
 const STAGES = ["New","Reached Out","Responded","Meeting Scheduled","Meeting Done","Placed in Ministry"];
 const STAGES_PT = ["Novo","Contato Feito","Respondeu","Reunião Agendada","Reunião Realizada","Colocado no Ministério"];
-const SPECIAL_GROUPS_PT = ["Jovens","Link","Legacy","Serviço em Inglês","Outro"];
+const SPECIAL_GROUPS_PT = ["Jovens","Link","Legacy","Brilho","Herói","Culto Hope","Culto Fé","Serviço em Inglês","Outro","CRIE","Gerações","Aluno do Carisma"];
 
 const STAGE_LABEL = {
   PT: {"New":"Novo","Reached Out":"Contato Feito","Responded":"Respondeu","Meeting Scheduled":"Reunião Agendada","Meeting Done":"Reunião Realizada","Placed in Ministry":"Colocado no Ministério"},
@@ -219,7 +219,8 @@ const DISC_TO_ANCHOR = { D:"executor", I:"comunicador", S:"planejador", C:"anali
 
 const SPECIAL_GROUP_PT = {
   "Rocket":"Rocket","Link":"Link","Legacy":"Legacy","Shine":"Shine","Hero":"Hero",
-  "Culto Hope":"Culto Hope","Culto Fé":"Culto Fé","English Service":"Culto em Inglês","Other":"Outro"
+  "Culto Hope":"Culto Hope","Culto Fé":"Culto Fé","English Service":"Culto em Inglês","Other":"Outro",
+  "CRIE":"CRIE","Gerações":"Gerações","Carisma Student":"Aluno do Carisma"
 };
 
 const PASTOR_SUGGESTIONS = ["Pra Alice","Pr Rafa"];
@@ -228,7 +229,7 @@ const MINISTRIES_STARTER = [
   "Worship Team","Sound","Lighting","Projection","Streaming","Photo & Video",
   "Social Media","Service Experience","Consolidation","Translation",
   "Lagoinha Kids","Intercession","Volunteer Coffee","Hospitality — Welcome",
-  "Parking","Setup & Teardown","GC Leader","Legacy","English Service"
+  "Parking","Setup & Teardown","GC Leader","Legacy","English Service","WE CARE"
 ];
 
 const MINISTRY_PT = {
@@ -268,7 +269,8 @@ const MINISTRY_PT = {
   "GC":"GC",
   "Hospitality - Welcome":"Recepção",
   "WE CARE - Helps":"WE CARE - Ajuda Pratica",
-  "WE CARE - Evangelism":"WE CARE - Evangelismo"
+  "WE CARE - Evangelism":"WE CARE - Evangelismo",
+  "WE CARE":"WE CARE"
 };
 
 function ministryLabel(name, lang, personLang) {
@@ -277,7 +279,7 @@ function ministryLabel(name, lang, personLang) {
   return name;
 }
 
-const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other"];
+const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other","CRIE","Gerações","Carisma Student"];
 const LANGUAGES = ["English","Português","Both"];
 
 const DEFAULT_TEMPLATE_PT = "Oi, {{name}}! Tudo bem? 😊 Que alegria ter você conosco! Vi que você tem o dom de {{gifting}} e isso é incrível! Adoraria marcar um tempo com você para te conhecer melhor e ver como podemos servir os seus dons aqui na Lagoinha Tampa. Quando seria um bom momento?";

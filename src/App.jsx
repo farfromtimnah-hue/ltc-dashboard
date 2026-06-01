@@ -1718,14 +1718,19 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
           <div>
             <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
               <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
-              {person.pastoral_flag==1 && (
+              {(person.pastoral_flag==1 || person.pastoral_flag==2) && (
                 <div style={{position:"relative",display:"inline-block"}}
                   onMouseEnter={()=>setShowPastoralTip(true)}
                   onMouseLeave={()=>setShowPastoralTip(false)}>
-                  <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",color:"#fbd590",fontWeight:700,cursor:"default"}}>★</span>
+                  <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+                    background:person.pastoral_flag==2?"rgba(42,191,191,0.12)":"rgba(245,158,11,0.12)",
+                    border:person.pastoral_flag==2?"1px solid rgba(42,191,191,0.3)":"1px solid rgba(245,158,11,0.3)",
+                    color:person.pastoral_flag==2?"#2ABFBF":"#fbd590",fontWeight:700,cursor:"default"}}>★</span>
                   {showPastoralTip && (
                     <div style={{position:"absolute",bottom:"125%",left:"50%",transform:"translateX(-50%)",background:"#1a2a2a",color:"#e6f1f0",fontSize:12,lineHeight:1.5,padding:"8px 12px",borderRadius:6,border:"1px solid #2ABFBF",zIndex:999,width:220,pointerEvents:"none",whiteSpace:"normal"}}>
-                      {lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential"}
+                      {person.pastoral_flag==2
+                        ? (lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor")
+                        : (lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential")}
                     </div>
                   )}
                 </div>
@@ -1893,6 +1898,10 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [labelPopup, setLabelPopup] = useState(null); // {type, value} or null
   const [showAllGiftings, setShowAllGiftings] = useState(false);
   const [ministryPopup, setMinistryPopup] = useState(null); // {ministry, reasons} or null
+  const [pastoralUI, setPastoralUI] = useState(false); // show pastor name selector
+  const [pastoralAction, setPastoralAction] = useState(null); // "confirm" | "flag" | null
+  const [pastoralPastorName, setPastoralPastorName] = useState("");
+  const [pastoralCustomName, setPastoralCustomName] = useState("");
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -2326,12 +2335,16 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                       {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_secondary]}
                     </span>
                   )}
-                  {person.pastoral_flag==1 && (
+                  {(person.pastoral_flag==1 || person.pastoral_flag==2) && (
                     <span onClick={function(){ setLabelPopup({type:'pastoral',value:'pastoral-potential'}); }}
                       style={{fontSize:10,padding:"4px 10px",borderRadius:6,
-                      background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
-                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
-                      {"★ "}{t.pastoralAlert}
+                      background:person.pastoral_flag==2?"rgba(42,191,191,0.12)":"rgba(245,158,11,0.12)",
+                      border:person.pastoral_flag==2?"1px solid rgba(42,191,191,0.3)":"1px solid rgba(245,158,11,0.3)",
+                      color:person.pastoral_flag==2?"#2ABFBF":"#fbd590",
+                      fontWeight:700,display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
+                      {"★ "}{person.pastoral_flag==2
+                        ? (lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor")
+                        : t.pastoralAlert}
                     </span>
                   )}
                 </div>
@@ -2382,8 +2395,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                         style={bpClickableTag}>
                         {lang==="PT" ? ldDisplay.PT : ldDisplay.EN}
                       </span>
-                      {person.pastoral_flag==1 && (
-                        <span title={lang==="PT"?"Potencial Pastoral":"Pastoral Potential"} style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",boxShadow:"0 0 6px #f59e0b",flexShrink:0,display:"inline-block"}} />
+                      {(person.pastoral_flag==1 || person.pastoral_flag==2) && (
+                        <span title={person.pastoral_flag==2?(lang==="PT"?"Confirmado pelo Pastor":"Confirmed by Pastor"):(lang==="PT"?"Potencial Pastoral":"Pastoral Potential")}
+                          style={{width:7,height:7,borderRadius:"50%",
+                            background:person.pastoral_flag==2?"#2ABFBF":"#f59e0b",
+                            boxShadow:person.pastoral_flag==2?"0 0 6px #2ABFBF":"0 0 6px #f59e0b",
+                            flexShrink:0,display:"inline-block"}} />
                       )}
                     </div>
                   )}
@@ -2444,6 +2461,100 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                   <span>{lang==='PT'
                     ? 'Comprometimento confirmado'
                     : 'Reliability confirmed'}</span>
+                </div>
+              )}
+              {/* Pastoral Flag Management — visible only when auth token present */}
+              {token && (
+                <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
+                    {lang==="PT" ? "Pastoral" : "Pastoral"}
+                  </div>
+                  {/* State: not flagged */}
+                  {(!person.pastoral_flag || person.pastoral_flag==0) && !pastoralUI && (
+                    <button onClick={function(){ setPastoralAction("flag"); setPastoralUI(true); setPastoralPastorName(""); setPastoralCustomName(""); }}
+                      disabled={saving}
+                      style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                      {lang==="PT" ? "Marcar Potencial" : "Flag Potential"}
+                    </button>
+                  )}
+                  {/* State: algorithm flagged */}
+                  {person.pastoral_flag==1 && !pastoralUI && (
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={function(){ setPastoralAction("confirm"); setPastoralUI(true); setPastoralPastorName(""); setPastoralCustomName(""); }}
+                        disabled={saving}
+                        style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(42,191,191,0.3)",background:"rgba(42,191,191,0.08)",color:"#2ABFBF",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                        {lang==="PT" ? "Confirmar" : "Confirm"}
+                      </button>
+                      <button onClick={function(){ updateConnection({pastoral_flag:0,pastor_confirmed_by:null}); }}
+                        disabled={saving}
+                        style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                        {lang==="PT" ? "Remover" : "Clear"}
+                      </button>
+                    </div>
+                  )}
+                  {/* State: pastor confirmed */}
+                  {person.pastoral_flag==2 && !pastoralUI && (
+                    <div>
+                      <div style={{fontSize:11,color:"#2ABFBF",fontFamily:"'JetBrains Mono',monospace",marginBottom:6}}>
+                        {lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor"}
+                        {person.pastor_confirmed_by ? " — " + person.pastor_confirmed_by : ""}
+                      </div>
+                      <button onClick={function(){ updateConnection({pastoral_flag:0,pastor_confirmed_by:null}); }}
+                        disabled={saving}
+                        style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                        {lang==="PT" ? "Remover" : "Clear"}
+                      </button>
+                    </div>
+                  )}
+                  {/* Pastor name selector — shown when action is pending */}
+                  {pastoralUI && (
+                    <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,padding:"10px 12px"}}>
+                      <div style={{fontSize:11,color:"#aebac0",fontFamily:"'JetBrains Mono',monospace",marginBottom:8}}>
+                        {lang==="PT" ? "Quem esta confirmando?" : "Who is confirming?"}
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+                        {["Pr. Daniel","Pra. Alice","Pr. Rafa","Pr. Andrey"].map(function(name){
+                          return (
+                            <button key={name} onClick={function(){ setPastoralPastorName(name); setPastoralCustomName(""); }}
+                              style={{fontSize:11,padding:"5px 10px",borderRadius:6,cursor:"pointer",fontFamily:"'Inter',sans-serif",
+                                border:pastoralPastorName===name?"1px solid rgba(42,191,191,0.4)":"1px solid rgba(255,255,255,0.08)",
+                                background:pastoralPastorName===name?"rgba(42,191,191,0.1)":"rgba(255,255,255,0.02)",
+                                color:pastoralPastorName===name?"#2ABFBF":"#aebac0"}}>
+                              {name}
+                            </button>
+                          );
+                        })}
+                        <button onClick={function(){ setPastoralPastorName("outro"); }}
+                          style={{fontSize:11,padding:"5px 10px",borderRadius:6,cursor:"pointer",fontFamily:"'Inter',sans-serif",
+                            border:pastoralPastorName==="outro"?"1px solid rgba(42,191,191,0.4)":"1px solid rgba(255,255,255,0.08)",
+                            background:pastoralPastorName==="outro"?"rgba(42,191,191,0.1)":"rgba(255,255,255,0.02)",
+                            color:pastoralPastorName==="outro"?"#2ABFBF":"#aebac0"}}>
+                          {lang==="PT" ? "Outro" : "Other"}
+                        </button>
+                      </div>
+                      {pastoralPastorName==="outro" && (
+                        <input value={pastoralCustomName} onChange={function(e){ setPastoralCustomName(e.target.value); }}
+                          placeholder={lang==="PT" ? "Nome do pastor..." : "Pastor name..."}
+                          style={{width:"100%",fontSize:12,padding:"6px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.03)",color:"#e6f1f0",fontFamily:"'Inter',sans-serif",boxSizing:"border-box",marginBottom:8}} />
+                      )}
+                      <div style={{display:"flex",gap:8,marginTop:4}}>
+                        <button
+                          disabled={saving || !pastoralPastorName || (pastoralPastorName==="outro" && !pastoralCustomName.trim())}
+                          onClick={function(){
+                            var confirmedBy = pastoralPastorName==="outro" ? pastoralCustomName.trim() : pastoralPastorName;
+                            updateConnection({pastoral_flag:2, pastor_confirmed_by:confirmedBy});
+                            setPastoralUI(false); setPastoralAction(null);
+                          }}
+                          style={{fontSize:11,padding:"6px 14px",borderRadius:7,border:"1px solid rgba(42,191,191,0.3)",background:"rgba(42,191,191,0.1)",color:"#2ABFBF",cursor:"pointer",fontFamily:"'Inter',sans-serif",opacity:(saving||!pastoralPastorName||(pastoralPastorName==="outro"&&!pastoralCustomName.trim()))?0.4:1}}>
+                          {lang==="PT" ? "Salvar" : "Save"}
+                        </button>
+                        <button onClick={function(){ setPastoralUI(false); setPastoralAction(null); setPastoralPastorName(""); setPastoralCustomName(""); }}
+                          style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"none",color:"#6b7a82",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                          {lang==="PT" ? "Cancelar" : "Cancel"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {/* Suggested Placements */}

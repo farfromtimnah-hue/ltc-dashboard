@@ -1315,3 +1315,137 @@ _Last updated: 2026-05-31 — Session 1 complete._
 App.jsx: Session 2 (2026-05-31)
 
 _Last updated: 2026-05-31 — Session 2 complete._
+
+---
+
+## Session 3 (2026-05-31) — WE CARE, Groups, GC Toggle
+
+### Files Changed
+- `src/App.jsx`
+
+### Fix 1 — WE CARE added to ministry list (DONE)
+- **Line 231**: Added `"WE CARE"` to `MINISTRIES_STARTER` array (the dropdown pastors use to assign current_ministries)
+- **Line 273**: Added `"WE CARE":"WE CARE"` to `MINISTRY_PT` lookup (no translation — proper name)
+- Note: `"WE CARE - Helps"` and `"WE CARE - Evangelism"` remain as suggestion-only labels in the recommendation engine. `"WE CARE"` is the canonical stored ministry name.
+
+### Fix 2 — New groups added to SPECIAL_GROUPS (DONE)
+- **Line 49**: `SPECIAL_GROUPS_PT` rebuilt as full 12-item parallel array including all existing + new groups
+- **Line 280**: Added `"CRIE"`, `"Gerações"`, `"Carisma Student"` to `SPECIAL_GROUPS` canonical EN array
+- **Lines 220–223**: Added to `SPECIAL_GROUP_PT` lookup: `"CRIE":"CRIE"`, `"Gerações":"Gerações"`, `"Carisma Student":"Aluno do Carisma"`
+- Carisma Student (currently enrolled) is distinct from Carisma completion badge (CARISMA_OPTIONS) — these are separate things, not confused
+
+### Fix 3 — GC Toggle (PENDING D1 SCHEMA)
+- `gc_connected` column does not exist anywhere in App.jsx or the connections table
+- Cannot implement without: `ALTER TABLE connections ADD COLUMN gc_connected INTEGER DEFAULT NULL;`
+- Once schema is updated, add a yes/no toggle in the connection form with label "Conectado a um GC?" / "Connected to a GC?" and display an amber indicator in PersonPanel when gc_connected = 0
+
+### Current version
+App.jsx: Session 3 (2026-05-31)
+
+_Last updated: 2026-05-31 — Session 3 complete._
+
+---
+
+## Session 5 (2026-05-31) — Pastoral Flag Redesign
+
+### Files Changed
+- `src/App.jsx`
+
+### Fix B1 — Visual Distinction: algorithm vs pastor flag
+
+**Extended `pastoral_flag` values (no D1 schema change needed):**
+- `0` = not flagged
+- `1` = algorithm flagged (existing behavior)
+- `2` = pastor confirmed/manually flagged
+
+**PersonCard star badge (was line 1721):**
+- `pastoral_flag==1`: gold star (`#fbd590`/`#F59E0B`), tooltip "Potencial Pastoral"/"Pastoral Potential"
+- `pastoral_flag==2`: teal star (`#2ABFBF`), tooltip "Confirmado pelo Pastor"/"Confirmed by Pastor"
+- `0` or null: nothing
+
+**PersonPanel DISC badge (was line ~2329):**
+- `pastoral_flag==1`: amber badge, label "Potencial Pastoral" / `t.pastoralAlert`
+- `pastoral_flag==2`: teal badge, label "Confirmado pelo Pastor" / "Confirmed by Pastor"
+- Clicking either opens the pastoral-potential popup (existing behavior)
+
+**Leadership dot (was line ~2385):**
+- Now shows for both 1 and 2; color follows flag value (amber/teal)
+
+### Fix B2 — Manual Pastoral Flag Toggle
+
+**New state vars added to PersonPanel:**
+- `pastoralUI` — bool: shows pastor name selector
+- `pastoralAction` — "confirm" | "flag" | null
+- `pastoralPastorName` — selected name from list
+- `pastoralCustomName` — text input when "Outro"/"Other" selected
+
+**Pastoral management section** added after reliability indicator, visible when `token` is present:
+- `pastoral_flag==0`: single "Marcar Potencial"/"Flag Potential" button
+- `pastoral_flag==1`: "Confirmar"/"Confirm" + "Remover"/"Clear" buttons
+- `pastoral_flag==2`: confirmed state with `pastor_confirmed_by` name + "Remover"/"Clear"
+
+**Pastor name selector** (inline):
+- Pills: "Pr. Daniel", "Pra. Alice", "Pr. Rafa", "Pr. Andrey", "Outro"/"Other"
+- "Outro" reveals text input for custom name
+- Save calls `updateConnection({pastoral_flag:2, pastor_confirmed_by: name})`
+- Clear calls `updateConnection({pastoral_flag:0, pastor_confirmed_by: null})`
+
+### Commit
+- `b353f9f`
+
+### PENDING — D1 Schema (required before pastor_confirmed_by saves):
+```sql
+ALTER TABLE connections ADD COLUMN pastor_confirmed_by TEXT DEFAULT NULL;
+```
+Run in Cloudflare D1 console for the `ltc-db` database. Until this is run, `pastor_confirmed_by` is sent in the PUT request but the Worker will silently ignore it (field not in D1 bind).
+
+### PENDING — Worker verification:
+Confirm the Worker's PUT `/person/:id/connection` handler passes `pastoral_flag` and `pastor_confirmed_by` through to the D1 bind. If `pastoral_flag` is not currently accepted, add both fields to the Worker's connection update handler alongside existing fields (stage, assigned_pastor, etc.).
+
+### GC Toggle (Fix 3 from Session 3) — still PENDING D1 schema:
+```sql
+ALTER TABLE connections ADD COLUMN gc_connected INTEGER DEFAULT NULL;
+```
+
+_Last updated: 2026-05-31 — Session 5 complete._
+
+---
+
+## Session 6 (2026-05-31) — Pastoral Badge Fixes
+
+### Files Changed
+- `src/App.jsx`
+
+### Fix B1 — Pastoral badge labels and pastor name display
+
+**PersonCard star badge tooltip:**
+- flag=1: "Potencial Pastoral" / "Pastoral Potential" — unchanged
+- flag=2: "Marcado Pastoral — por [pastor_confirmed_by]" / "Marked for Pastoral — by [pastor_confirmed_by]" (name omitted if null)
+
+**PersonPanel pastoral badge label:**
+- flag=1: t.pastoralAlert ("Potencial Pastoral" / "Pastoral Potential") — unchanged
+- flag=2: "Marcado Pastoral — por [name]" / "Marked for Pastoral — by [name]"
+
+**onClick updated** to pass `pastoralFlag` and `confirmedBy` to popup:
+`setLabelPopup({type:'pastoral',value:'pastoral-potential',pastoralFlag:person.pastoral_flag,confirmedBy:person.pastor_confirmed_by||null})`
+
+### Fix B2 — Pastoral popup content for flag=2
+
+**LabelDescriptionPopup** receives new props: `pastoralFlag`, `confirmedBy`
+
+**heading** — when `pastoralFlag===2`: "Marcado Pastoral" / "Marked for Pastoral" (overrides item.labelPT/EN)
+
+**body** — when `type==="pastoral" && pastoralFlag===2`: shows pastoral-observation copy instead of algorithm explanation:
+- PT: "Esta pessoa foi identificada para desenvolvimento pastoral por meio de observacao e relacionamento pastoral direto..." + "Identificado por: [name]" if available
+- EN: "This person has been identified for pastoral development by direct pastoral observation..." + "Identified by: [name]" if available
+- flag=1 continues to show algorithm content (no change)
+
+**LabelDescriptionPopup call site** (line ~2031): now passes `pastoralFlag={labelPopup.pastoralFlag}` and `confirmedBy={labelPopup.confirmedBy}`
+
+### Fix B3 — Remove Pr. Andrey from pastor selector
+- Pastor name pills now: "Pr. Daniel", "Pra. Alice", "Pr. Rafa", "Outro"/"Other"
+
+### Commit
+- `4db405e`
+
+_Last updated: 2026-05-31 — Session 6 complete._

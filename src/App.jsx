@@ -220,7 +220,7 @@ const DISC_TO_ANCHOR = { D:"executor", I:"comunicador", S:"planejador", C:"anali
 const SPECIAL_GROUP_PT = {
   "Rocket":"Rocket","Link":"Link","Legacy":"Legacy","Shine":"Shine","Hero":"Hero",
   "Culto Hope":"Culto Hope","Culto Fé":"Culto Fé","English Service":"Culto em Inglês","Other":"Outro",
-  "CRIE":"CRIE","Gerações":"Gerações","Carisma Serve Team":"Equipe Carisma"
+  "CRIE":"CRIE","Gerações":"Gerações","Carisma Serve Team":"Equipe Carisma","Carisma Student":"Equipe Carisma"
 };
 
 const PASTOR_SUGGESTIONS = ["Pra Alice","Pr Rafa"];

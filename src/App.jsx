@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 
 const API = "https://ltc-api.farfromtimnah.workers.dev";
 
 // ─── CARISMA LOGO (embedded) ──────────────────────────────────────
 const CARISMA_LOGO = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAzNTkgNTE3Ij4KICA8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMzAuNC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogMi4xLjQgQnVpbGQgMjI2KSAgLS0+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5zdDAgewogICAgICAgIGZpbGw6ICM1OTIyMWM7CiAgICAgIH0KCiAgICAgIC5zdDEgewogICAgICAgIGZpbGw6ICNiNDY5Njg7CiAgICAgIH0KCiAgICAgIC5zdDIgewogICAgICAgIGZpbGw6ICM0NDFjMTc7CiAgICAgIH0KCiAgICAgIC5zdDMgewogICAgICAgIGZpbGw6ICM2ODEyMTE7CiAgICAgIH0KCiAgICAgIC5zdDQgewogICAgICAgIGZpbGw6ICM0ZDFlMTk7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxnIGlkPSJXVlU2elgiPgogICAgPGc+CiAgICAgIDxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik0yODUuNCwzMy41OWwtMzAuMzYsNTUuMTZjMTIuMSw4LjkuMTgsMTkuODUtNy40OCwyNi4zMy0yLjI4LDIuNC04LjMsMTIuOTctNC41MywxNi44OSwyNS4xMSwyLjYyLDUwLjE3LDEuNDEsNzUuNS0xLjk3LDI0LjQ1LDM2Ljc4LDI5LjYxLDc0Ljk2LDMwLjU4LDExNi45NywyLjU0LDExMC40Ni03My44LDIwMC4xNC0xNjkuOTMsMjU2LjItMzMuNDYtMTYuMTEtNTguOTItMzguNzItODQuNjYtNjUuOTgtMTkuNzgsMTcuMzYtMTguMTIsNDguOTQtNTQuMjgsNTUuNzEtMjYuNDctNDAuMjcsMzQuOTYtNzYuNzQsMTUuNzMtMTA2Ljg2LTIyLjMxLTM0Ljk1LTM4Ljk1LTc0LjI0LTM4LjgxLTExNC4xMi0zLjQ3LTE1Ljk0LTMuOTItMzIuMTMtMS4zNC00OC41Nyw1LjcyLTI5Ljg0LDEwLjAyLTY2Ljg2LDM0LjkxLTkxLjEsMzMuOTUtMTEuODgsODUuNDgsOS4yMiwxMzkuMDUtMS4xNywxNS43OS0zLjA2LDIzLjg2LTM1LjAxLDE0LjY0LTQ1LjQ4LTEuMzktMTEuMjMsMy42OC0xMi44MiwxMy43Ny05LjcxLDE3LTIuMzEsMTUuMDUtMjguMTksMjguOTctMzguMjMsNy4yOC0yNS43LDM1LjcyLTMxLjE0LDM4LjI0LTQuMDVaTTE4Mi43OCwzMzguNDljLTMyLjI2LTEuODYtNDguNzgtMjkuODktNTAuMzUtNTUuMzctMS42MS0yNi4xNiwxOS4wNC01My43Niw0Ny4wNy01Ni40OCwyMi4zOS0yLjE3LDM4LjQ4LDEyLjMxLDU0LjA3LDI1LjAxbDM0LjAzLTE2Ljc0Yy0xNC4wOC0yOS41Ni0zOC41LTQ2LjE0LTY1LjEyLTUxLjYxLTI2LjkzLTUuNTMtNTcuMTksNC41OS03Ni43OCwyMy44NC00MS45LDQxLjE4LTQ0LjU1LDEwNC43NC00LjEyLDE0Ny4zMiwyMS4wNCwyMi4xNiw1MS42MiwzMS44OSw4MS45NCwyNS41NywyNS42Ny01LjM1LDU0LjQ0LTIwLjYzLDY0LjQ1LTUwLTkuNTEtOS4yMi0xOS42Ni0xNS4zNi0zMi4wNS0yMC43MS0xMy41NywxMy43MS0yOS4yNywzMC41NC01My4xMywyOS4xNloiLz4KICAgICAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTI4NS40LDMzLjU5Yy00LjQxLTkuMjMtMTYuNDgtMTUuMS0yNS4xMi03LjI2LTUuMDgsNC42LTguOTgsOC4zMy0xMy4xMiwxMS4zMWw2LjgzLTI2LjYxYzIuMi04LjEzLDM0LjY4LDEuMjcsMzYuNDQsMTQuMTguNTEsMy43Mi0zLjcyLDYuMDEtNS4wMiw4LjM3WiIvPgogICAgICA8cGF0aCBjbGFzcz0ic3Q0IiBkPSJNMjQ3LjU2LDExNS4wN2MtMy44MS0xMC4zOCwzLjQxLTE4LjkyLDcuNDgtMjYuMzMsMTAuMzIsMTAuMTksMjQuODYsOC43MywzNS4zOSwyMy4zLTE4LjIxLDUuODYtMzMuNDQtOS41Ny00Mi44OCwzLjAzWiIvPgogICAgICA8cGF0aCBjbGFzcz0ic3QyIiBkPSJNMjE4LjE5LDc1Ljg3Yy0yLjAzLDYuMDktNy43Niw5LjcyLTEzLjc3LDkuNzEtNi41Ny03LjQ2LTE0LjQ2LTEyLjc5LTE1LjE1LTI1LjEzLDEzLjQ3LDIuMzksMTkuMzQsMTEuNjgsMjguOTIsMTUuNDJaIi8+CiAgICAgIDxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNy4xNywyNzEuOWMtOS4xMS0xNC44NS00LjM0LTMyLjk0LTEuMzQtNDguNTdsMS4zNCw0OC41N1oiLz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPg==";
+
+const ROLES = { OWNER: 'owner', SENIOR_PASTOR: 'senior_pastor', PASTOR: 'pastor', GROUP_LEADER: 'group_leader' };
 
 const GIFTINGS = [
   "Worship & Music","Gift of Helps","Visual Storytelling","Digital Communication",
@@ -352,6 +355,12 @@ const L = {
     byNatural:"Forcas Naturais",discCulturalNote:"No Brasil, o perfil Comunicador e mais prevalente do que nos EUA, refletindo a cultura relacional e expressiva da comunidade.",
     noDistData:"Sem dados suficientes ainda.",
     reference:"Referencia",
+    loginRestricted:"Acesso Restrito",loginEmail:"Email",loginPassword:"Senha",
+    loginSignIn:"Entrar",loginSignInGoogle:"Entrar com Google",loginOr:"ou",loginSigningIn:"Entrando...",
+    roleOwner:"Desenvolvedor",roleSeniorPastor:"Pastor Sênior",rolePastor:"Pastor",roleGroupLeader:"Líder de Grupo",
+    usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",
+    addUser:"Adicionar Usuário",userCreated:"Usuário criado com sucesso.",sendCredentials:"Envie as credenciais via WhatsApp.",
+    userRoleSenior:"Pastor Sênior",userRolePastor:"Pastor",userRoleGroupLeader:"Líder de Grupo",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -419,6 +428,12 @@ const L = {
     byNatural:"Natural Strengths",discCulturalNote:"In Brazilian communities, the Comunicador profile is more prevalent than in the US, reflecting the relational and expressive culture of the congregation.",
     noDistData:"Not enough data yet.",
     reference:"Reference",
+    loginRestricted:"Restricted Access",loginEmail:"Email",loginPassword:"Password",
+    loginSignIn:"Sign In",loginSignInGoogle:"Sign in with Google",loginOr:"or",loginSigningIn:"Signing in...",
+    roleOwner:"Developer",roleSeniorPastor:"Senior Pastor",rolePastor:"Pastor",roleGroupLeader:"Group Leader",
+    usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",
+    addUser:"Add User",userCreated:"User created successfully.",sendCredentials:"Send credentials via WhatsApp.",
+    userRoleSenior:"Senior Pastor",userRolePastor:"Pastor",userRoleGroupLeader:"Group Leader",
   }
 };
 
@@ -1093,65 +1108,83 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────
-function Login({ onLogin, lang, t }) {
+function Login({ lang, t, onLangChange }) {
   const tt = t || L["PT"];
+  const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin() {
+  async function handleEmailSignIn() {
+    if (!email || !pw) return;
     setLoading(true); setError("");
     try {
-      const r = await fetch(`${API}/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw })
-      });
-      const d = await r.json();
-      if (d.success) { onLogin(pw); }
-      else { setError(tt.loginErrorPw); }
-    } catch { setError(tt.loginErrorConn); }
+      await signInWithEmailAndPassword(auth, email, pw);
+    } catch(e) {
+      const badCred = e.code === "auth/invalid-credential" || e.code === "auth/wrong-password" || e.code === "auth/user-not-found";
+      setError(badCred ? tt.loginErrorPw : tt.loginErrorConn);
+    }
+    setLoading(false);
+  }
+
+  async function handleGoogleSignIn() {
+    setLoading(true); setError("");
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch(e) {
+      if (e.code !== "auth/popup-closed-by-user") setError(tt.loginErrorConn);
+    }
     setLoading(false);
   }
 
   return (
     <div style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:"40px 20px",position:"relative"}}>
       <style>{css}</style>
-      {/* Backdrop glow halo behind logo */}
+      {/* Lang toggle top right */}
+      <div style={{position:"fixed",top:20,right:24,display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace",zIndex:10}}>
+        <button onClick={()=>onLangChange("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
+        <button onClick={()=>onLangChange("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
+      </div>
+      {/* Backdrop glow halo */}
       <div style={{position:"absolute",top:"24%",left:"50%",transform:"translateX(-50%)",width:520,height:520,borderRadius:"50%",background:"radial-gradient(circle, rgba(94,234,212,0.08), transparent 70%)",pointerEvents:"none"}} />
       <div style={{width:440,maxWidth:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:36,position:"relative"}}>
-        {/* LTC2 circle mark — displayed directly on background, no wrapper */}
-        <img src={`${import.meta.env.BASE_URL}LTC2.svg`} alt="LTC" style={{width:84,height:84,objectFit:"contain",flexShrink:0}} />
-        {/* Card */}
+        <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:48,width:"auto",objectFit:"contain"}} />
         <div className="glass" style={{width:"100%",padding:36,borderRadius:20,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(94,234,212,0.08) inset",position:"relative"}}>
-          {/* Top accent line */}
           <div style={{position:"absolute",top:0,left:"15%",right:"15%",height:1,background:"linear-gradient(90deg, transparent, #5eead4, transparent)",opacity:0.6}} />
           <div style={{marginBottom:28}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:10}}>LTC Ministry</div>
-            <h1 style={{margin:0,fontSize:30,fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,letterSpacing:"-0.01em",color:"#e6f1f0"}}>
-              {tt.loginTitle}
-            </h1>
-            <p style={{margin:"10px 0 0",color:"#6b7a82",fontSize:13.5}}>
-              {tt.loginDesc}
-            </p>
+            <h1 style={{margin:0,fontSize:28,fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,letterSpacing:"-0.01em",color:"#e6f1f0"}}>{tt.loginRestricted}</h1>
+            <p style={{margin:"10px 0 0",color:"#6b7a82",fontSize:13.5}}>{tt.loginDesc}</p>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:18}}>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div>
-              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>{tt.loginPasswordLabel}</div>
-              <div style={{position:"relative"}}>
-                <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:"#6b7a82",pointerEvents:"none",fontSize:14}}>🔒</div>
-                <input
-                  type="password" placeholder="• • • • • • • •"
-                  value={pw} onChange={e=>setPw(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-                  style={{paddingLeft:40,height:46}}
-                />
-              </div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>{tt.loginEmail}</div>
+              <input type="email" placeholder="email@lagoinha.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmailSignIn()} style={{height:46}} />
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>{tt.loginPassword}</div>
+              <input type="password" placeholder="• • • • • • • •" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmailSignIn()} style={{height:46}} />
             </div>
             {error && <div style={{color:"#f87171",fontSize:13}}>{error}</div>}
-            <button onClick={handleLogin} disabled={loading} className="btn-primary"
-              style={{height:46,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginTop:6}}>
-              {loading ? tt.loginChecking : tt.loginEnter} {!loading && <span style={{fontSize:14}}>→</span>}
+            <button onClick={handleEmailSignIn} disabled={loading} className="btn-primary" style={{height:46,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginTop:6}}>
+              {loading ? tt.loginSigningIn : tt.loginSignIn}
+            </button>
+            <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0"}}>
+              <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}} />
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",color:"#475a64",letterSpacing:"0.1em"}}>{tt.loginOr}</span>
+              <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}} />
+            </div>
+            <button onClick={handleGoogleSignIn} disabled={loading}
+              style={{height:46,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"#fff",border:"1px solid rgba(0,0,0,0.12)",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,color:"#3c4043",fontFamily:"Inter,sans-serif",transition:"box-shadow 0.18s"}}
+              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.2)"}
+              onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+              <svg width="18" height="18" viewBox="0 0 48 48">
+                <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21.5 0-1.4-.1-2.7-.5-4.5z"/>
+                <path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 16.1 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16 2 9.1 7.4 6.3 14.7z"/>
+                <path fill="#FBBC05" d="M24 46c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.3C29.6 37.6 26.9 38.5 24 38.5c-5.1 0-9.4-3.4-11-8l-6.9 5.3C9.4 42.3 16.1 46 24 46z"/>
+                <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.2-2.2 4.1-4 5.5l6.5 5.3c3.8-3.5 6.2-8.7 6.2-15.3 0-1.4-.1-2.7-.5-4.5z"/>
+              </svg>
+              {tt.loginSignInGoogle}
             </button>
           </div>
           <div style={{marginTop:24,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#475a64"}}>
@@ -1159,9 +1192,6 @@ function Login({ onLogin, lang, t }) {
             <span style={{fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.18em",textTransform:"uppercase",fontSize:"10.5px",color:"#5eead4",opacity:0.7}}>{tt.loginConnected}</span>
           </div>
         </div>
-        <p style={{fontSize:11.5,color:"#475a64",textAlign:"center",maxWidth:320,lineHeight:1.6}}>
-          {tt.loginTagline}
-        </p>
       </div>
     </div>
   );
@@ -3672,9 +3702,147 @@ function ReferenceTab({ t, lang, anchor, onAnchorConsumed, onBack }) {
 
 
 
+// ─── USER MANAGEMENT TAB ─────────────────────────────────────────
+function UserManagementTab({ token, t, lang }) {
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [newRole, setNewRole] = useState("pastor");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [createdUser, setCreatedUser] = useState(null);
+
+  const roleNames = {
+    senior_pastor: t.userRoleSenior,
+    pastor: t.userRolePastor,
+    group_leader: t.userRoleGroupLeader,
+  };
+
+  function loadUsers() {
+    fetch(`${API}/admin/users`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { if (d.users) setUsers(d.users); setLoadingUsers(false); })
+      .catch(() => setLoadingUsers(false));
+  }
+
+  useEffect(() => { loadUsers(); }, [token]);
+
+  async function handleAddUser() {
+    if (!email || !pw) return;
+    setAdding(true); setAddError("");
+    try {
+      const r = await fetch(`${API}/admin/user`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email, password: pw, role: newRole })
+      });
+      const d = await r.json();
+      if (d.success) {
+        setCreatedUser({ email, password: pw });
+        setEmail(""); setPw(""); setNewRole("pastor");
+        loadUsers();
+      } else {
+        setAddError(d.error || (lang === "PT" ? "Erro ao criar usuário." : "Error creating user."));
+      }
+    } catch { setAddError(lang === "PT" ? "Erro de conexão." : "Connection error."); }
+    setAdding(false);
+  }
+
+  return (
+    <div style={{padding:"40px 32px",maxWidth:900}}>
+      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:8}}>LTC Ministry</div>
+      <h2 style={{margin:"0 0 32px",fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:28,color:"#e6f1f0"}}>{t.usersTab}</h2>
+
+      {/* Add user form */}
+      <div className="glass" style={{padding:28,borderRadius:16,marginBottom:32,position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",opacity:0.4}} />
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:20}}>{t.addUser}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>{t.loginEmail}</div>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@lagoinha.com" style={{height:42}} />
+          </div>
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>{lang==="PT"?"Senha Temporária":"Temporary Password"}</div>
+            <input type="text" value={pw} onChange={e=>setPw(e.target.value)} placeholder={lang==="PT"?"Senha inicial...":"Initial password..."} style={{height:42}} />
+          </div>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10}}>{lang==="PT"?"Função":"Role"}</div>
+          <div style={{display:"flex",gap:8}}>
+            {["senior_pastor","pastor","group_leader"].map(r=>(
+              <button key={r} onClick={()=>setNewRole(r)} style={{padding:"8px 16px",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid",background:newRole===r?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",borderColor:newRole===r?"rgba(94,234,212,0.3)":"rgba(255,255,255,0.06)",color:newRole===r?"#5eead4":"#6b7a82",transition:"all 0.18s"}}>
+                {roleNames[r]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {addError && <div style={{color:"#f87171",fontSize:13,marginBottom:12}}>{addError}</div>}
+        <button onClick={handleAddUser} disabled={adding||!email||!pw} className="btn-primary" style={{padding:"10px 24px",fontSize:13}}>
+          {adding ? "..." : t.addUser}
+        </button>
+      </div>
+
+      {/* User list */}
+      <div className="glass" style={{padding:28,borderRadius:16,position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",opacity:0.4}} />
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:16}}>{lang==="PT"?"Usuários Ativos":"Active Users"}</div>
+        {loadingUsers ? (
+          <div style={{color:"#6b7a82",fontSize:13}}>{t.loading}</div>
+        ) : users.length === 0 ? (
+          <div style={{color:"#6b7a82",fontSize:13}}>{lang==="PT"?"Nenhum usuário encontrado.":"No users found."}</div>
+        ) : (
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead>
+              <tr style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#6b7a82",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>Email</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Função":"Role"}</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Último acesso":"Last sign in"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u,i)=>{
+                var customAttrs = {};
+                try { customAttrs = u.customAttributes ? JSON.parse(u.customAttributes) : {}; } catch(e) {}
+                return (
+                  <tr key={u.localId||i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                    <td style={{padding:"12px 0",color:"#e6f1f0"}}>{u.email}</td>
+                    <td style={{padding:"12px 0",color:"#aebac0"}}>{roleNames[customAttrs.role] || t.userRolePastor}</td>
+                    <td style={{padding:"12px 0",color:"#6b7a82"}}>{u.lastSignedInAt ? new Date(parseInt(u.lastSignedInAt)).toLocaleDateString() : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Created user modal */}
+      {createdUser && (
+        <div style={{position:"fixed",inset:0,background:"rgba(5,10,16,0.85)",backdropFilter:"blur(8px)",zIndex:200,display:"grid",placeItems:"center"}}
+          onClick={()=>setCreatedUser(null)}>
+          <div className="glass" style={{padding:36,borderRadius:20,maxWidth:420,width:"90%",position:"relative"}} onClick={e=>e.stopPropagation()}>
+            <div style={{position:"absolute",top:0,left:"15%",right:"15%",height:1,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",opacity:0.6}} />
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:16}}>{t.userCreated}</div>
+            <div style={{background:"rgba(0,0,0,0.3)",borderRadius:10,padding:16,marginBottom:16,fontFamily:"'JetBrains Mono',monospace",fontSize:13,lineHeight:1.9,color:"#e6f1f0"}}>
+              <div>Email: <span style={{color:"#5eead4"}}>{createdUser.email}</span></div>
+              <div>{lang==="PT"?"Senha":"Password"}: <span style={{color:"#5eead4"}}>{createdUser.password}</span></div>
+            </div>
+            <p style={{color:"#6b7a82",fontSize:13,margin:"0 0 20px"}}>{t.sendCredentials}</p>
+            <button onClick={()=>setCreatedUser(null)} className="btn-primary" style={{width:"100%",padding:"10px",fontSize:13}}>OK</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function App() {
-  const [token, setToken] = useState(() => sessionStorage.getItem("ltc_token") || null);
+  const [token, setToken] = useState(null);
+  const [role, setRole] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [tab, setTab] = useState("analytics");
   const [refAnchor, setRefAnchor] = useState(null);
   const [lang, setLang] = useState("PT");
@@ -3682,6 +3850,27 @@ export default function App() {
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const idToken = await user.getIdToken();
+          const result = await user.getIdTokenResult();
+          setToken(idToken);
+          setRole(result.claims.role || 'pastor');
+        } catch(e) {
+          setToken(null);
+          setRole(null);
+        }
+      } else {
+        setToken(null);
+        setRole(null);
+      }
+      setAuthReady(true);
+    });
+    return unsub;
+  }, []);
 
   function handleNavigate(tabId, anchor) {
     setTab(tabId);
@@ -3699,12 +3888,27 @@ export default function App() {
       .catch(() => {});
   }, [token]);
 
-  function handleLogin(pw) {
-    sessionStorage.setItem("ltc_token", pw);
-    setToken(pw);
-  }
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#050a10"}}>
+      <style>{css}</style>
+      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#475a64"}}>...</div>
+    </div>
+  );
 
-  if (!token) return <Login onLogin={handleLogin} lang={lang} t={t} />;
+  if (!token) return <Login lang={lang} t={t} onLangChange={setLang} />;
+
+  if (role === 'group_leader') return (
+    <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#050a10"}}>
+      <style>{css}</style>
+      <div className="glass" style={{padding:40,borderRadius:20,textAlign:"center",maxWidth:400}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:16}}>LTC Ministry</div>
+        <p style={{color:"#e6f1f0",fontSize:16,margin:"0 0 24px"}}>{t.groupLeaderMsg}</p>
+        <button onClick={()=>signOut(auth)} className="btn-ghost" style={{padding:"8px 20px",fontSize:12}}>{t.logout}</button>
+      </div>
+    </div>
+  );
+
+  const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
 
   const tabs = [
     { id: "analytics", label: t.analytics },
@@ -3713,6 +3917,7 @@ export default function App() {
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
   ];
+  if (role === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
   return (
     <div className="app" style={{minHeight:"100vh"}}>
@@ -3741,16 +3946,16 @@ export default function App() {
           </nav>
           {/* Utility */}
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            {/* Language toggle */}
+            {role && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[role] || role}</span>}
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
-              <button onClick={()=>lang==="EN"&&setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
-              <button onClick={()=>lang==="PT"&&setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
+              <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
+              <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
             <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost"
               style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
               ⚙️
             </button>
-            <button onClick={()=>{sessionStorage.removeItem("ltc_token");setToken(null);}} className="btn-ghost"
+            <button onClick={()=>signOut(auth)} className="btn-ghost"
               style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
               ↪ {t.logout}
             </button>
@@ -3769,6 +3974,7 @@ export default function App() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
+        {tab === "users" && role === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
 
       {showSettings && (

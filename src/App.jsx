@@ -4275,6 +4275,10 @@ export default function App() {
 
   const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
 
+  const effectiveRole = viewMode === 'senior_pastor_view' ? 'senior_pastor'
+    : viewMode === 'pastor_view' ? 'pastor'
+    : role;
+
   const tabs = [
     { id: "analytics", label: t.analytics },
     { id: "people", label: t.people },
@@ -4282,7 +4286,7 @@ export default function App() {
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
   ];
-  if (role === 'owner') tabs.push({ id: "users", label: t.usersTab });
+  if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
   return (
     <div className="app" style={{minHeight:"100vh"}}>
@@ -4311,7 +4315,7 @@ export default function App() {
           </nav>
           {/* Utility */}
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            {role && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[role] || role}</span>}
+            {role && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[effectiveRole] || effectiveRole}</span>}
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
@@ -4323,6 +4327,8 @@ export default function App() {
                   onChange={e => { setViewMode(e.target.value); if (e.target.value === 'my_view') setGlGroup(""); }}
                   style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"#aebac0",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
                   <option value="my_view">{lang === "PT" ? "Minha visao" : "My View"}</option>
+                  {role === 'owner' && <option value="senior_pastor_view">{lang === "PT" ? "Visao do Pastor Senior" : "Senior Pastor View"}</option>}
+                  {role === 'owner' && <option value="pastor_view">{lang === "PT" ? "Visao do Pastor" : "Pastor View"}</option>}
                   <option value="group_leader">{lang === "PT" ? "Visao do Lider" : "Group Leader View"}</option>
                 </select>
                 {viewMode === 'group_leader' && (
@@ -4362,7 +4368,7 @@ export default function App() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {tab === "users" && role === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
+        {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
 
       {showSettings && (

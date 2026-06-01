@@ -1536,3 +1536,44 @@ VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE
 ### Firebase Console setup required
 - Enable Email/Password and Google sign-in providers: Firebase Console → Authentication → Sign-in method
 - Add `farfromtimnah-hue.github.io` to Authorized domains: Firebase Console → Authentication → Settings → Authorized domains
+
+---
+
+## Session 7 (2026-06-01) — Group Leader View + View Switcher
+
+### Commit
+`8f065e6` — "Add group leader view and view switcher"
+
+### Changes made
+
+**Change 1 — Language default for owner**
+- File: `src/App.jsx`
+- In the `onAuthStateChanged` effect (~line 4226), after setting token/role, added:
+  `if (user.email === 'nicoleylepage@gmail.com') setLang('EN');`
+- Language toggle still works normally; this only sets the default at login.
+
+**Change 2 — View switcher in nav bar**
+- Added two new state vars in App: `viewMode` (default `"my_view"`) and `glGroup` (default `""`).
+- Rendered a view-mode `<select>` (PT: "Minha visao" / EN: "My View" + PT: "Visao do Lider" / EN: "Group Leader View") in the nav utility bar, visible only to `owner` and `pastor` roles.
+- When "Group Leader View" is selected, a second `<select>` appears for the group (GL_GROUPS constant).
+- Switching back to "My View" clears glGroup and restores the full dashboard immediately.
+
+**Change 3 — GroupLeaderView component**
+- New function component `GroupLeaderView({ token, lang, groupName })` added just before the App function.
+- **Data strategy: Option B** — fetches `/people` then makes individual `/person/:id` calls in parallel (Promise.all). Caches results in component state; shows a `...` spinner during load.
+- Section A (Our Team): pill-tab toggle between Serving (from group_roles) and Attending (from group_attendance, excluding servers).
+- Section B (Sunday Ministry Pool): derives candidates from current_ministries using MINISTRY_TO_GL_ROLE and GROUP_ROLE_MAP_DASH; excludes existing servers; grouped by Sunday ministry; hardcoded ministry leader names.
+- Read-only: no edit controls, no stage changes, no pastoral flags.
+
+**New constants added** (~line 302):
+- `GL_GROUPS` — the 10 selectable groups
+- `MINISTRY_TO_GL_ROLE` — Sunday ministry name -> group role name mapping
+- `MINISTRY_LEADERS` — hardcoded leader names per Sunday ministry
+
+### File size
+`src/App.jsx` grew from ~4143 lines to ~4380 lines (all in one file as before).
+
+### What remains
+- Group leader accounts themselves log in and see a "coming soon" placeholder (existing behavior, not changed this session).
+- WhatsApp tap for ministry leaders in the Sunday pool is explicitly deferred (FUTURE).
+- No Worker changes were needed or made this session.

@@ -1577,3 +1577,37 @@ VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE
 - Group leader accounts themselves log in and see a "coming soon" placeholder (existing behavior, not changed this session).
 - WhatsApp tap for ministry leaders in the Sunday pool is explicitly deferred (FUTURE).
 - No Worker changes were needed or made this session.
+
+---
+
+## Session 8 (2026-06-01) — View Switcher Role Fix
+
+### Commit
+`1decc26` — "Fix view switcher: add Senior Pastor View and Pastor View options for owner"
+
+### Changes made (all in `src/App.jsx`)
+
+**`effectiveRole` variable** (~line 4279)
+Added `const effectiveRole = viewMode === 'senior_pastor_view' ? 'senior_pastor' : viewMode === 'pastor_view' ? 'pastor' : role;`
+This drives tabs, roleLabel, and users tab visibility so the owner's previewed role is reflected accurately without changing the actual auth role.
+
+**Tabs array** (~line 4287)
+Changed `if (role === 'owner')` to `if (effectiveRole === 'owner')` so the Users tab disappears when the owner is previewing Senior Pastor or Pastor views.
+
+**Nav roleLabel** (~line 4316)
+Changed `roleLabel[role]` to `roleLabel[effectiveRole]` so the role chip in the nav updates to match the previewed role.
+
+**View switcher dropdown** (~line 4327)
+Owner now sees 4 options: My View / Senior Pastor View (PT: Visao do Pastor Senior) / Pastor View (PT: Visao do Pastor) / Group Leader View.
+Pastor still sees 2 options: My View / Group Leader View.
+Senior pastor and group leader see no switcher (unchanged).
+
+**Users tab guard** (~line 4367)
+Changed `role === "owner"` to `effectiveRole === "owner"` so the Users tab content is hidden when previewing other roles.
+
+### Behavior
+- Owner in "My View": full dashboard + Users tab + 4-option switcher
+- Owner in "Senior Pastor View": full dashboard, no Users tab, roleLabel shows "Senior Pastor" / "Pastor Senior"
+- Owner in "Pastor View": full dashboard, no Users tab, roleLabel shows "Pastor"
+- Owner in "Group Leader View" + group selected: GroupLeaderView component (unchanged from Session 7)
+- Pastor: unchanged (My View + Group Leader View)

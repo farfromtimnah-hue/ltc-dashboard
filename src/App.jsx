@@ -1662,7 +1662,7 @@ function AnalyticsTab({ token, t, lang }) {
       </div>
 
       {/* ── Leadership + Emotional + Natural Strength Distribution ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20}}>
         {/* Leadership Tendencies */}
         <div className="glass" style={{padding:28,borderRadius:12}}>
           <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,
@@ -1672,28 +1672,27 @@ function AnalyticsTab({ token, t, lang }) {
           {(data.byLeadership||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {(data.byLeadership||[]).map(function(row,i){
-                const pct=total>0?(row.count/total)*100:0;
-                const colors=["#5eead4","#60a5fa","#a78bfa","#f59e0b","#34d399"];
-                const color=colors[i%colors.length];
-                const ldEntry2=row.leadership_tendency?LEADERSHIP_MAP[row.leadership_tendency]:null;
-                const label=ldEntry2?(lang==="PT"?ldEntry2.PT:ldEntry2.EN):(row.leadership_tendency||"Outro");
-                return (
-                  <div key={row.leadership_tendency||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                      <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
-                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
-                      </span>
+            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+              <Donut
+                size={180} strokeWidth={18}
+                centerValue={String((data.byLeadership||[]).reduce((s,r)=>s+r.count,0))}
+                centerLabel={t.mapped}
+                data={(data.byLeadership||[]).map((row,i)=>({value:row.count,color:donutColors[i]||"#5eead4"}))}
+              />
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {(data.byLeadership||[]).map(function(row,i){
+                  const color=donutColors[i]||"#5eead4";
+                  const ldEntry2=row.leadership_tendency?LEADERSHIP_MAP[row.leadership_tendency]:null;
+                  const label=ldEntry2?(lang==="PT"?ldEntry2.PT:ldEntry2.EN):(row.leadership_tendency||"Outro");
+                  return (
+                    <div key={row.leadership_tendency||i} style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:color,boxShadow:"0 0 8px "+color}}/>
+                      <span style={{flex:1,fontSize:12,color:"#aebac0",lineHeight:1.3}}>{label}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{row.count}</span>
                     </div>
-                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1707,28 +1706,27 @@ function AnalyticsTab({ token, t, lang }) {
           {(data.byEmotional||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {(data.byEmotional||[]).map(function(row,i){
-                const pct=total>0?(row.count/total)*100:0;
-                const colors=["#5eead4","#f59e0b","#f87171","#a78bfa","#34d399"];
-                const color=colors[i%colors.length];
-                const emEntry2=row.emotional_profile?EMOTIONAL_MAP[row.emotional_profile]:null;
-                const label=emEntry2?(lang==="PT"?emEntry2.PT:emEntry2.EN):(row.emotional_profile||"Outro");
-                return (
-                  <div key={row.emotional_profile||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                      <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
-                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
-                      </span>
+            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+              <Donut
+                size={180} strokeWidth={18}
+                centerValue={String((data.byEmotional||[]).reduce((s,r)=>s+r.count,0))}
+                centerLabel={t.mapped}
+                data={(data.byEmotional||[]).map((row,i)=>({value:row.count,color:donutColors[i]||"#5eead4"}))}
+              />
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {(data.byEmotional||[]).map(function(row,i){
+                  const color=donutColors[i]||"#5eead4";
+                  const emEntry2=row.emotional_profile?EMOTIONAL_MAP[row.emotional_profile]:null;
+                  const label=emEntry2?(lang==="PT"?emEntry2.PT:emEntry2.EN):(row.emotional_profile||"Outro");
+                  return (
+                    <div key={row.emotional_profile||i} style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:color,boxShadow:"0 0 8px "+color}}/>
+                      <span style={{flex:1,fontSize:12,color:"#aebac0",lineHeight:1.3}}>{label}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{row.count}</span>
                     </div>
-                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1742,28 +1740,27 @@ function AnalyticsTab({ token, t, lang }) {
           {(data.byNatural||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {(data.byNatural||[]).map(function(row,i){
-                const pct=total>0?(row.count/total)*100:0;
-                const colors=["#34d399","#5eead4","#60a5fa","#a78bfa"];
-                const color=colors[i%colors.length];
-                const nsEntry2=row.natural_strength?NATURAL_STRENGTH_MAP[row.natural_strength]:null;
-                const label=nsEntry2?(lang==="PT"?nsEntry2.PT:nsEntry2.EN):(row.natural_strength||"Outro");
-                return (
-                  <div key={row.natural_strength||i}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                      <span style={{fontSize:12,color:"#aebac0"}}>{label}</span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:"#e6f1f0",fontWeight:600}}>
-                        {row.count} <span style={{fontWeight:400,fontSize:11,color:"#6b7a82"}}>({Math.round(pct)}%)</span>
-                      </span>
+            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+              <Donut
+                size={180} strokeWidth={18}
+                centerValue={String((data.byNatural||[]).reduce((s,r)=>s+r.count,0))}
+                centerLabel={t.mapped}
+                data={(data.byNatural||[]).map((row,i)=>({value:row.count,color:donutColors[i]||"#5eead4"}))}
+              />
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {(data.byNatural||[]).map(function(row,i){
+                  const color=donutColors[i]||"#5eead4";
+                  const nsEntry2=row.natural_strength?NATURAL_STRENGTH_MAP[row.natural_strength]:null;
+                  const label=nsEntry2?(lang==="PT"?nsEntry2.PT:nsEntry2.EN):(row.natural_strength||"Outro");
+                  return (
+                    <div key={row.natural_strength||i} style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:color,boxShadow:"0 0 8px "+color}}/>
+                      <span style={{flex:1,fontSize:12,color:"#aebac0",lineHeight:1.3}}>{label}</span>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:"#e6f1f0",fontWeight:600}}>{row.count}</span>
                     </div>
-                    <div style={{height:6,background:"rgba(255,255,255,0.04)",borderRadius:999,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:(row.count>0?Math.max(pct,2):0)+"%",
-                        background:"linear-gradient(90deg,"+color+"aa,"+color+")",borderRadius:999,boxShadow:"0 0 8px "+color+"55",transition:"width 0.8s cubic-bezier(0.16,1,0.3,1)"}}/>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

@@ -1449,3 +1449,90 @@ _Last updated: 2026-05-31 — Session 5 complete._
 - `4db405e`
 
 _Last updated: 2026-05-31 — Session 6 complete._
+
+---
+
+## Session Firebase Auth (2026-06-01) — Firebase Authentication Implementation
+
+### Files Changed
+- `src/App.jsx` — Login component replaced, App main auth rewritten, UserManagementTab added
+- `src/firebase.js` — new file, Firebase SDK initialization
+- `.github/workflows/deploy.yml` — build step now injects VITE_FIREBASE_* env vars from secrets
+- `package.json` — firebase 12.14.0 added
+
+### What was implemented
+
+#### firebase.js (new file)
+Initializes Firebase app from VITE_FIREBASE_* env vars. Exports: `auth`, `googleProvider`, `signInWithPopup`, `signInWithEmailAndPassword`, `signOut`, `onAuthStateChanged`.
+
+#### Login component (fully replaced)
+- Email + password fields
+- "Entrar" / "Sign In" button → `signInWithEmailAndPassword`
+- Divider "ou" / "or"
+- "Entrar com Google" / "Sign in with Google" button with Google SVG logo → `signInWithPopup`
+- PT/EN lang toggle at top-right corner (accessible before login)
+- LTC1.svg logo (full church logo, not LTC2)
+- Error handling for bad credentials vs connection errors
+- No `onLogin` callback — Firebase `onAuthStateChanged` in App picks up auth state change
+
+#### App main auth rewrite
+- Removed `sessionStorage`-based token + `handleLogin`
+- Added `onAuthStateChanged` useEffect — sets `token` (Firebase ID token) and `role` (from custom claims)
+- Added `authReady` state — shows `...` spinner while Firebase resolves auth state on page load
+- Logout button now calls `signOut(auth)`
+- Group leader role shows placeholder screen instead of dashboard
+- Role indicator shown in nav bar (muted, small text)
+- Users tab visible only when `role === 'owner'`
+
+#### ROLES constant
+`{ OWNER: 'owner', SENIOR_PASTOR: 'senior_pastor', PASTOR: 'pastor', GROUP_LEADER: 'group_leader' }`
+
+#### UserManagementTab (new component — owner only)
+- Add user form: email, temporary password, role selector (Senior Pastor / Pastor / Group Leader)
+- Calls `POST /admin/user` on the Worker
+- On success: shows modal with email + password to copy for WhatsApp
+- User list: fetches `GET /admin/users`, shows email, role, last sign-in date
+- Role names use L dict keys (fully bilingual)
+
+#### L dictionary additions (both PT and EN)
+New keys: `loginRestricted`, `loginEmail`, `loginPassword`, `loginSignIn`, `loginSignInGoogle`, `loginOr`, `loginSigningIn`, `roleOwner`, `roleSeniorPastor`, `rolePastor`, `roleGroupLeader`, `usersTab`, `groupLeaderMsg`, `addUser`, `userCreated`, `sendCredentials`, `userRoleSenior`, `userRolePastor`, `userRoleGroupLeader`
+
+### Worker changes (see ltc-api/Progress.md)
+- `auth()` now async, verifies Firebase ID tokens via REST API
+- Legacy `DASHBOARD_PASSWORD` kept during transition
+- New admin endpoints: GET /admin/users, POST /admin/user, GET /admin/init-owner
+- Service account JWT helper for setting custom claims
+
+### Commit
+- ltc-dashboard: `02f6c4b` — Add Firebase authentication
+- Worker: `d00d743a` — deployed
+
+### Current version
+App.jsx: Session Firebase Auth (2026-06-01)
+Worker: d00d743a
+
+---
+
+## PENDING MANUAL ACTIONS (required before Firebase auth works end-to-end)
+
+### Cloudflare Worker secrets (Workers & Pages → ltc-api → Settings → Variables → Secrets)
+- `FIREBASE_API_KEY` — the apiKey from .env.local
+- `FIREBASE_PROJECT_ID` — the projectId from .env.local
+- `FIREBASE_CLIENT_EMAIL` — from Firebase service account JSON (Project Settings → Service Accounts → Generate new private key)
+- `FIREBASE_PRIVATE_KEY` — from service account JSON (the full -----BEGIN PRIVATE KEY----- string; paste as-is, Cloudflare handles newlines)
+- `INIT_SECRET` — any random string of your choice
+
+### GitHub Actions secrets (already added — confirmed)
+VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+
+### Bootstrap owner role (one-time)
+1. Create your Firebase account (if not already created) via the Firebase Console → Authentication → Users → Add user
+2. After adding all Cloudflare secrets and redeploying, visit:
+   `https://ltc-api.farfromtimnah.workers.dev/admin/init-owner?email=YOUR_EMAIL&secret=YOUR_INIT_SECRET`
+3. Confirm response: `{ "success": true }`
+4. Sign out and sign back in — role claim will appear
+5. Remove the `/admin/init-owner` endpoint from worker.js and redeploy
+
+### Firebase Console setup required
+- Enable Email/Password and Google sign-in providers: Firebase Console → Authentication → Sign-in method
+- Add `farfromtimnah-hue.github.io` to Authorized domains: Firebase Console → Authentication → Settings → Authorized domains

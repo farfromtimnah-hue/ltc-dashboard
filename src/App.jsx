@@ -1729,7 +1729,9 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
                   {showPastoralTip && (
                     <div style={{position:"absolute",bottom:"125%",left:"50%",transform:"translateX(-50%)",background:"#1a2a2a",color:"#e6f1f0",fontSize:12,lineHeight:1.5,padding:"8px 12px",borderRadius:6,border:"1px solid #2ABFBF",zIndex:999,width:220,pointerEvents:"none",whiteSpace:"normal"}}>
                       {person.pastoral_flag==2
-                        ? (lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor")
+                        ? (lang==="PT"
+                          ? "Marcado Pastoral" + (person.pastor_confirmed_by ? " — por " + person.pastor_confirmed_by : "")
+                          : "Marked for Pastoral" + (person.pastor_confirmed_by ? " — by " + person.pastor_confirmed_by : ""))
                         : (lang==="PT" ? "Potencial Pastoral" : "Pastoral Potential")}
                     </div>
                   )}
@@ -2033,6 +2035,8 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
           value={labelPopup.value}
           lang={lang}
           onClose={function(){ setLabelPopup(null); }}
+          pastoralFlag={labelPopup.pastoralFlag}
+          confirmedBy={labelPopup.confirmedBy}
         />
       )}
       {ministryPopup && (
@@ -2336,14 +2340,16 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     </span>
                   )}
                   {(person.pastoral_flag==1 || person.pastoral_flag==2) && (
-                    <span onClick={function(){ setLabelPopup({type:'pastoral',value:'pastoral-potential'}); }}
+                    <span onClick={function(){ setLabelPopup({type:'pastoral',value:'pastoral-potential',pastoralFlag:person.pastoral_flag,confirmedBy:person.pastor_confirmed_by||null}); }}
                       style={{fontSize:10,padding:"4px 10px",borderRadius:6,
                       background:person.pastoral_flag==2?"rgba(42,191,191,0.12)":"rgba(245,158,11,0.12)",
                       border:person.pastoral_flag==2?"1px solid rgba(42,191,191,0.3)":"1px solid rgba(245,158,11,0.3)",
                       color:person.pastoral_flag==2?"#2ABFBF":"#fbd590",
                       fontWeight:700,display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
                       {"★ "}{person.pastoral_flag==2
-                        ? (lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor")
+                        ? (lang==="PT"
+                          ? "Marcado Pastoral" + (person.pastor_confirmed_by ? " — por " + person.pastor_confirmed_by : "")
+                          : "Marked for Pastoral" + (person.pastor_confirmed_by ? " — by " + person.pastor_confirmed_by : ""))
                         : t.pastoralAlert}
                     </span>
                   )}
@@ -2513,7 +2519,7 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                         {lang==="PT" ? "Quem esta confirmando?" : "Who is confirming?"}
                       </div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-                        {["Pr. Daniel","Pra. Alice","Pr. Rafa","Pr. Andrey"].map(function(name){
+                        {["Pr. Daniel","Pra. Alice","Pr. Rafa"].map(function(name){
                           return (
                             <button key={name} onClick={function(){ setPastoralPastorName(name); setPastoralCustomName(""); }}
                               style={{fontSize:11,padding:"5px 10px",borderRadius:6,cursor:"pointer",fontFamily:"'Inter',sans-serif",
@@ -3231,7 +3237,7 @@ class RefErrorBoundary extends React.Component {
 // Overlay rendered inside PersonPanel; shows Reference content for a label tag.
 // type: "disc" | "natural_strength" | "leadership_tendency" | "emotional_profile" | "pairing" | "gifting" | "pastoral"
 // value: canonical English value, e.g. "Sustainer", "D", "Deep Worshiper", "pastoral-potential"
-function LabelDescriptionPopup({ type, value, lang, onClose }) {
+function LabelDescriptionPopup({ type, value, lang, onClose, pastoralFlag, confirmedBy }) {
   const [refContent, setRefContent] = useState(null);
   const [discTab, setDiscTab] = useState("brazil");
 
@@ -3263,7 +3269,9 @@ function LabelDescriptionPopup({ type, value, lang, onClose }) {
   }
 
   var isDisc = type === "disc";
-  var headingLabel = item ? (lang === "PT" ? item.labelPT : item.labelEN) : value;
+  var headingLabel = (type === "pastoral" && pastoralFlag === 2)
+    ? (lang === "PT" ? "Marcado Pastoral" : "Marked for Pastoral")
+    : (item ? (lang === "PT" ? item.labelPT : item.labelEN) : value);
   var body = item ? (lang === "PT" ? item.bodyPT : item.bodyEN) : null;
 
   function tabBtnStyle(active) {
@@ -3333,6 +3341,24 @@ function LabelDescriptionPopup({ type, value, lang, onClose }) {
                 {discTab==="usa"    && renderParagraphs(lang==="PT"?item.usaPT:item.usaEN)}
                 {discTab==="cult"   && renderParagraphs(lang==="PT"?item.culturalPT:item.culturalEN)}
               </div>
+            </div>
+          ) : (type === "pastoral" && pastoralFlag === 2) ? (
+            <div style={{fontSize:13,color:"#aebac0",lineHeight:1.75}}>
+              {lang === "PT" ? (
+                <>
+                  <p style={{margin:0,marginBottom:"0.85em"}}>{"Esta pessoa foi identificada para desenvolvimento pastoral por meio de observacao e relacionamento pastoral direto."}</p>
+                  <p style={{margin:0,marginBottom:"0.85em"}}>{"Esta designacao foi feita por um pastor com base em conhecimento pessoal do carater, maturidade de fe e chamado desta pessoa — fatores que vao alem do que qualquer avaliacao pode medir."}</p>
+                  <p style={{margin:0,marginBottom:confirmedBy?"0.85em":0}}>{"A avaliacao pode revelar padroes. Somente o pastor pode discernir o chamado."}</p>
+                  {confirmedBy && <p style={{margin:0,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{"Identificado por: " + confirmedBy}</p>}
+                </>
+              ) : (
+                <>
+                  <p style={{margin:0,marginBottom:"0.85em"}}>{"This person has been identified for pastoral development by direct pastoral observation and relationship."}</p>
+                  <p style={{margin:0,marginBottom:"0.85em"}}>{"This designation was made by a pastor based on personal knowledge of this person's character, faith maturity, and calling — factors that go beyond what any assessment can measure."}</p>
+                  <p style={{margin:0,marginBottom:confirmedBy?"0.85em":0}}>{"The assessment can surface patterns. Only the pastor can discern the calling."}</p>
+                  {confirmedBy && <p style={{margin:0,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{"Identified by: " + confirmedBy}</p>}
+                </>
+              )}
             </div>
           ) : (
             <div style={{fontSize:13,color:"#aebac0",lineHeight:1.75}}>

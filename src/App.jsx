@@ -299,6 +299,44 @@ const GROUP_ROLE_MAP_DASH = {
   "Carisma Serve Team": ["Welcome","Set Up","Sound","Projection","Photo & Video","Social Media","Kids","Cafe/Food"]
 };
 
+const GL_GROUPS = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Carisma Serve Team"];
+
+const MINISTRY_TO_GL_ROLE = {
+  "Worship Team":         "Worship",
+  "Sound":                "Sound",
+  "Lighting":             "Lighting",
+  "Projection":           "Projection",
+  "Streaming":            "Streaming",
+  "Photo & Video":        "Photo & Video",
+  "Social Media":         "Social Media",
+  "Service Experience":   "Service Experience",
+  "Consolidation":        "Consolidation",
+  "Translation":          "Translation",
+  "Lagoinha Kids":        "Kids",
+  "Intercession":         "Intercession",
+  "Volunteer Coffee":     "Cafe/Food",
+  "Hospitality - Welcome":"Welcome",
+  "Setup & Teardown":     "Set Up",
+};
+
+const MINISTRY_LEADERS = {
+  "Worship Team":         "Kenia",
+  "Sound":                "Claudio",
+  "Lighting":             "Kevin",
+  "Projection":           "Marjorie",
+  "Streaming":            "Mauricio",
+  "Photo & Video":        "Marjorie",
+  "Social Media":         "Marjorie",
+  "Service Experience":   "Fabi",
+  "Consolidation":        "Petito",
+  "Translation":          "Pastora Paula",
+  "Lagoinha Kids":        "Babi",
+  "Intercession":         "Vania",
+  "Volunteer Coffee":     "Juliana",
+  "Hospitality - Welcome":"Fabi",
+  "Setup & Teardown":     "Anderson",
+};
+
 const DEFAULT_TEMPLATE_PT = "Oi, {{name}}! Tudo bem? 😊 Que alegria ter você conosco! Vi que você tem o dom de {{gifting}} e isso é incrível! Adoraria marcar um tempo com você para te conhecer melhor e ver como podemos servir os seus dons aqui na Lagoinha Tampa. Quando seria um bom momento?";
 const DEFAULT_TEMPLATE_EN = "Hi {{name}}! So glad you are here with us! I saw that you have the gifting of {{gifting}} and that is amazing! I would love to find a time to meet with you and see how we can best serve your giftings here at Lagoinha Tampa. When would be a good time?";
 
@@ -3991,6 +4029,178 @@ function UserManagementTab({ token, t, lang }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────
+function GroupLeaderView({ token, lang, groupName }) {
+  const [allPersons, setAllPersons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [glTab, setGlTab] = useState("serving");
+
+  const tx = {
+    serving:       lang === "PT" ? "Servindo"        : "Serving",
+    attending:     lang === "PT" ? "Frequentando"    : "Attending",
+    ourTeam:       lang === "PT" ? "Nossa Equipe"    : "Our Team",
+    sundayPool:    lang === "PT" ? "Voluntarios do Culto de Domingo" : "Sunday Ministry Volunteers",
+    sundaySub:     lang === "PT" ? "Pessoas servindo no culto que podem ter interesse neste grupo" : "People serving on Sundays who may be a fit for this group",
+    noServing:     lang === "PT" ? "Nenhum voluntario neste grupo ainda." : "No volunteers in this group yet.",
+    noAttending:   lang === "PT" ? "Nenhum membro registrado neste grupo." : "No members recorded for this group.",
+    noSunday:      lang === "PT" ? "Nenhum voluntario do culto identificado para este grupo." : "No Sunday volunteers identified for this group yet.",
+    notYetServing: lang === "PT" ? "Nao serve ainda" : "Not yet serving",
+    leader:        lang === "PT" ? "Lider" : "Leader",
+    people:        lang === "PT" ? "pessoas" : "people",
+    person:        lang === "PT" ? "pessoa"  : "person",
+    glView:        lang === "PT" ? "VISAO DO LIDER" : "GROUP LEADER VIEW",
+  };
+
+  useEffect(() => {
+    if (!token || !groupName) return;
+    setLoading(true);
+    fetch(`${API}/people`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(async (people) => {
+        if (!Array.isArray(people)) { setLoading(false); return; }
+        const detailed = await Promise.all(
+          people.map(p =>
+            fetch(`${API}/person/${p.id}`, { headers: { Authorization: `Bearer ${token}` } })
+              .then(r => r.json())
+              .catch(() => p)
+          )
+        );
+        setAllPersons(detailed.filter(Boolean));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [token, groupName]);
+
+  const groupRolesFor = (person) => {
+    if (!person.group_roles) return [];
+    return person.group_roles.filter(r => r.group_name === groupName).map(r => r.role);
+  };
+
+  const serving = allPersons.filter(p => groupRolesFor(p).length > 0);
+  const servingIds = new Set(serving.map(p => p.id));
+
+  const attending = allPersons.filter(p => {
+    if (servingIds.has(p.id)) return false;
+    const att = parseJSON(p.group_attendance);
+    return att && att.includes(groupName);
+  });
+
+  const groupRoles = GROUP_ROLE_MAP_DASH[groupName] || [];
+  const sundayByMinistry = {};
+  Object.entries(MINISTRY_TO_GL_ROLE).forEach(([ministry, glRole]) => {
+    if (!groupRoles.includes(glRole)) return;
+    const pool = allPersons.filter(p => {
+      if (servingIds.has(p.id)) return false;
+      const minis = parseJSON(p.current_ministries);
+      return minis && minis.includes(ministry);
+    });
+    if (pool.length > 0) sundayByMinistry[ministry] = pool;
+  });
+
+  const displayName = (p) => p.preferred_name || p.name || "";
+
+  const GlAvatar = ({ person }) => {
+    const initials = displayName(person).split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    return (
+      <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,rgba(94,234,212,0.2),rgba(94,234,212,0.08))",border:"1px solid rgba(94,234,212,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#5eead4",fontFamily:"'Space Grotesk',sans-serif",flexShrink:0}}>{initials||"?"}</div>
+    );
+  };
+
+  const Chip = ({ label, teal }) => (
+    <span style={{fontSize:11,padding:"3px 8px",borderRadius:5,background:teal?"rgba(94,234,212,0.07)":"rgba(255,255,255,0.04)",border:teal?"1px solid rgba(94,234,212,0.28)":"1px solid rgba(255,255,255,0.07)",color:teal?"#5eead4":"#aebac0",whiteSpace:"nowrap"}}>{label}</span>
+  );
+
+  const GiftBadge = ({ person }) => {
+    if (!person.gifting_1) return null;
+    const label = lang === "PT" ? (GIFTING_LABEL_PT[person.gifting_1] || person.gifting_1) : person.gifting_1;
+    return <span style={{fontSize:11,padding:"3px 8px",borderRadius:5,background:"rgba(94,234,212,0.06)",border:"1px solid rgba(94,234,212,0.2)",color:"#5eead4"}}>{GIFTING_ICONS[person.gifting_1]||"◆"} {label}</span>;
+  };
+
+  const PersonRow = ({ person, showRoles }) => {
+    const roles = showRoles ? groupRolesFor(person) : [];
+    const minis = parseJSON(person.current_ministries) || [];
+    return (
+      <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+        <GlAvatar person={person} />
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:14,color:"#e6f1f0",marginBottom:6}}>{displayName(person)}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+            {roles.map(r => <Chip key={r} label={r} teal />)}
+            {minis.map(m => <Chip key={m} label={m} />)}
+            {!showRoles && minis.length === 0 && <span style={{fontSize:11,color:"#475a64",fontStyle:"italic"}}>{tx.notYetServing}</span>}
+            <GiftBadge person={person} />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const PillBtn = ({ id, label, count }) => {
+    const active = glTab === id;
+    return (
+      <button onClick={() => setGlTab(id)} style={{padding:"6px 14px",borderRadius:999,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.1em",cursor:"pointer",transition:"all 0.18s",background:active?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:active?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.06)",color:active?"#5eead4":"#6b7a82"}}>
+        {label} ({count})
+      </button>
+    );
+  };
+
+  if (loading) return (
+    <div style={{padding:60,textAlign:"center",color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase"}}>...</div>
+  );
+
+  return (
+    <div style={{maxWidth:900,margin:"0 auto",padding:"32px 24px"}}>
+      <div style={{marginBottom:28}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:8}}>{tx.glView}</div>
+        <h1 style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:28,color:"#e6f1f0",margin:0}}>{groupName}</h1>
+      </div>
+
+      {/* Section A */}
+      <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:14,fontWeight:500}}>{tx.ourTeam}</div>
+        <div style={{display:"flex",gap:8,marginBottom:18}}>
+          <PillBtn id="serving" label={tx.serving} count={serving.length} />
+          <PillBtn id="attending" label={tx.attending} count={attending.length} />
+        </div>
+        {glTab === "serving" && (
+          serving.length === 0
+            ? <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noServing}</div>
+            : serving.map(p => <PersonRow key={p.id} person={p} showRoles />)
+        )}
+        {glTab === "attending" && (
+          attending.length === 0
+            ? <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noAttending}</div>
+            : attending.map(p => <PersonRow key={p.id} person={p} showRoles={false} />)
+        )}
+      </div>
+
+      {/* Section B */}
+      <div className="glass" style={{borderRadius:16,padding:24}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4,fontWeight:500}}>{tx.sundayPool}</div>
+        <div style={{fontSize:12,color:"#475a64",marginBottom:20}}>{tx.sundaySub}</div>
+        {Object.keys(sundayByMinistry).length === 0
+          ? <div style={{color:"#475a64",fontSize:13}}>{tx.noSunday}</div>
+          : Object.entries(sundayByMinistry).map(([ministry, pool]) => (
+            <div key={ministry} style={{marginBottom:20}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:6}}>
+                <div style={{fontWeight:600,fontSize:13,color:"#aebac0"}}>{ministry} <span style={{color:"#475a64",fontSize:11,fontWeight:400}}>({pool.length} {pool.length === 1 ? tx.person : tx.people})</span></div>
+                <div style={{fontSize:11,color:"#475a64"}}>{tx.leader}: {MINISTRY_LEADERS[ministry] || ""}</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {pool.map(p => (
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                    <span style={{fontSize:13,color:"#e6f1f0",flex:1}}>{displayName(p)}</span>
+                    <Chip label={ministry} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
@@ -3998,6 +4208,8 @@ export default function App() {
   const [tab, setTab] = useState("analytics");
   const [refAnchor, setRefAnchor] = useState(null);
   const [lang, setLang] = useState("PT");
+  const [viewMode, setViewMode] = useState("my_view");
+  const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -4011,6 +4223,7 @@ export default function App() {
           const result = await user.getIdTokenResult();
           setToken(idToken);
           setRole(result.claims.role || 'pastor');
+          if (user.email === 'nicoleylepage@gmail.com') setLang('EN');
         } catch(e) {
           setToken(null);
           setRole(null);
@@ -4103,6 +4316,26 @@ export default function App() {
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
+            {(role === 'owner' || role === 'pastor') && (
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <select
+                  value={viewMode}
+                  onChange={e => { setViewMode(e.target.value); if (e.target.value === 'my_view') setGlGroup(""); }}
+                  style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"#aebac0",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
+                  <option value="my_view">{lang === "PT" ? "Minha visao" : "My View"}</option>
+                  <option value="group_leader">{lang === "PT" ? "Visao do Lider" : "Group Leader View"}</option>
+                </select>
+                {viewMode === 'group_leader' && (
+                  <select
+                    value={glGroup}
+                    onChange={e => setGlGroup(e.target.value)}
+                    style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(94,234,212,0.25)",color:glGroup?"#5eead4":"#6b7a82",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
+                    <option value="">{lang === "PT" ? "Escolher grupo..." : "Select group..."}</option>
+                    {GL_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
             <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost"
               style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
               ⚙️
@@ -4117,11 +4350,14 @@ export default function App() {
 
       {/* Content */}
       <div style={{maxWidth:1600,margin:"0 auto"}}>
-        {tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
-        {tab === "reference" && (
+        {viewMode === 'group_leader' && glGroup
+          ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
+          : null}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>

@@ -1710,3 +1710,29 @@ Added responsive collapsing nav with hamburger menu.
 - `e275f6c` — Add responsive nav with hamburger collapse
 
 _Last updated: 2026-06-02 — Responsive nav complete._
+
+---
+
+## Session — Responsive Nav Fix (2026-06-02)
+
+### Problem
+CSS @media query approach was unreliable: hamburger was showing at wide widths and disappearing at narrow widths (inverted behavior). Nav tabs disappeared entirely at narrow widths instead of moving into the hamburger dropdown.
+
+### Root cause
+CSS injected via `<style>{css}</style>` had correct rules but hamburger visibility was CSS-class-driven while dropdown content was React-state-driven. Style injection ordering or specificity conflicts inverted the behavior.
+
+### Fix
+Replaced CSS @media queries with JS-driven conditional rendering:
+- Added `winWidth` state + `resize` event listener in App
+- `tabsCollapsed = winWidth < 900` drives nav tab and hamburger visibility
+- `switcherCollapsed = winWidth < 600` drives view switcher placement
+- Hamburger button: `{tabsCollapsed && ...}` rendered only when needed
+- Nav tabs: `{!tabsCollapsed && <nav>}` rendered only when wide
+- View switcher in nav: `{!switcherCollapsed && ...}` at >= 600px
+- View switcher in dropdown: `{switcherCollapsed && ...}` at < 600px
+- Logo, lang toggle, logout: always rendered unconditionally
+
+### Commit
+- `b318942` — Fix responsive nav: JS-driven collapse instead of CSS media queries
+
+_Last updated: 2026-06-02 — Responsive nav fix complete._

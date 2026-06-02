@@ -2796,21 +2796,41 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
             </div>
           )}
 
-          {/* Current Ministries — read-only display (3F: follows Suggested Placements) */}
-          {(()=>{
-            const minis = parseJSON(person.current_ministries)||[];
-            if(!minis.length) return null;
-            return (
-              <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.currentMin}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {minis.map(m=>(
-                    <span key={m} style={{fontSize:12,padding:"4px 10px",borderRadius:6,background:"rgba(94,234,212,0.06)",color:"#c5f5ec",border:"1px solid rgba(94,234,212,0.18)"}}>{ministryLabel(m,lang)}</span>
-                  ))}
-                </div>
+          {/* Current Ministries — editable (3F: follows Suggested Placements) */}
+          <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>{t.currentMin}</div>
+              <span style={{fontSize:11,padding:"4px 10px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:`1px solid ${badge.color}44`}}>{badge.label==="Available"?t.available:badge.label}</span>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+              {ministries.map(m=>(
+                <span key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,padding:"6px 11px",background:"rgba(94,234,212,0.08)",color:"#c5f5ec",borderRadius:8,border:"1px solid rgba(94,234,212,0.22)"}}>
+                  {ministryLabel(m, lang)}
+                  <button onClick={()=>removeMinistry(m)} style={{background:"none",border:"none",color:"#5eead4",cursor:"pointer",fontSize:14,lineHeight:1,padding:0,opacity:0.7}}>×</button>
+                </span>
+              ))}
+              <button onClick={()=>setShowMinistryInput(true)} style={{fontSize:12,padding:"6px 11px",background:"rgba(255,255,255,0.02)",color:"#6b7a82",border:"1px dashed rgba(255,255,255,0.1)",borderRadius:8,cursor:"pointer"}}>{t.addBtn}</button>
+            </div>
+            {showMinistryInput && (
+              <div style={{display:"flex",gap:8}}>
+                <select value={newMinistry} onChange={e=>setNewMinistry(e.target.value)} style={{flex:1}}>
+                  <option value="">{t.selectMinistry}</option>
+                  {MINISTRIES_STARTER.filter(m=>!ministries.includes(m)).map(m=><option key={m} value={m}>{ministryLabel(m, lang, lang)}</option>)}
+                  <option value="__custom">{t.selectCustom}</option>
+                </select>
+                <button onClick={()=>newMinistry==="__custom"?setShowMinistryInput("custom"):addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>{t.addMinistry}</button>
+                <button onClick={()=>{setShowMinistryInput(false);setNewMinistry("");}} className="btn-ghost" style={{padding:"8px 12px"}}>✕</button>
               </div>
-            );
-          })()}
+            )}
+            {showMinistryInput === "custom" && (
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <input placeholder={t.typeMinistry} value={newMinistry==="__custom"?"":newMinistry}
+                  onChange={e=>setNewMinistry(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addMinistry(newMinistry)}/>
+                <button onClick={()=>addMinistry(newMinistry)} className="btn-primary" style={{padding:"8px 16px",whiteSpace:"nowrap"}}>{t.addMinistry}</button>
+              </div>
+            )}
+          </div>
 
           {/* Group Attendance */}
           {(() => {

@@ -669,13 +669,13 @@ const css = `
     stroke: rgba(255,255,255,0.88);
     stroke-width: 10;
     stroke-linecap: round;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
+    stroke-dasharray: 440 440;
+    stroke-dashoffset: 440;
     opacity: 0;
     animation: ltcRingDraw 1.1s cubic-bezier(0.16,1,0.3,1) forwards;
   }
   @keyframes ltcRingDraw {
-    0%   { stroke-dashoffset: 1; opacity: 0; }
+    0%   { stroke-dashoffset: 440; opacity: 0; }
     8%   { opacity: 0.9; }
     85%  { opacity: 0.9; }
     100% { stroke-dashoffset: 0; opacity: 0; }
@@ -698,17 +698,17 @@ const css = `
     stroke: rgba(255,255,255,0.9);
     stroke-width: 8;
     stroke-linecap: round;
-    stroke-dasharray: 0.14 0.86;
-    stroke-dashoffset: 1;
+    stroke-dasharray: 62 378;
+    stroke-dashoffset: 0;
     opacity: 0;
     filter: url(#ltcSoftGlow);
     animation: ltcLightSweep 0.75s ease-out 1.2s forwards;
   }
   @keyframes ltcLightSweep {
-    0%   { stroke-dashoffset: 1; opacity: 0; }
-    15%  { opacity: 0.45; }
-    85%  { opacity: 0.45; }
-    100% { stroke-dashoffset: 0; opacity: 0; }
+    0%   { stroke-dashoffset: 0;    opacity: 0; }
+    10%  { opacity: 0.45; }
+    90%  { opacity: 0.45; }
+    100% { stroke-dashoffset: -440; opacity: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     .ltc-logo-ring,
@@ -1284,8 +1284,8 @@ function Login({ lang, t, onLangChange }) {
               <path className="ltc2-st9" d="M84.67,84.09c-.72,0-1.38-.25-1.37-1.09l.07-8.57c.59-.32.98.42.98,1.49l.33,8.18Z"/>
               <path className="ltc2-st2" d="M107.23,103.4c-3.57.89-6.72.92-10.49-.11l10.49.11Z"/>
             </g>
-            <circle cx="79.19" cy="79.5" r="70" className="ltc-logo-ring" pathLength="1" />
-            <circle cx="79.19" cy="79.5" r="70" className="ltc-light-sweep" pathLength="1" />
+            <circle cx="79.19" cy="79.5" r="70" className="ltc-logo-ring" />
+            <circle cx="79.19" cy="79.5" r="70" className="ltc-light-sweep" />
           </g>
         </svg>
         <div className="glass" style={{width:"100%",padding:36,borderRadius:20,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(94,234,212,0.08) inset",position:"relative"}}>

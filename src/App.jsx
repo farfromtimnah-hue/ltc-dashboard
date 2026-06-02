@@ -2962,7 +2962,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
-function PeopleTab({ token, t, lang, templatePT, templateEN, onNavigate }) {
+function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("All");
@@ -4690,7 +4690,7 @@ export default function App() {
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (

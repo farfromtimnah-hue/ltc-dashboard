@@ -1672,3 +1672,41 @@ Replaced the `<img src="...LTC1.svg">` on the login screen with an inline SVG of
 _Last updated: 2026-06-02 — Login logo animation complete._
 
 **Not changed:** DISC Profile distribution, Language/Preferred Language distribution, all other analytics sections, all data/labels.
+
+---
+
+## Session — Responsive Nav with Hamburger (2026-06-02)
+
+### Files changed
+- `src/App.jsx`
+
+### What was done
+
+Added responsive collapsing nav with hamburger menu.
+
+**CSS additions (in `css` constant):**
+- `.nav-tabs-row` — flex row for tab buttons; `display:none` below 900px
+- `.nav-view-switcher` — flex row for view switcher dropdowns; `display:none` below 600px
+- `.hamburger-btn` — 44x44px tap target; `display:none` above 900px, `display:flex` below
+- `.hamburger-dropdown` — absolute-positioned dark panel with teal border, z-index 200
+- `.hdd-item`, `.hdd-active`, `.hdd-divider`, `.hdd-sub` — dropdown item styles
+- `@media (max-width:900px)` and `@media (max-width:600px)` breakpoints
+
+**JSX changes:**
+- Added `menuOpen` state to App
+- `<nav>` tabs given `className="nav-nav-tabs-row"` so CSS media query hides them at <900px
+- View switcher div given `className="nav-view-switcher"` so it hides at <600px
+- Hamburger button (three bars, Unicode-free CSS bars) added to utility section, position:relative wrapper
+- Fixed backdrop div (position:fixed, inset:0, zIndex:199) closes menu on outside tap
+- Hamburger dropdown contains: all tab buttons (active state highlighted teal), divider, view switcher selects (incl. group picker when Group Leader View is active)
+- Dropdown closes when any tab is tapped
+
+**Collapse priority (as specified):**
+1. Never collapse: logo, language toggle (PT/EN), logout button
+2. Collapse first (below 900px): tab navigation items
+3. Collapse second (below 600px): view switcher dropdowns
+
+### Commit
+- `e275f6c` — Add responsive nav with hamburger collapse
+
+_Last updated: 2026-06-02 — Responsive nav complete._

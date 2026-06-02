@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const API = "https://ltc-api.farfromtimnah.workers.dev";
 
@@ -4109,6 +4110,203 @@ function UserManagementTab({ token, t, lang }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────
+const CHART_TEAL = "#5eead4";
+const CHART_GREY = "#2a3a40";
+const CHART_GOLD = "#f0c060";
+const CHART_COLORS = [CHART_TEAL, CHART_GOLD, "#a78bfa", "#fb923c", "#34d399", "#60a5fa", "#f472b6"];
+
+function GroupHealthBox({ attending, serving, lang, groupName }) {
+  // Engagement donut: serving vs attending-only
+  const servingIds = new Set(serving.map(p => p.id));
+  const attendingOnly = attending.filter(p => !servingIds.has(p.id)).length;
+  const engagementData = [
+    { name: lang === "PT" ? "Servindo" : "Serving", value: serving.length },
+    { name: lang === "PT" ? "Frequentando" : "Attending only", value: attendingOnly },
+  ];
+
+  // Group Growth line: cumulative attendees over time from attendance_log
+  const growthMap = {};
+  attending.forEach(p => {
+    const log = Array.isArray(p.attendance_log) ? p.attendance_log : [];
+    const groupEntry = log.find(e => e.group_name === groupName);
+    const dateStr = groupEntry?.joined_at || p.submitted_at || null;
+    if (dateStr) {
+      const month = dateStr.slice(0, 7);
+      growthMap[month] = (growthMap[month] || 0) + 1;
+    }
+  });
+  const sortedMonths = Object.keys(growthMap).sort();
+  let cumulative = 0;
+  const growthData = sortedMonths.map(m => {
+    cumulative += growthMap[m];
+    return { month: m.slice(5), total: cumulative };
+  });
+
+  // Serving Growth line: cumulative servers over time
+  const servingGrowthMap = {};
+  serving.forEach(p => {
+    const log = Array.isArray(p.attendance_log) ? p.attendance_log : [];
+    const groupEntry = log.find(e => e.group_name === groupName);
+    const dateStr = groupEntry?.joined_at || p.submitted_at || null;
+    if (dateStr) {
+      const month = dateStr.slice(0, 7);
+      servingGrowthMap[month] = (servingGrowthMap[month] || 0) + 1;
+    }
+  });
+  const servingMonths = Object.keys(servingGrowthMap).sort();
+  let servingCumulative = 0;
+  const servingGrowthData = servingMonths.map(m => {
+    servingCumulative += servingGrowthMap[m];
+    return { month: m.slice(5), total: servingCumulative };
+  });
+
+  // Giftings donut: top gifting distribution among attendees
+  const giftCount = {};
+  attending.forEach(p => {
+    if (p.gifting_1) giftCount[p.gifting_1] = (giftCount[p.gifting_1] || 0) + 1;
+  });
+  const giftingsData = Object.entries(giftCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, value]) => ({
+      name: lang === "PT" ? (GIFTING_LABEL_PT[name] || name) : name,
+      value,
+      icon: GIFTING_ICONS[name] || "◆",
+    }));
+
+  const sectionLabel = {
+    fontFamily: "'JetBrains Mono',monospace",
+    fontSize: "10px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: "#6b7a82",
+    fontWeight: 600,
+    marginBottom: 10,
+    textAlign: "center",
+  };
+
+  const chartBox = {
+    background: "rgba(255,255,255,0.015)",
+    border: "1px solid rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: "14px 10px 10px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  };
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{background:"#0f1e24",border:"1px solid rgba(94,234,212,0.2)",borderRadius:6,padding:"6px 10px",fontSize:11,color:"#aebac0"}}>
+        {payload[0].name}: <strong style={{color:"#5eead4"}}>{payload[0].value}</strong>
+      </div>
+    );
+  };
+
+  const engagementPct = attending.length > 0 ? Math.round((serving.length / attending.length) * 100) : 0;
+
+  return (
+    <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
+      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:16}}>
+        {lang === "PT" ? "Saúde do Grupo" : "Group Health"}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+
+        {/* Engagement donut */}
+        <div style={chartBox}>
+          <div style={sectionLabel}>{lang === "PT" ? "Engajamento" : "Engagement"}</div>
+          <div style={{position:"relative",width:120,height:120}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={engagementData} cx="50%" cy="50%" innerRadius={34} outerRadius={52} dataKey="value" stroke="none">
+                  {engagementData.map((_, i) => (
+                    <Cell key={i} fill={i === 0 ? CHART_TEAL : CHART_GREY} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
+              <div style={{fontSize:18,fontWeight:700,color:"#5eead4",fontFamily:"'Space Grotesk',sans-serif"}}>{engagementPct}%</div>
+            </div>
+          </div>
+          <div style={{marginTop:8,display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center"}}>
+            {engagementData.map((d, i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"#6b7a82"}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:i===0?CHART_TEAL:CHART_GREY,border:"1px solid rgba(255,255,255,0.12)"}} />
+                {d.name} ({d.value})
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Group Giftings donut */}
+        <div style={chartBox}>
+          <div style={sectionLabel}>{lang === "PT" ? "Dons no Grupo" : "Group Giftings"}</div>
+          {giftingsData.length === 0
+            ? <div style={{fontSize:11,color:"#475a64",marginTop:20,textAlign:"center"}}>{lang==="PT"?"Sem dados":"No data"}</div>
+            : <>
+              <div style={{position:"relative",width:120,height:120}}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={giftingsData} cx="50%" cy="50%" innerRadius={34} outerRadius={52} dataKey="value" stroke="none">
+                      {giftingsData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:3,width:"100%"}}>
+                {giftingsData.slice(0,4).map((d, i) => (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"#6b7a82"}}>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:CHART_COLORS[i % CHART_COLORS.length],flexShrink:0}} />
+                    <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.icon} {d.name}</span>
+                    <span style={{color:"#aebac0"}}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          }
+        </div>
+
+        {/* Group Growth line */}
+        <div style={chartBox}>
+          <div style={sectionLabel}>{lang === "PT" ? "Crescimento do Grupo" : "Group Growth"}</div>
+          {growthData.length < 2
+            ? <div style={{fontSize:11,color:"#475a64",marginTop:16,textAlign:"center"}}>{lang==="PT"?"Poucos dados":"Not enough data"}</div>
+            : <ResponsiveContainer width="100%" height={90}>
+              <LineChart data={growthData} margin={{top:4,right:4,left:-28,bottom:0}}>
+                <XAxis dataKey="month" tick={{fontSize:9,fill:"#475a64"}} axisLine={false} tickLine={false} />
+                <YAxis tick={{fontSize:9,fill:"#475a64"}} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="total" stroke={CHART_TEAL} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          }
+        </div>
+
+        {/* Serving Growth line */}
+        <div style={chartBox}>
+          <div style={sectionLabel}>{lang === "PT" ? "Crescimento em Serviço" : "Serving Growth"}</div>
+          {servingGrowthData.length < 2
+            ? <div style={{fontSize:11,color:"#475a64",marginTop:16,textAlign:"center"}}>{lang==="PT"?"Poucos dados":"Not enough data"}</div>
+            : <ResponsiveContainer width="100%" height={90}>
+              <LineChart data={servingGrowthData} margin={{top:4,right:4,left:-28,bottom:0}}>
+                <XAxis dataKey="month" tick={{fontSize:9,fill:"#475a64"}} axisLine={false} tickLine={false} />
+                <YAxis tick={{fontSize:9,fill:"#475a64"}} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="total" stroke={CHART_GOLD} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          }
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 function GroupLeaderView({ token, lang, groupName }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4293,7 +4491,10 @@ function GroupLeaderView({ token, lang, groupName }) {
         )}
       </div>
 
-      {/* Section B — Sunday Pool (collapsible, 4D) */}
+      {/* Section B — Group Health Analytics (4C) */}
+      <GroupHealthBox attending={attending} serving={serving} lang={lang} groupName={groupName} />
+
+      {/* Section C — Sunday Pool (collapsible, 4D) */}
       <div className="glass" style={{borderRadius:16,padding:24}}>
         <button onClick={()=>setSundayOpen(o=>!o)}
           style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",cursor:"pointer",padding:0,width:"100%",marginBottom:sundayOpen?16:0}}>

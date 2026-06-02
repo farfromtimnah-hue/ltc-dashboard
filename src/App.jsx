@@ -647,6 +647,26 @@ const css = `
     border-bottom: 1px solid rgba(255,255,255,0.04);
   }
 
+  .nav-tabs-row { display:flex; gap:28px; align-items:center; }
+  .nav-view-switcher { display:flex; align-items:center; gap:6px; }
+  .hamburger-btn { display:none; width:44px; height:44px; align-items:center; justify-content:center; background:transparent; border:none; cursor:pointer; color:#aebac0; font-size:20px; border-radius:8px; flex-shrink:0; }
+  .hamburger-btn:hover { background:rgba(255,255,255,0.07); }
+  .hamburger-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#08121a; border:1px solid rgba(94,234,212,0.15); border-radius:12px; padding:8px; z-index:200; min-width:220px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
+  .hdd-item { display:block; width:100%; background:transparent; border:none; padding:10px 16px; color:#aebac0; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; cursor:pointer; text-align:left; border-radius:8px; transition:background 0.15s,color 0.15s; white-space:nowrap; box-sizing:border-box; }
+  .hdd-item:hover { background:rgba(94,234,212,0.06); color:#e6f1f0; }
+  .hdd-item.hdd-active { color:#2ABFBF; background:rgba(42,191,191,0.08); }
+  .hdd-divider { height:1px; background:rgba(255,255,255,0.06); margin:6px 8px; }
+  .hdd-sub { padding:6px 8px 4px; }
+  .hdd-sub select { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#aebac0; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'JetBrains Mono',monospace; cursor:pointer; outline:none; margin-bottom:6px; box-sizing:border-box; }
+
+  @media (max-width:900px) {
+    .nav-tabs-row { display:none; }
+    .hamburger-btn { display:flex; }
+  }
+  @media (max-width:600px) {
+    .nav-view-switcher { display:none; }
+  }
+
   @keyframes drawerSlide {
     from { transform: translateX(40px); opacity: 0; }
     to   { transform: translateX(0); opacity: 1; }
@@ -4619,6 +4639,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState("my_view");
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
@@ -4702,15 +4723,15 @@ export default function App() {
 
       {/* Nav */}
       <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
-        <div style={{maxWidth:1600,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:28,justifyContent:"space-between"}}>
-          {/* Brand cluster */}
+        <div style={{maxWidth:1600,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:28,justifyContent:"space-between",position:"relative"}}>
+          {/* Brand cluster — never collapses */}
           <div style={{display:"flex",alignItems:"center",gap:20,flexShrink:0}}>
             <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block"}} />
             <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />
             <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
           </div>
-          {/* Nav tabs */}
-          <nav style={{display:"flex",gap:28,alignItems:"center"}}>
+          {/* Nav tabs — hidden below 900px */}
+          <nav className="nav-tabs-row">
             {tabs.map(t2=>(
               <button key={t2.id} onClick={()=>setTab(t2.id)}
                 style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap"}}
@@ -4721,15 +4742,17 @@ export default function App() {
               </button>
             ))}
           </nav>
-          {/* Utility */}
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {/* Utility — lang toggle and logout never collapse */}
+          <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             {role && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[effectiveRole] || effectiveRole}</span>}
+            {/* Lang toggle — never collapses */}
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
+            {/* View switcher — hidden below 600px (moves to hamburger) */}
             {(role === 'owner' || role === 'pastor') && (
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div className="nav-view-switcher">
                 <select
                   value={viewMode}
                   onChange={e => { setViewMode(e.target.value); if (e.target.value === 'my_view') setGlGroup(""); }}
@@ -4754,10 +4777,54 @@ export default function App() {
               style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
               ⚙️
             </button>
+            {/* Logout — never collapses */}
             <button onClick={()=>signOut(auth)} className="btn-ghost"
               style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
               ↪ {t.logout}
             </button>
+            {/* Hamburger — visible below 900px */}
+            <div style={{position:"relative"}}>
+              <button className="hamburger-btn" onClick={()=>setMenuOpen(o=>!o)} aria-label="Menu">
+                <span style={{display:"flex",flexDirection:"column",gap:5,pointerEvents:"none"}}>
+                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                </span>
+              </button>
+              {menuOpen && (
+                <>
+                  <div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                  <div className="hamburger-dropdown">
+                    {tabs.map(t2=>(
+                      <button key={t2.id} className={"hdd-item"+(tab===t2.id?" hdd-active":"")}
+                        onClick={()=>{setTab(t2.id);setMenuOpen(false);}}>
+                        {t2.label}
+                      </button>
+                    ))}
+                    {(role === 'owner' || role === 'pastor') && (
+                      <>
+                        <div className="hdd-divider" />
+                        <div className="hdd-sub">
+                          <select value={viewMode}
+                            onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
+                            <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
+                            {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
+                            {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
+                            <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
+                          </select>
+                          {viewMode==='group_leader'&&(
+                            <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
+                              <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+                              {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+                            </select>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

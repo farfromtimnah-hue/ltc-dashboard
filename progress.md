@@ -1635,4 +1635,40 @@ Label translation uses existing LEADERSHIP_MAP / EMOTIONAL_MAP / NATURAL_STRENGT
 
 Outer grid changed from `1fr 1fr` (2-col, 3 cards creating uneven bottom row) to `1fr 1fr 1fr` (3-col, all three cards in one even row).
 
+---
+
+## Session — Login Logo Animation (2026-06-02)
+
+### Files changed
+- `src/App.jsx`
+
+### What was done
+
+Replaced the `<img src="...LTC1.svg">` on the login screen with an inline SVG of LTC2.svg (the 158x159 square circle icon, rendered at 80x80px). Added a three-phase CSS-only startup animation:
+
+**Phase 1 — Draw-on (1.1s, cubic-bezier(0.16,1,0.3,1))**
+- A `<circle cx="79.19" cy="79.5" r="70" className="ltc-logo-ring" pathLength="1">` overlays the ring.
+  Stroke-dashoffset animates 1 to 0 (draws on), then opacity fades out, leaving the filled ring visible.
+- The dove/mark group (inner `<g className="ltc-logo-mark">`) fades in from opacity 0 with a 3px upward drift resolving to 0. Delay: 0.75s, duration: 0.45s.
+
+**Phase 2 — Light sweep (0.75s, starts at 1.2s)**
+- A second `<circle className="ltc-light-sweep" pathLength="1">` with `strokeDasharray="0.14 0.86"` sweeps once around the ring.
+  Opacity arcs 0 to 0.45 to 0. `filter: url(#ltcSoftGlow)` gives the soft blur glow.
+  A `<filter id="ltcSoftGlow">` (feGaussianBlur stdDeviation=2.5 + feMerge) was added to `<defs>`.
+
+**Phase 3 — Resting float (5.5s loop, starts at 2.1s)**
+- `ltcFloat` keyframes on `.ltc-logo-mark` float the dove mark 1.5px up and down indefinitely.
+  Composes with `ltcMarkReveal` using CSS multi-animation on same element.
+
+**Internal SVG class names prefixed `ltc2-st0` through `ltc2-st9`** to avoid document-level CSS conflicts with any other inlined SVG.
+
+**`prefers-reduced-motion` media query** disables all three animations and sets opacity/transform/stroke-dashoffset to resting state.
+
+**Phase 2 note:** Implemented cleanly. The `pathLength="1"` attribute on both overlay circles normalizes the stroke-dasharray values, avoiding hard-coded circumference math.
+
+### Commit
+- `d90b0da` — Add startup animation to login logo
+
+_Last updated: 2026-06-02 — Login logo animation complete._
+
 **Not changed:** DISC Profile distribution, Language/Preferred Language distribution, all other analytics sections, all data/labels.

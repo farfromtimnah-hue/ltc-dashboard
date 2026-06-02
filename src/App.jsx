@@ -647,17 +647,13 @@ const css = `
     border-bottom: 1px solid rgba(255,255,255,0.04);
   }
 
-  .nav-tabs-row { display:flex; gap:28px; align-items:center; }
-  .nav-view-switcher { display:flex; align-items:center; gap:6px; }
-  .hamburger-btn { display:none; width:44px; height:44px; align-items:center; justify-content:center; background:transparent; border:none; cursor:pointer; color:#aebac0; font-size:20px; border-radius:8px; flex-shrink:0; }
-  .hamburger-btn:hover { background:rgba(255,255,255,0.07); }
-  .hamburger-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#08121a; border:1px solid rgba(94,234,212,0.15); border-radius:12px; padding:8px; z-index:200; min-width:220px; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
-  .hdd-item { display:block; width:100%; background:transparent; border:none; padding:10px 16px; color:#aebac0; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; cursor:pointer; text-align:left; border-radius:8px; transition:background 0.15s,color 0.15s; white-space:nowrap; box-sizing:border-box; }
-  .hdd-item:hover { background:rgba(94,234,212,0.06); color:#e6f1f0; }
-  .hdd-item.hdd-active { color:#2ABFBF; background:rgba(42,191,191,0.08); }
-  .hdd-divider { height:1px; background:rgba(255,255,255,0.06); margin:6px 8px; }
-  .hdd-sub { padding:6px 8px 4px; }
-  .hdd-sub select { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#aebac0; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'JetBrains Mono',monospace; cursor:pointer; outline:none; margin-bottom:6px; box-sizing:border-box; }
+  .pp-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#1a1a1a; border:1px solid rgba(42,191,191,0.18); border-radius:8px; padding:6px; z-index:200; min-width:200px; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+  .pp-item { display:block; width:100%; background:transparent; border:none; padding:9px 14px; color:#aebac0; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; text-align:left; border-radius:6px; transition:background 0.12s,color 0.12s; white-space:nowrap; box-sizing:border-box; }
+  .pp-item:hover { background:rgba(42,191,191,0.10); color:#2ABFBF; }
+  .pp-active { color:#2ABFBF; background:rgba(42,191,191,0.08); }
+  .pp-divider { height:1px; background:rgba(255,255,255,0.06); margin:5px 8px; }
+  .pp-sub { padding:4px 8px 2px; }
+  .pp-sub select { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#aebac0; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'JetBrains Mono',monospace; cursor:pointer; outline:none; margin-bottom:5px; box-sizing:border-box; }
 
 
 
@@ -4633,10 +4629,10 @@ export default function App() {
   const [viewMode, setViewMode] = useState("my_view");
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [winWidth, setWinWidth] = useState(window.innerWidth);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [navW, setNavW] = useState(window.innerWidth);
   useEffect(() => {
-    function onResize() { setWinWidth(window.innerWidth); }
+    function onResize() { setNavW(window.innerWidth); }
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -4717,105 +4713,115 @@ export default function App() {
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
-  const tabsCollapsed = winWidth < 900;
-  const switcherCollapsed = winWidth < 600;
+  // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
+  // 2=also switcher in More, 3=also tabs in More
+  const collapseLevel = navW >= 1100 ? 0 : navW >= 800 ? 1 : navW >= 600 ? 2 : 3;
+  const tabsInMore    = collapseLevel >= 3;
+  const switcherInMore = collapseLevel >= 2;
+  const auxInMore     = collapseLevel >= 1;
+  const showMore      = collapseLevel > 0;
 
   return (
     <div className="app" style={{minHeight:"100vh"}}>
       <style>{css}</style>
 
-      {/* Nav */}
+      {/* Nav — Priority+ pattern */}
       <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
-        <div style={{maxWidth:1600,margin:"0 auto",padding:"18px 32px",display:"flex",alignItems:"center",gap:28,justifyContent:"space-between",position:"relative"}}>
-          {/* Brand cluster — never collapses */}
-          <div style={{display:"flex",alignItems:"center",gap:20,flexShrink:0}}>
+        <div style={{maxWidth:1600,margin:"0 auto",padding:"12px 32px",display:"flex",alignItems:"center",gap:16}}>
+
+          {/* Left: Logo (always) + title (collapses at level 1) */}
+          <div style={{display:"flex",alignItems:"center",gap:16,flexShrink:0}}>
             <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block"}} />
-            <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />
-            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
+            {!auxInMore && <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />}
+            {!auxInMore && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>}
           </div>
-          {/* Nav tabs — shown only when wide enough (tabsCollapsed = winWidth < 900) */}
-          {!tabsCollapsed && (
-            <nav style={{display:"flex",gap:28,alignItems:"center",flex:1,justifyContent:"center"}}>
+
+          {/* Center: Tab nav (collapses at level 3) */}
+          {!tabsInMore && (
+            <nav style={{display:"flex",gap:24,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
               {tabs.map(t2=>(
                 <button key={t2.id} onClick={()=>setTab(t2.id)}
-                  style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap"}}
+                  style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
                   onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
                   onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
                   {t2.label}
-                  {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-18,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
+                  {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
                 </button>
               ))}
             </nav>
           )}
-          {/* Utility — lang toggle and logout never collapse */}
-          <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            {role && !tabsCollapsed && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[effectiveRole] || effectiveRole}</span>}
-            {/* Lang toggle — never collapses */}
+
+          {/* Right cluster */}
+          <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:"auto"}}>
+
+            {/* Lang toggle — always visible */}
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
-            {/* View switcher — shown in nav only when wide enough (switcherCollapsed = winWidth < 600) */}
-            {!switcherCollapsed && (role === 'owner' || role === 'pastor') && (
+
+            {/* View switcher — in nav at levels 0-1, collapses at level 2 */}
+            {!switcherInMore && (role === 'owner' || role === 'pastor') && (
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <select
-                  value={viewMode}
-                  onChange={e => { setViewMode(e.target.value); if (e.target.value === 'my_view') setGlGroup(""); }}
+                <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}
                   style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"#aebac0",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
-                  <option value="my_view">{lang === "PT" ? "Minha visao" : "My View"}</option>
-                  {role === 'owner' && <option value="senior_pastor_view">{lang === "PT" ? "Visao do Pastor Senior" : "Senior Pastor View"}</option>}
-                  {role === 'owner' && <option value="pastor_view">{lang === "PT" ? "Visao do Pastor" : "Pastor View"}</option>}
-                  <option value="group_leader">{lang === "PT" ? "Visao do Lider" : "Group Leader View"}</option>
+                  <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
+                  {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
+                  {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
+                  <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
                 </select>
-                {viewMode === 'group_leader' && (
-                  <select
-                    value={glGroup}
-                    onChange={e => setGlGroup(e.target.value)}
+                {viewMode==='group_leader'&&(
+                  <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}
                     style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(94,234,212,0.25)",color:glGroup?"#5eead4":"#6b7a82",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
-                    <option value="">{lang === "PT" ? "Escolher grupo..." : "Select group..."}</option>
-                    {GL_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                    <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+                    {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
                   </select>
                 )}
               </div>
             )}
-            <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost"
-              style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
-              ⚙️
-            </button>
-            {/* Logout — never collapses */}
-            <button onClick={()=>signOut(auth)} className="btn-ghost"
-              style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
-              ↪ {t.logout}
-            </button>
-            {/* Hamburger — rendered only when tabsCollapsed (winWidth < 900) */}
-            {tabsCollapsed && (
+
+            {/* Gear — in nav at level 0, collapses at level 1 */}
+            {!auxInMore && (
+              <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost"
+                style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
+                ⚙️
+              </button>
+            )}
+
+            {/* Logout — in nav at level 0, collapses at level 1 */}
+            {!auxInMore && (
+              <button onClick={()=>signOut(auth)} className="btn-ghost"
+                style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
+                ↪ {t.logout}
+              </button>
+            )}
+
+            {/* More button — appears when anything has collapsed (level >= 1) */}
+            {showMore && (
               <div style={{position:"relative"}}>
-                <button onClick={()=>setMenuOpen(o=>!o)} aria-label="Menu"
-                  style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",borderRadius:8,flexShrink:0}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
-                  <span style={{display:"flex",flexDirection:"column",gap:5,pointerEvents:"none"}}>
-                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                  </span>
+                <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
+                  style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+                  {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
                 </button>
-                {menuOpen && (
+                {moreOpen && (
                   <>
-                    <div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
-                    <div className="hamburger-dropdown">
-                      {tabs.map(t2=>(
-                        <button key={t2.id} className={"hdd-item"+(tab===t2.id?" hdd-active":"")}
-                          onClick={()=>{setTab(t2.id);setMenuOpen(false);}}>
+                    <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                    <div className="pp-dropdown">
+
+                      {/* 1. Tabs (level 3) */}
+                      {tabsInMore && tabs.map(t2=>(
+                        <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
+                          onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
                           {t2.label}
                         </button>
                       ))}
-                      {switcherCollapsed && (role === 'owner' || role === 'pastor') && (
+
+                      {/* 2. View switcher (level 2+) */}
+                      {switcherInMore && (role==='owner'||role==='pastor') && (
                         <>
-                          <div className="hdd-divider" />
-                          <div className="hdd-sub">
-                            <select value={viewMode}
-                              onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
+                          {tabsInMore && <div className="pp-divider"/>}
+                          <div className="pp-sub">
+                            <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
                               <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
                               {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
                               {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
@@ -4830,11 +4836,26 @@ export default function App() {
                           </div>
                         </>
                       )}
+
+                      {/* 3-5. Gear + Logout (level 1+) */}
+                      {auxInMore && (
+                        <>
+                          {(tabsInMore||switcherInMore) && <div className="pp-divider"/>}
+                          <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>
+                            &#9881; {t.settings}
+                          </button>
+                          <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>
+                            &#8618; {t.logout}
+                          </button>
+                        </>
+                      )}
+
                     </div>
                   </>
                 )}
               </div>
             )}
+
           </div>
         </div>
       </div>

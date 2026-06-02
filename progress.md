@@ -1736,3 +1736,64 @@ Replaced CSS @media queries with JS-driven conditional rendering:
 - `b318942` — Fix responsive nav: JS-driven collapse instead of CSS media queries
 
 _Last updated: 2026-06-02 — Responsive nav fix complete._
+
+---
+
+## Session — Priority+ Responsive Nav (2026-06-02)
+
+### Approach used
+**Breakpoint approach** (not ResizeObserver). navW state + window resize listener.
+Breakpoint approach chosen because it produces cleaner, more predictable code in this single-file React app.
+
+### What was removed
+All hamburger/winWidth implementation from previous sessions:
+- `menuOpen` state removed
+- `winWidth` state + window resize listener removed
+- `tabsCollapsed` / `switcherCollapsed` variables removed
+- All hamburger CSS (`.hamburger-btn`, `.hamburger-dropdown`, `.hdd-*`) removed from css constant
+
+### What was added
+
+**State:**
+- `moreOpen` — controls More dropdown open/closed
+- `navW` — window.innerWidth, updated on resize
+
+**Collapse variables (computed from navW):**
+- `collapseLevel`: 0 (>=1100px), 1 (800-1099px), 2 (600-799px), 3 (<600px)
+- `tabsInMore = collapseLevel >= 3`
+- `switcherInMore = collapseLevel >= 2`
+- `auxInMore = collapseLevel >= 1`
+- `showMore = collapseLevel > 0`
+
+**Breakpoint behavior:**
+| Width | Tabs | Switcher | Gear+Logout | More button |
+|---|---|---|---|---|
+| >= 1100px | nav | nav | nav | hidden |
+| 800-1099px | nav | nav | More | visible |
+| 600-799px | nav | More | More | visible |
+| < 600px | More | More | More | visible |
+| Always | - | - | - | logo + PT/EN toggle |
+
+**More button:**
+- Label: "More" (EN) / "Mais" (PT) with down-arrow glyph
+- Style: btn-ghost (same as Logout)
+- Position: rightmost in nav
+- Dropdown: `.pp-dropdown` dark (#1a1a1a), teal border, 8px border-radius
+- Dropdown items in order: tabs, then switcher, then gear+logout
+- All items functional from dropdown (tabs navigate, gear opens settings, logout signs out)
+
+**CSS added to css constant:**
+- `.pp-dropdown`, `.pp-item`, `.pp-item:hover`, `.pp-active`, `.pp-divider`, `.pp-sub`, `.pp-sub select`
+
+### Verified
+Collapse logic verified via browser JS simulation at 5 widths:
+- 1280px: all visible, no More
+- 1050px: gear+logout in More
+- 750px: switcher+gear+logout in More
+- 580px: tabs+switcher+gear+logout in More
+- 375px: same as 580px
+
+### Commit
+- `93ee839` — Replace hamburger with Priority+ responsive nav
+
+_Last updated: 2026-06-02 — Priority+ nav complete._

@@ -659,13 +659,7 @@ const css = `
   .hdd-sub { padding:6px 8px 4px; }
   .hdd-sub select { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#aebac0; border-radius:8px; padding:6px 10px; font-size:11px; font-family:'JetBrains Mono',monospace; cursor:pointer; outline:none; margin-bottom:6px; box-sizing:border-box; }
 
-  @media (max-width:900px) {
-    .nav-tabs-row { display:none; }
-    .hamburger-btn { display:flex; }
-  }
-  @media (max-width:600px) {
-    .nav-view-switcher { display:none; }
-  }
+
 
   @keyframes drawerSlide {
     from { transform: translateX(40px); opacity: 0; }
@@ -4640,6 +4634,12 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [winWidth, setWinWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  useEffect(() => {
+    function onResize() { setWinWidth(window.innerWidth); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
@@ -4717,6 +4717,9 @@ export default function App() {
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
+  const tabsCollapsed = winWidth < 900;
+  const switcherCollapsed = winWidth < 600;
+
   return (
     <div className="app" style={{minHeight:"100vh"}}>
       <style>{css}</style>
@@ -4730,29 +4733,31 @@ export default function App() {
             <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />
             <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
           </div>
-          {/* Nav tabs — hidden below 900px */}
-          <nav className="nav-tabs-row">
-            {tabs.map(t2=>(
-              <button key={t2.id} onClick={()=>setTab(t2.id)}
-                style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap"}}
-                onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
-                onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
-                {t2.label}
-                {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-18,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
-              </button>
-            ))}
-          </nav>
+          {/* Nav tabs — shown only when wide enough (tabsCollapsed = winWidth < 900) */}
+          {!tabsCollapsed && (
+            <nav style={{display:"flex",gap:28,alignItems:"center",flex:1,justifyContent:"center"}}>
+              {tabs.map(t2=>(
+                <button key={t2.id} onClick={()=>setTab(t2.id)}
+                  style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap"}}
+                  onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
+                  onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
+                  {t2.label}
+                  {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-18,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
+                </button>
+              ))}
+            </nav>
+          )}
           {/* Utility — lang toggle and logout never collapse */}
           <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            {role && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[effectiveRole] || effectiveRole}</span>}
+            {role && !tabsCollapsed && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#475a64"}}>{roleLabel[effectiveRole] || effectiveRole}</span>}
             {/* Lang toggle — never collapses */}
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
-            {/* View switcher — hidden below 600px (moves to hamburger) */}
-            {(role === 'owner' || role === 'pastor') && (
-              <div className="nav-view-switcher">
+            {/* View switcher — shown in nav only when wide enough (switcherCollapsed = winWidth < 600) */}
+            {!switcherCollapsed && (role === 'owner' || role === 'pastor') && (
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <select
                   value={viewMode}
                   onChange={e => { setViewMode(e.target.value); if (e.target.value === 'my_view') setGlGroup(""); }}
@@ -4782,49 +4787,54 @@ export default function App() {
               style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
               ↪ {t.logout}
             </button>
-            {/* Hamburger — visible below 900px */}
-            <div style={{position:"relative"}}>
-              <button className="hamburger-btn" onClick={()=>setMenuOpen(o=>!o)} aria-label="Menu">
-                <span style={{display:"flex",flexDirection:"column",gap:5,pointerEvents:"none"}}>
-                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                  <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
-                </span>
-              </button>
-              {menuOpen && (
-                <>
-                  <div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
-                  <div className="hamburger-dropdown">
-                    {tabs.map(t2=>(
-                      <button key={t2.id} className={"hdd-item"+(tab===t2.id?" hdd-active":"")}
-                        onClick={()=>{setTab(t2.id);setMenuOpen(false);}}>
-                        {t2.label}
-                      </button>
-                    ))}
-                    {(role === 'owner' || role === 'pastor') && (
-                      <>
-                        <div className="hdd-divider" />
-                        <div className="hdd-sub">
-                          <select value={viewMode}
-                            onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
-                            <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
-                            {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
-                            {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
-                            <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
-                          </select>
-                          {viewMode==='group_leader'&&(
-                            <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
-                              <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-                              {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+            {/* Hamburger — rendered only when tabsCollapsed (winWidth < 900) */}
+            {tabsCollapsed && (
+              <div style={{position:"relative"}}>
+                <button onClick={()=>setMenuOpen(o=>!o)} aria-label="Menu"
+                  style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",cursor:"pointer",borderRadius:8,flexShrink:0}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                  <span style={{display:"flex",flexDirection:"column",gap:5,pointerEvents:"none"}}>
+                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                    <span style={{height:2,width:20,background:"#aebac0",borderRadius:1,display:"block"}} />
+                  </span>
+                </button>
+                {menuOpen && (
+                  <>
+                    <div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                    <div className="hamburger-dropdown">
+                      {tabs.map(t2=>(
+                        <button key={t2.id} className={"hdd-item"+(tab===t2.id?" hdd-active":"")}
+                          onClick={()=>{setTab(t2.id);setMenuOpen(false);}}>
+                          {t2.label}
+                        </button>
+                      ))}
+                      {switcherCollapsed && (role === 'owner' || role === 'pastor') && (
+                        <>
+                          <div className="hdd-divider" />
+                          <div className="hdd-sub">
+                            <select value={viewMode}
+                              onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
+                              <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
+                              {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
+                              {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
+                              <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
                             </select>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                            {viewMode==='group_leader'&&(
+                              <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
+                                <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+                                {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

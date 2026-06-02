@@ -4634,7 +4634,7 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [winWidth, setWinWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [winWidth, setWinWidth] = useState(window.innerWidth);
   useEffect(() => {
     function onResize() { setWinWidth(window.innerWidth); }
     window.addEventListener('resize', onResize);

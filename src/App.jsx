@@ -1969,7 +1969,7 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
 }
 
 // ─── PERSON DETAIL PANEL ──────────────────────────────────────────
-function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT, templateEN, onNavigate }) {
+function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templatePT, templateEN, onNavigate }) {
   const [person, setPerson] = useState(null);
   const [saving, setSaving] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -1985,6 +1985,13 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
   const [pastoralCustomName, setPastoralCustomName] = useState("");
   const [editGroupRoles, setEditGroupRoles] = useState({}); // {groupName: [role,...]}
   const [groupRolesDirty, setGroupRolesDirty] = useState(false);
+  const [pastoralInfoPopup, setPastoralInfoPopup] = useState(false);
+  const [assignedPastorOpen, setAssignedPastorOpen] = useState(false);
+  const [groupsRolesOpen, setGroupsRolesOpen] = useState(false);
+  const [nameEditMode, setNameEditMode] = useState(false);
+  const [nameEditFull, setNameEditFull] = useState("");
+  const [nameEditPreferred, setNameEditPreferred] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1999,6 +2006,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
     person.group_roles.forEach(function(r){ if(!map[r.group_name]) map[r.group_name]=[]; map[r.group_name].push(r.role); });
     setEditGroupRoles(map);
     setGroupRolesDirty(false);
+    // Init collapsible states on first load
+    setAssignedPastorOpen(!person.assigned_pastor);
+    const hasGroups = (parseJSON(person.group_attendance)||[]).length > 0 || (person.group_roles||[]).length > 0;
+    setGroupsRolesOpen(!hasGroups);
+    setNameEditFull(person.name || "");
+    setNameEditPreferred(person.preferred_name || "");
   }, [person]);
 
   if (!person) return (
@@ -2024,6 +2037,17 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
       body: JSON.stringify(patch)
     });
     load(); onUpdated(); setSaving(false);
+  }
+
+  async function saveName() {
+    if (!nameEditFull.trim()) return;
+    setNameSaving(true);
+    await fetch(`${API}/person/${personId}/name`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: nameEditFull.trim(), preferred_name: nameEditPreferred.trim() || null })
+    });
+    setNameEditMode(false); setNameSaving(false); load(); onUpdated();
   }
 
   async function addNote() {
@@ -2172,6 +2196,10 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                   <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:22,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
+                  {role && role !== 'group_leader' && !nameEditMode && (
+                    <button onClick={()=>{ setNameEditFull(person.name||""); setNameEditPreferred(person.preferred_name||""); setNameEditMode(true); }}
+                      style={{background:"none",border:"none",color:"#475a64",cursor:"pointer",padding:"2px 4px",fontSize:14,lineHeight:1}} title={lang==="PT"?"Editar nome":"Edit name"}>✎</button>
+                  )}
                   <CarismaBadge levels={carisma} lang={lang} />
                 </div>
                 {person.full_name && person.preferred_name &&
@@ -2189,6 +2217,27 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             </div>
             <button onClick={onClose} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,color:"#6b7a82",fontSize:14,cursor:"pointer",width:32,height:32,display:"grid",placeItems:"center",flexShrink:0}}>✕</button>
           </div>
+          {/* Name edit inline form */}
+          {nameEditMode && (
+            <div style={{padding:"12px 0 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",flexDirection:"column",gap:8}}>
+              <input value={nameEditFull} onChange={e=>setNameEditFull(e.target.value)}
+                placeholder={lang==="PT"?"Nome completo...":"Full name..."}
+                style={{padding:"8px 12px",fontSize:13}}/>
+              <input value={nameEditPreferred} onChange={e=>setNameEditPreferred(e.target.value)}
+                placeholder={lang==="PT"?"Nome preferido...":"Preferred name..."}
+                style={{padding:"8px 12px",fontSize:13}}/>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={saveName} disabled={nameSaving||!nameEditFull.trim()}
+                  style={{fontSize:11,padding:"6px 14px",borderRadius:7,border:"1px solid rgba(42,191,191,0.3)",background:"rgba(42,191,191,0.1)",color:"#2ABFBF",cursor:"pointer",opacity:nameSaving||!nameEditFull.trim()?0.4:1}}>
+                  {lang==="PT"?"Salvar":"Save"}
+                </button>
+                <button onClick={()=>setNameEditMode(false)}
+                  style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"none",color:"#6b7a82",cursor:"pointer"}}>
+                  {lang==="PT"?"Cancelar":"Cancel"}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Contact actions */}
           <div style={{display:"flex",gap:10,paddingBottom:18,borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
             {waURL && (
@@ -2224,22 +2273,32 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
           {/* Assigned Pastor */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.assignedPastor}</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-              {PASTOR_SUGGESTIONS.map(p=>(
-                <button key={p} onClick={()=>updateConnection({assigned_pastor:p})} disabled={saving}
-                  style={{padding:"8px 14px",borderRadius:8,border:person.assigned_pastor===p?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.04)",
-                    background:person.assigned_pastor===p?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
-                    color:person.assigned_pastor===p?"#5eead4":"#aebac0",fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
-                    boxShadow:person.assigned_pastor===p?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
-                  {p}
-                </button>
-              ))}
-            </div>
-            <input placeholder={t.orType}
-              defaultValue={!PASTOR_SUGGESTIONS.includes(person.assigned_pastor)?person.assigned_pastor:""}
-              onBlur={e=>{ if(e.target.value && !PASTOR_SUGGESTIONS.includes(e.target.value)) updateConnection({assigned_pastor:e.target.value}); }}
-              style={{padding:"10px 14px"}}/>
+            <button onClick={()=>setAssignedPastorOpen(o=>!o)}
+              style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",cursor:"pointer",padding:0,width:"100%",marginBottom:assignedPastorOpen?12:0}}>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>
+                {person.assigned_pastor ? `${t.assignedPastor}: ${person.assigned_pastor}` : t.assignedPastor}
+              </span>
+              <span style={{color:"#475a64",fontSize:11,marginLeft:"auto"}}>{assignedPastorOpen?"▼":"▶"}</span>
+            </button>
+            {assignedPastorOpen && (
+              <>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                  {PASTOR_SUGGESTIONS.map(p=>(
+                    <button key={p} onClick={()=>updateConnection({assigned_pastor:p})} disabled={saving}
+                      style={{padding:"8px 14px",borderRadius:8,border:person.assigned_pastor===p?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.04)",
+                        background:person.assigned_pastor===p?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                        color:person.assigned_pastor===p?"#5eead4":"#aebac0",fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                        boxShadow:person.assigned_pastor===p?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <input placeholder={t.orType}
+                  defaultValue={!PASTOR_SUGGESTIONS.includes(person.assigned_pastor)?person.assigned_pastor:""}
+                  onBlur={e=>{ if(e.target.value && !PASTOR_SUGGESTIONS.includes(e.target.value)) updateConnection({assigned_pastor:e.target.value}); }}
+                  style={{padding:"10px 14px"}}/>
+              </>
+            )}
           </div>
 
           {/* Ministry Load */}
@@ -2331,26 +2390,19 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
             </div>
           </div>
 
-          {/* Special Groups */}
-          <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.specialGroups}</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {SPECIAL_GROUPS.map(g=>(
-                <button key={g} onClick={()=>toggleGroup(g)} disabled={saving}
-                  style={{padding:"8px 14px",borderRadius:8,
-                    border:`1px solid ${groups.includes(g)?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.04)"}`,
-                    background:groups.includes(g)?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
-                    color:groups.includes(g)?"#5eead4":"#aebac0",
-                    fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
-                    boxShadow:groups.includes(g)?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-
+          {/* Groups & Roles collapsible wrapper */}
+          <div style={{paddingTop:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+            <button onClick={()=>setGroupsRolesOpen(o=>!o)}
+              style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",cursor:"pointer",padding:0,width:"100%",marginBottom:groupsRolesOpen?14:22}}>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>
+                {lang==="PT"?"Grupos e Funcoes":"Groups & Roles"}
+              </span>
+              <span style={{color:"#475a64",fontSize:11,marginLeft:"auto"}}>{groupsRolesOpen?"▼":"▶"}</span>
+            </button>
+            {groupsRolesOpen && (
+              <>
           {/* Group Attendance (edit) */}
-          <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+          <div style={{paddingBottom:22}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.groupsAttendedHd||"Groups Attended"}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
               {ATTENDANCE_GROUPS_DASH.map(g => {
@@ -2436,6 +2488,9 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                 </div>
               );
             })}
+          </div>
+              </>
+            )}
           </div>
 
           {/* Gifting Profile */}
@@ -2650,15 +2705,27 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
               {/* Pastoral Flag Management — visible only when auth token present */}
               {token && (
                 <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8}}>
-                    {lang==="PT" ? "Pastoral" : "Pastoral"}
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,position:"relative"}}>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.15em",textTransform:"uppercase",color:"#6b7a82"}}>
+                      {lang==="PT" ? "Candidato Pastoral" : "Pastoral Candidate"}
+                    </div>
+                    <button onClick={()=>setPastoralInfoPopup(o=>!o)}
+                      style={{background:"none",border:"none",color:"#475a64",cursor:"pointer",padding:"0 2px",fontSize:13,lineHeight:1}}>i</button>
+                    {pastoralInfoPopup && (
+                      <div onClick={()=>setPastoralInfoPopup(false)}
+                        style={{position:"absolute",top:22,left:0,zIndex:20,background:"#1a1a1a",color:"#e6f1f0",borderRadius:6,padding:"10px 14px",fontSize:11,lineHeight:1.6,maxWidth:280,boxShadow:"0 4px 20px rgba(0,0,0,0.6)",border:"1px solid rgba(255,255,255,0.08)",cursor:"pointer"}}>
+                        {lang==="PT"
+                          ? "Esta indicacao identifica alguem cujo perfil de dons e padrao comportamental sugere potencial para desenvolvimento pastoral. Pode ser definida automaticamente pelo sistema quando criterios especificos sao atendidos, ou manualmente por um pastor. Indicacoes do sistema e de pastores sao registradas separadamente. Esta e uma nota pastoral privada - nao visivel ao voluntario."
+                          : "This flag identifies someone whose gifting profile and behavioral pattern suggest potential for pastoral development. It can be set automatically by the system when specific criteria are met, or manually by a pastor. System flags and pastor flags are tracked separately. This is a private pastoral note - not visible to the volunteer."}
+                      </div>
+                    )}
                   </div>
                   {/* State: not flagged */}
                   {(!person.pastoral_flag || person.pastoral_flag==0) && !pastoralUI && (
                     <button onClick={function(){ setPastoralAction("flag"); setPastoralUI(true); setPastoralPastorName(""); setPastoralCustomName(""); }}
                       disabled={saving}
                       style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
-                      {lang==="PT" ? "Marcar Potencial" : "Flag Potential"}
+                      {lang==="PT" ? "Candidato Pastoral" : "Pastoral Candidate"}
                     </button>
                   )}
                   {/* State: algorithm flagged */}
@@ -2667,12 +2734,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                       <button onClick={function(){ setPastoralAction("confirm"); setPastoralUI(true); setPastoralPastorName(""); setPastoralCustomName(""); }}
                         disabled={saving}
                         style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(42,191,191,0.3)",background:"rgba(42,191,191,0.08)",color:"#2ABFBF",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
-                        {lang==="PT" ? "Confirmar" : "Confirm"}
+                        {lang==="PT" ? "Candidato Pastoral" : "Pastoral Candidate"}
                       </button>
                       <button onClick={function(){ updateConnection({pastoral_flag:0,pastor_confirmed_by:null}); }}
                         disabled={saving}
                         style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
-                        {lang==="PT" ? "Remover" : "Clear"}
+                        {lang==="PT" ? "Remover indicacao" : "Remove Flag"}
                       </button>
                     </div>
                   )}
@@ -2681,12 +2748,12 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
                     <div>
                       <div style={{fontSize:11,color:"#2ABFBF",fontFamily:"'JetBrains Mono',monospace",marginBottom:6}}>
                         {lang==="PT" ? "Confirmado pelo Pastor" : "Confirmed by Pastor"}
-                        {person.pastor_confirmed_by ? " — " + person.pastor_confirmed_by : ""}
+                        {person.pastor_confirmed_by ? " - " + person.pastor_confirmed_by : ""}
                       </div>
                       <button onClick={function(){ updateConnection({pastoral_flag:0,pastor_confirmed_by:null}); }}
                         disabled={saving}
                         style={{fontSize:11,padding:"6px 12px",borderRadius:7,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"#aebac0",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
-                        {lang==="PT" ? "Remover" : "Clear"}
+                        {lang==="PT" ? "Remover indicacao" : "Remove Flag"}
                       </button>
                     </div>
                   )}
@@ -2763,6 +2830,22 @@ function PersonPanel({ personId, token, onClose, onUpdated, t, lang, templatePT,
 
             </div>
           )}
+
+          {/* Current Ministries — read-only display (3F: follows Suggested Placements) */}
+          {(()=>{
+            const minis = parseJSON(person.current_ministries)||[];
+            if(!minis.length) return null;
+            return (
+              <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.currentMin}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {minis.map(m=>(
+                    <span key={m} style={{fontSize:12,padding:"4px 10px",borderRadius:6,background:"rgba(94,234,212,0.06)",color:"#c5f5ec",border:"1px solid rgba(94,234,212,0.18)"}}>{ministryLabel(m,lang)}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Group Attendance */}
           {(() => {
@@ -3056,14 +3139,14 @@ function PeopleTab({ token, t, lang, templatePT, templateEN, onNavigate }) {
       </div>
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
+        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
       )}
     </div>
   );
 }
 
 // ─── GIFTING FILTER TAB ───────────────────────────────────────────
-function GiftingTab({ token, t, lang, templatePT, templateEN, onNavigate }) {
+function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate }) {
   const [selectedGifting, setSelectedGifting] = useState(null);
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -3243,7 +3326,7 @@ function GiftingTab({ token, t, lang, templatePT, templateEN, onNavigate }) {
       )}
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
+        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
       )}
     </div>
   );
@@ -4029,7 +4112,10 @@ function UserManagementTab({ token, t, lang }) {
 function GroupLeaderView({ token, lang, groupName }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [glTab, setGlTab] = useState("serving");
+  const [glTab, setGlTab] = useState("attending");
+  const [sundayOpen, setSundayOpen] = useState(false);
+  const [expandedMinistry, setExpandedMinistry] = useState(null);
+  const [alsoServingOpen, setAlsoServingOpen] = useState(false);
 
   const tx = {
     serving:       lang === "PT" ? "Servindo"        : "Serving",
@@ -4075,11 +4161,14 @@ function GroupLeaderView({ token, lang, groupName }) {
   const serving = allPersons.filter(p => groupRolesFor(p).length > 0);
   const servingIds = new Set(serving.map(p => p.id));
 
+  // All attendees (including those who also serve)
   const attending = allPersons.filter(p => {
-    if (servingIds.has(p.id)) return false;
     const att = parseJSON(p.group_attendance);
     return att && att.includes(groupName);
   });
+  // Sub-sections for Attending tab
+  const attendingAlsoServing = attending.filter(p => servingIds.has(p.id));
+  const attendingNotServing = attending.filter(p => !servingIds.has(p.id));
 
   const groupRoles = GROUP_ROLE_MAP_DASH[groupName] || [];
   const sundayByMinistry = {};
@@ -4155,8 +4244,8 @@ function GroupLeaderView({ token, lang, groupName }) {
       <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
         <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:14,fontWeight:500}}>{tx.ourTeam}</div>
         <div style={{display:"flex",gap:8,marginBottom:18}}>
-          <PillBtn id="serving" label={tx.serving} count={serving.length} />
           <PillBtn id="attending" label={tx.attending} count={attending.length} />
+          <PillBtn id="serving" label={tx.serving} count={serving.length} />
         </div>
         {glTab === "serving" && (
           serving.length === 0
@@ -4166,33 +4255,76 @@ function GroupLeaderView({ token, lang, groupName }) {
         {glTab === "attending" && (
           attending.length === 0
             ? <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noAttending}</div>
-            : attending.map(p => <PersonRow key={p.id} person={p} showRoles={false} />)
+            : (
+              <>
+                {/* Also Serving sub-section */}
+                {attendingAlsoServing.length > 0 && (
+                  <div style={{marginBottom:18}}>
+                    <button onClick={()=>setAlsoServingOpen(o=>!o)}
+                      style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",padding:"0 0 10px",width:"100%"}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#5eead4",fontWeight:600}}>
+                        {lang==="PT"?"Tambem Servindo":"Also Serving"} ({attendingAlsoServing.length})
+                      </span>
+                      <span style={{color:"#475a64",fontSize:10,marginLeft:"auto"}}>{alsoServingOpen?"▼":"▶"}</span>
+                    </button>
+                    {alsoServingOpen && attendingAlsoServing.map(p => (
+                      <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                        <GlAvatar person={p} />
+                        <span style={{fontSize:13,color:"#aebac0",flex:1}}>{displayName(p)}</span>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {groupRolesFor(p).map(r=><Chip key={r} label={r} teal />)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Not Yet Serving sub-section */}
+                <div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",fontWeight:600,marginBottom:12}}>
+                    {lang==="PT"?"Ainda nao Servindo":"Not Yet Serving"} ({attendingNotServing.length})
+                  </div>
+                  {attendingNotServing.length === 0
+                    ? <div style={{color:"#475a64",fontSize:13}}>{lang==="PT"?"Todos os membros ja servem neste grupo.":"All members already serve in this group."}</div>
+                    : attendingNotServing.map(p => <PersonRow key={p.id} person={p} showRoles={false} />)
+                  }
+                </div>
+              </>
+            )
         )}
       </div>
 
-      {/* Section B */}
+      {/* Section B — Sunday Pool (collapsible, 4D) */}
       <div className="glass" style={{borderRadius:16,padding:24}}>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4,fontWeight:500}}>{tx.sundayPool}</div>
-        <div style={{fontSize:12,color:"#475a64",marginBottom:20}}>{tx.sundaySub}</div>
-        {Object.keys(sundayByMinistry).length === 0
+        <button onClick={()=>setSundayOpen(o=>!o)}
+          style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",cursor:"pointer",padding:0,width:"100%",marginBottom:sundayOpen?16:0}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,textAlign:"left"}}>
+            {lang==="PT"?"Precisa de ajuda para preencher uma area?":"Need Help Filling an Area?"}
+          </div>
+          <span style={{color:"#475a64",fontSize:11,marginLeft:"auto",flexShrink:0}}>{sundayOpen?"▼":"▶"}</span>
+        </button>
+        {sundayOpen && (Object.keys(sundayByMinistry).length === 0
           ? <div style={{color:"#475a64",fontSize:13}}>{tx.noSunday}</div>
           : Object.entries(sundayByMinistry).map(([ministry, pool]) => (
-            <div key={ministry} style={{marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:6}}>
-                <div style={{fontWeight:600,fontSize:13,color:"#aebac0"}}>{ministry} <span style={{color:"#475a64",fontSize:11,fontWeight:400}}>({pool.length} {pool.length === 1 ? tx.person : tx.people})</span></div>
-                <div style={{fontSize:11,color:"#475a64"}}>{tx.leader}: {MINISTRY_LEADERS[ministry] || ""}</div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {pool.map(p => (
-                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                    <span style={{fontSize:13,color:"#e6f1f0",flex:1}}>{displayName(p)}</span>
-                    <Chip label={ministry} />
-                  </div>
-                ))}
-              </div>
+            <div key={ministry} style={{marginBottom:6}}>
+              <button onClick={()=>setExpandedMinistry(m=>m===ministry?null:ministry)}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:"10px 14px",cursor:"pointer",marginBottom:expandedMinistry===ministry?8:0}}>
+                <span style={{fontWeight:600,fontSize:13,color:"#aebac0",flex:1,textAlign:"left"}}>{ministry}</span>
+                <span style={{color:"#475a64",fontSize:11}}>{pool.length} {pool.length===1?tx.person:tx.people}</span>
+                <span style={{color:"#475a64",fontSize:11,marginLeft:4}}>{expandedMinistry===ministry?"▼":"▶"}</span>
+              </button>
+              {expandedMinistry===ministry && (
+                <div style={{paddingLeft:8}}>
+                  {pool.map(p => (
+                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                      <span style={{fontSize:13,color:"#e6f1f0",flex:1}}>{displayName(p)}</span>
+                      <Chip label={ministry} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
-        }
+        )}
       </div>
     </div>
   );
@@ -4358,7 +4490,7 @@ export default function App() {
           : null}
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>

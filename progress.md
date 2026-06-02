@@ -1611,3 +1611,28 @@ Changed `role === "owner"` to `effectiveRole === "owner"` so the Users tab conte
 - Owner in "Pastor View": full dashboard, no Users tab, roleLabel shows "Pastor"
 - Owner in "Group Leader View" + group selected: GroupLeaderView component (unchanged from Session 7)
 - Pastor: unchanged (My View + Group Leader View)
+
+---
+
+## Session 9 (2026-06-01) — Analytics Chart Style Unification
+
+### Commit
+`f19f24a` — "Unify analytics charts: Leadership, Emotional, Natural Strength now use donut style"
+
+### Changes made (`src/App.jsx` lines 1664-1770)
+
+Replaced the horizontal gradient bar chart rendering in three Analytics sections with the identical `<Donut>` + legend layout used by the Top Giftings chart.
+
+| Section | Before | After |
+|---|---|---|
+| Leadership Tendencies | gradient bar rows | Donut (size=180, strokeWidth=18) + dot/label/count legend |
+| Emotional Profiles | gradient bar rows | Donut + dot/label/count legend |
+| Natural Strengths | gradient bar rows | Donut + dot/label/count legend |
+
+All three use the same `donutColors` array already defined in AnalyticsTab scope.
+Center value = sum of counts for that dataset; centerLabel = `t.mapped`.
+Label translation uses existing LEADERSHIP_MAP / EMOTIONAL_MAP / NATURAL_STRENGTH_MAP lookups (unchanged).
+
+Outer grid changed from `1fr 1fr` (2-col, 3 cards creating uneven bottom row) to `1fr 1fr 1fr` (3-col, all three cards in one even row).
+
+**Not changed:** DISC Profile distribution, Language/Preferred Language distribution, all other analytics sections, all data/labels.

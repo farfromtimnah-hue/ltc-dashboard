@@ -1892,14 +1892,6 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
 
   return (
     <div onClick={onClick} className="glass glow-hover" style={{borderRadius:12,padding:"16px 20px",cursor:"pointer",transition:"all 0.2s ease",borderLeft:"3px solid " + stageColor,borderTop:"2px solid " + topBorderColor,boxShadow:"0 4px 16px rgba(0,0,0,0.25)",position:"relative"}}>
-      {/* ── Role badge top-right ── */}
-      {(isPastor || isLeader) && (
-        <div style={{position:"absolute",top:8,right:8,fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:600,
-          background:isPastor?"#F0E6D3":isLeader?"#5B9BD5":"transparent",
-          color:isPastor?"#3a2e1e":"#fff"}}>
-          {isPastor ? "Pastor/Pastora" : (lang==="PT" ? "Lider" : "Leader")}
-        </div>
-      )}
       {/* ── Header row ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1947,6 +1939,13 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
           <span style={{fontSize:11,padding:"3px 9px",background:stageColor+"1a",color:stageColor,borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:"1px solid " + stageColor + "33"}}>{(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[person.stage||"New"]||person.stage||"New"}</span>
           <span style={{fontSize:11,padding:"3px 9px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:"1px solid " + badge.color + "33"}}>{badge.label==="Available"?t.available:badge.label}</span>
+          {(isPastor || isLeader) && (
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:600,whiteSpace:"nowrap",
+              background:isPastor?"#F0E6D3":"#5B9BD5",
+              color:isPastor?"#3a2e1e":"#fff"}}>
+              {isPastor ? "Pastor/Pastora" : (lang==="PT" ? "Lider" : "Leader")}
+            </span>
+          )}
         </div>
       </div>
 

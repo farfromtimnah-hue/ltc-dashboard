@@ -3422,172 +3422,467 @@ function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate }
 }
 
 // ─── MINISTRY HEALTH TAB ──────────────────────────────────────────
-const MINISTRY_HEALTH_DATA = [
-  { name:"Worship Team", min:6, ideal:10, current:8, leader:"Kênia" },
-  { name:"Sound", min:2, ideal:4, current:2, leader:"Cláudio" },
-  { name:"Lighting", min:2, ideal:4, current:3, leader:"Kevin" },
-  { name:"Projection", min:2, ideal:4, current:2, leader:"Marjorie" },
-  { name:"Streaming", min:1, ideal:2, current:1, leader:"Maurício" },
-  { name:"Photo & Video", min:2, ideal:4, current:2, leader:"Marjorie" },
-  { name:"Social Media", min:2, ideal:4, current:3, leader:"Marjorie" },
-  { name:"Service Experience", min:3, ideal:6, current:3, leader:"Fabi" },
-  { name:"Consolidation", min:4, ideal:8, current:5, leader:"Petito" },
-  { name:"Translation", min:2, ideal:4, current:1, leader:"Pastora Paula" },
-  { name:"Lagoinha Kids", min:6, ideal:12, current:5, leader:"Babi" },
-  { name:"Intercession", min:4, ideal:8, current:7, leader:"Vânia" },
-  { name:"Volunteer Coffee", min:2, ideal:4, current:3, leader:"Juliana" },
-  { name:"Hospitality — Welcome", min:4, ideal:8, current:6, leader:"—" },
-  { name:"Parking", min:3, ideal:6, current:2, leader:"—" },
-  { name:"Setup & Teardown", min:4, ideal:8, current:6, leader:"Anderson" },
-  { name:"GC Leader", min:5, ideal:10, current:4, leader:"—" },
+const MH_API = 'https://ltc-api.farfromtimnah.workers.dev';
+const FORM_LINK = 'FORM_LINK_HERE';
+
+const MH_MINISTRIES = [
+  "Worship Team","Sound","Lighting","Projection","Streaming",
+  "Photo & Video","Social Media","Service Experience","Consolidation",
+  "Translation","Lagoinha Kids","Intercession","Volunteer Coffee",
+  "Hospitality - Welcome","Parking","Setup & Teardown",
+  "WE CARE - Helps","WE CARE - Evangelism","GC Leader",
 ];
 
-function ministryHealthStatus(current, min, ideal) {
-  if (current < min) return { color:"#ef4444", label:"Critical", bg:"rgba(239,68,68,0.12)" };
-  if (current < ideal) return { color:"#f59e0b", label:"Needs Volunteers", bg:"rgba(245,158,11,0.12)" };
-  return { color:"#22c55e", label:"Healthy", bg:"rgba(34,197,94,0.12)" };
+const MH_DEFAULT_LEADERS = {
+  "Worship Team":"Kenia","Sound":"Claudio","Lighting":"Kevin",
+  "Projection":"Marjorie","Streaming":"Mauricio","Photo & Video":"Marjorie",
+  "Social Media":"Marjorie","Service Experience":"Fabi","Consolidation":"Petito",
+  "Translation":"Pastora Paula","Lagoinha Kids":"Babi","Intercession":"Vania",
+  "Volunteer Coffee":"Juliana","Hospitality - Welcome":"Fabi","Parking":"Anderson",
+  "Setup & Teardown":"Anderson","WE CARE - Helps":null,"WE CARE - Evangelism":null,
+  "GC Leader":null,
+};
+
+const MH_GIFTING_MAP = {
+  "Worship Team":"Worship & Music",
+  "Sound":"Technical Arts",
+  "Lighting":"Technical Arts",
+  "Projection":"Technical Arts",
+  "Streaming":"Technical Arts",
+  "Photo & Video":"Visual Storytelling",
+  "Social Media":"Digital Communication",
+  "Service Experience":"Hospitality",
+  "Consolidation":"Evangelism",
+  "Translation":null,
+  "Lagoinha Kids":"Gift of Helps",
+  "Intercession":"Intercession",
+  "Volunteer Coffee":"Gift of Helps",
+  "Hospitality - Welcome":"Hospitality",
+  "Parking":"Gift of Helps",
+  "Setup & Teardown":"Gift of Helps",
+  "WE CARE - Helps":"Gift of Helps",
+  "WE CARE - Evangelism":"Evangelism",
+  "GC Leader":"Influence & Servant Leadership",
+};
+
+const MH_MINISTRY_PT = {
+  "Worship Team":"Ministerio de Louvor",
+  "Sound":"Som",
+  "Lighting":"Luz",
+  "Projection":"Projecao",
+  "Streaming":"Transmissao",
+  "Photo & Video":"Foto e Video",
+  "Social Media":"Midias Sociais",
+  "Service Experience":"Experiencia do Culto",
+  "Consolidation":"Consolidacao",
+  "Translation":"Traducao",
+  "Lagoinha Kids":"Lagoinha Kids",
+  "Intercession":"Intercessao",
+  "Volunteer Coffee":"Cafe dos Voluntarios",
+  "Hospitality - Welcome":"Recepcao",
+  "Parking":"Estacionamento",
+  "Setup & Teardown":"Montagem",
+  "WE CARE - Helps":"WE CARE - Ajuda Pratica",
+  "WE CARE - Evangelism":"WE CARE - Evangelismo",
+  "GC Leader":"Lider de GC",
+};
+
+function mhStatusBadge(total, minCount, idealCount) {
+  if (minCount === null || minCount === undefined) return { label:"No Data", color:"#666", bg:"rgba(102,102,102,0.12)" };
+  if (total < minCount) return { label:"Critical", color:"#E74C3C", bg:"rgba(231,76,60,0.12)" };
+  if (total < idealCount) return { label:"Needs Volunteers", color:"#F39C12", bg:"rgba(243,156,18,0.12)" };
+  return { label:"Healthy", color:"#27AE60", bg:"rgba(39,174,96,0.12)" };
 }
 
-function MinistryHealthTab({ t, lang }) {
-  const healthy  = MINISTRY_HEALTH_DATA.filter(m => m.current >= m.ideal).length;
-  const needs    = MINISTRY_HEALTH_DATA.filter(m => m.current >= m.min && m.current < m.ideal).length;
-  const critical = MINISTRY_HEALTH_DATA.filter(m => m.current < m.min).length;
+function mhSortOrder(status) {
+  if (status.label === "Critical") return 0;
+  if (status.label === "Needs Volunteers") return 1;
+  if (status.label === "Healthy") return 2;
+  return 3;
+}
+
+function SurveyModal({ ministry, token, lang, onClose }) {
+  var [rows, setRows] = useState([]);
+  useEffect(function() {
+    fetch(MH_API + '/ministry-health', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .catch(function() { return []; });
+    // For now just show a coming soon — full survey row fetch not implemented
+    setRows([]);
+  }, []);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:9000,display:"flex",alignItems:"center",justifyContent:"center"}}
+      onClick={onClose}>
+      <div style={{background:"#08121a",border:"1px solid rgba(94,234,212,0.18)",borderRadius:16,padding:32,maxWidth:540,width:"90%",maxHeight:"80vh",overflow:"auto"}}
+        onClick={function(e){e.stopPropagation();}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>
+            {lang==="PT" ? "Resultados da Pesquisa" : "Survey Results"} - {ministry}
+          </h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#6b7a82",cursor:"pointer",fontSize:18}}>x</button>
+        </div>
+        <p style={{color:"#6b7a82",fontSize:13}}>
+          {lang==="PT" ? "Nenhum resultado ainda." : "No results yet."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MinistryHealthTab({ token, role, t, lang }) {
+  var [mhData, setMhData] = useState({});
+  var [loading, setLoading] = useState(true);
+  var [savingNotes, setSavingNotes] = useState({});
+  var [localNotes, setLocalNotes] = useState({});
+  var [surveyModal, setSurveyModal] = useState(null);
+  var [otherFlags, setOtherFlags] = useState([]);
+  var [showOtherFlags, setShowOtherFlags] = useState(false);
+  // CSV import state
+  var [csvRows, setCsvRows] = useState(null);
+  var [csvMapping, setCsvMapping] = useState({});
+  var [csvHeaders, setCsvHeaders] = useState([]);
+  var [csvImporting, setCsvImporting] = useState(false);
+  var [csvMsg, setCsvMsg] = useState(null);
+
+  var isOwnerRole = role === 'owner';
+
+  function loadMH() {
+    setLoading(true);
+    fetch(MH_API + '/ministry-health', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        var map = {};
+        var flags = [];
+        (rows || []).forEach(function(row) {
+          map[row.ministry_name] = row;
+          if (row.ministry_other_flag) flags.push(row.ministry_other_flag);
+        });
+        setMhData(map);
+        setOtherFlags(flags);
+      })
+      .catch(function() {})
+      .finally(function() { setLoading(false); });
+  }
+
+  useEffect(function() { loadMH(); }, []);
+
+  function saveNotes(ministryName, notes) {
+    setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=true; return n; });
+    fetch(MH_API + '/ministry-health/' + encodeURIComponent(ministryName), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ coaching_notes: notes }),
+    }).finally(function() {
+      setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=false; return n; });
+    });
+  }
+
+  // Parse CSV helper
+  function parseCSV(text) {
+    var lines = text.trim().split('\n');
+    if (lines.length < 2) return { headers: [], rows: [] };
+    var headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g,''); });
+    var rows = lines.slice(1).map(function(line) {
+      var cols = line.split(',').map(function(c) { return c.trim().replace(/^"|"$/g,''); });
+      var obj = {};
+      headers.forEach(function(h, i) { obj[h] = cols[i] || ''; });
+      return obj;
+    });
+    return { headers: headers, rows: rows };
+  }
+
+  function handleCSVFile(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var parsed = parseCSV(ev.target.result);
+      setCsvHeaders(parsed.headers);
+      setCsvRows(parsed.rows);
+      var mapping = {};
+      parsed.headers.forEach(function(h) { mapping[h] = 'ignore'; });
+      setCsvMapping(mapping);
+      setCsvMsg(null);
+    };
+    reader.readAsText(file);
+  }
+
+  function handleCSVImport() {
+    if (!csvRows) return;
+    setCsvImporting(true);
+    var items = csvRows.map(function(row) {
+      var item = {};
+      Object.keys(csvMapping).forEach(function(col) {
+        var target = csvMapping[col];
+        if (target !== 'ignore') item[target] = row[col];
+      });
+      return item;
+    }).filter(function(item) { return item.ministry_name; });
+
+    fetch(MH_API + '/ministry-health/survey-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(items),
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var mSet = new Set(items.map(function(i) { return i.ministry_name; }));
+        setCsvMsg((lang==="PT"
+          ? items.length + ' respostas importadas para ' + mSet.size + ' ministerio(s)'
+          : items.length + ' responses imported for ' + mSet.size + ' ministr' + (mSet.size===1?'y':'ies')));
+        setCsvRows(null); setCsvHeaders([]); setCsvMapping({});
+        loadMH();
+      })
+      .catch(function() { setCsvMsg(lang==="PT"?"Erro ao importar":"Import error"); })
+      .finally(function() { setCsvImporting(false); });
+  }
+
+  // Compute cards
+  var cards = MH_MINISTRIES.map(function(name) {
+    var row = mhData[name] || {};
+    var assessed = row.actual_count_assessed || 0;
+    var reported = row.actual_count_form || 0;
+    var total = assessed + reported;
+    var minCount = row.min_count !== undefined ? row.min_count : null;
+    var idealCount = row.ideal_count || null;
+    var status = mhStatusBadge(total, minCount, idealCount);
+    var leaderName = row.leader_preferred_name || MH_DEFAULT_LEADERS[name] || null;
+    var whatsapp = row.leader_whatsapp || null;
+    var notes = localNotes[name] !== undefined ? localNotes[name] : (row.coaching_notes || '');
+    var surveyCount = row.survey_count || 0;
+    var giftingKey = MH_GIFTING_MAP[name];
+    return { name, row, assessed, reported, total, minCount, idealCount, status, leaderName, whatsapp, notes, surveyCount, giftingKey };
+  }).sort(function(a, b) { return mhSortOrder(a.status) - mhSortOrder(b.status); });
+
+  var healthy = cards.filter(function(c) { return c.status.label === 'Healthy'; }).length;
+  var needs = cards.filter(function(c) { return c.status.label === 'Needs Volunteers'; }).length;
+  var critical = cards.filter(function(c) { return c.status.label === 'Critical'; }).length;
+
+  var whatsappTemplatePT = 'Oi! Tudo bem? Preparei um formulario rapido sobre o seu ministerio e seria muito valioso ter a sua visao. Leva menos de 1 minuto. ' + FORM_LINK;
+  var whatsappTemplateEN = 'Hi! How are you doing? I put together a quick form about your ministry and your input would mean a lot. It takes less than a minute. ' + FORM_LINK;
+  var sendFormMsg = lang === 'PT' ? whatsappTemplatePT : whatsappTemplateEN;
+
   return (
     <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
 
-      {/* ── Dev banner ── */}
-      <div style={{display:"flex",gap:14,padding:"16px 22px",borderRadius:14,
-        background:"linear-gradient(90deg,rgba(245,158,11,0.10),rgba(245,158,11,0.02))",
-        border:"1px solid rgba(245,158,11,0.2)",alignItems:"center"}}>
-        <div style={{width:36,height:36,borderRadius:8,flexShrink:0,
-          background:"rgba(245,158,11,0.18)",display:"grid",placeItems:"center",
-          color:"#fbd590",fontSize:16}}>
-          🚧
-        </div>
-        <div>
-          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:13,fontWeight:700,
-            letterSpacing:"0.1em",textTransform:"uppercase",color:"#fbd590",marginBottom:4}}>
-            {lang==="PT" ? "Em Desenvolvimento" : "Under Construction"}
-          </div>
-          <p style={{margin:0,fontSize:12,color:"#6b7a82",lineHeight:1.6}}>
+      {/* ── Other flags notice (owner only) ── */}
+      {isOwnerRole && otherFlags.length > 0 && (
+        <div style={{padding:"12px 18px",borderRadius:10,background:"rgba(243,156,18,0.08)",border:"1px solid rgba(243,156,18,0.25)",cursor:"pointer"}}
+          onClick={function(){setShowOtherFlags(!showOtherFlags);}}>
+          <span style={{color:"#F39C12",fontSize:13,fontWeight:600}}>
             {lang==="PT"
-              ? "Em breve, pastores poderão acompanhar a saúde de cada ministério em tempo real."
-              : "Coming soon — pastors will track each ministry's health in real time."}
-          </p>
+              ? otherFlags.length + ' ministerio(s) nao identificado(s) aguardando revisao'
+              : otherFlags.length + ' unidentified ministr' + (otherFlags.length===1?'y':'ies') + ' awaiting review'}
+          </span>
+          {showOtherFlags && (
+            <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
+              {otherFlags.map(function(f,i) {
+                return <span key={i} style={{color:"#aebac0",fontSize:12}}>{f}</span>;
+              })}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ── Top actions ── */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start"}}>
+        {/* Send Form button */}
+        <a href={'https://wa.me/?text=' + encodeURIComponent(sendFormMsg)}
+          target="_blank" rel="noopener noreferrer"
+          style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",
+            borderRadius:8,background:"linear-gradient(135deg,#25D366,#128C7E)",
+            color:"#fff",fontWeight:600,fontSize:13,textDecoration:"none",border:"none",cursor:"pointer"}}>
+          {lang==="PT" ? "Enviar Formulario aos Lideres" : "Send Form to Leaders"}
+        </a>
+
+        {/* CSV import (owner only) */}
+        {isOwnerRole && (
+          <div style={{display:"flex",flexDirection:"column",gap:8,padding:"14px 18px",borderRadius:10,
+            background:"rgba(14,26,36,0.55)",border:"1px solid rgba(94,234,212,0.07)",minWidth:260}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",
+              textTransform:"uppercase",color:"#6b7a82"}}>
+              {lang==="PT" ? "Importar Resultados da Pesquisa" : "Import Survey Results"}
+            </div>
+            <input type="file" accept=".csv" onChange={handleCSVFile}
+              style={{fontSize:12,color:"#aebac0",cursor:"pointer"}} />
+            {csvRows && csvRows.length > 0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {/* Preview */}
+                <div style={{overflowX:"auto"}}>
+                  <table style={{fontSize:11,color:"#aebac0",borderCollapse:"collapse",width:"100%"}}>
+                    <thead>
+                      <tr>{csvHeaders.map(function(h) {
+                        return <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#6b7a82",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>{h}</th>;
+                      })}</tr>
+                    </thead>
+                    <tbody>
+                      {csvRows.slice(0,5).map(function(row,i) {
+                        return <tr key={i}>{csvHeaders.map(function(h) {
+                          return <td key={h} style={{padding:"4px 8px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>{row[h]}</td>;
+                        })}</tr>;
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Column mapping */}
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {csvHeaders.map(function(h) {
+                    return (
+                      <div key={h} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                        <span style={{color:"#aebac0",minWidth:120}}>{h}</span>
+                        <select value={csvMapping[h]||'ignore'}
+                          onChange={function(e){
+                            var v=e.target.value;
+                            setCsvMapping(function(prev){var n=Object.assign({},prev);n[h]=v;return n;});
+                          }}
+                          style={{background:"#0c1a24",border:"1px solid rgba(94,234,212,0.15)",color:"#e6f1f0",
+                            borderRadius:6,padding:"3px 6px",fontSize:12,cursor:"pointer"}}>
+                          <option value="ignore">ignore</option>
+                          <option value="ministry_name">ministry_name</option>
+                          <option value="response_text">response_text</option>
+                          <option value="sentiment">sentiment</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={handleCSVImport} disabled={csvImporting}
+                  style={{padding:"8px 16px",borderRadius:7,background:"linear-gradient(135deg,rgba(42,191,191,0.9),rgba(13,148,136,0.9))",
+                    border:"none",color:"#fff",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                  {csvImporting ? (lang==="PT"?"Importando...":"Importing...") : (lang==="PT"?"Importar":"Import")}
+                </button>
+              </div>
+            )}
+            {csvMsg && <div style={{fontSize:12,color:"#27AE60",fontWeight:600}}>{csvMsg}</div>}
+          </div>
+        )}
       </div>
 
       {/* ── KPI row ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
-        {[
-          {label:lang==="PT"?"Total de Ministérios":"Total Ministries", value:MINISTRY_HEALTH_DATA.length, accent:"#5eead4", spark:[16,16,16,17,17,17,17,17]},
-          {label:lang==="PT"?"Saudáveis":"Healthy",                     value:healthy,  accent:"#34d399", spark:[2,2,1,1,1,0,0,healthy]},
-          {label:lang==="PT"?"Precisam de Voluntários":"Need Volunteers",value:needs,   accent:"#f59e0b", spark:[10,11,12,12,13,13,13,needs]},
-          {label:lang==="PT"?"Críticos":"Critical",                      value:critical, accent:"#f87171", spark:[3,4,4,3,4,4,4,critical]},
-        ].map(({label,value,accent,spark})=>(
-          <div key={label} className="glass" style={{padding:24,position:"relative",overflow:"hidden",borderRadius:12}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:2,
-              background:`linear-gradient(90deg,${accent},transparent 60%)`,
-              boxShadow:`0 0 12px ${accent}66`}}/>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-              <div>
-                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:52,
-                  color:accent,lineHeight:1,letterSpacing:"-0.02em",textShadow:`0 0 24px ${accent}33`}}>
-                  {value}
+      {loading ? (
+        <div style={{color:"#6b7a82",fontSize:13,padding:20}}>{lang==="PT"?"Carregando...":"Loading..."}</div>
+      ) : (
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:14}}>
+            {[
+              {label:lang==="PT"?"Total":"Total", value:MH_MINISTRIES.length, accent:"#5eead4"},
+              {label:lang==="PT"?"Saudaveis":"Healthy", value:healthy, accent:"#27AE60"},
+              {label:lang==="PT"?"Precisam de Voluntarios":"Need Volunteers", value:needs, accent:"#F39C12"},
+              {label:lang==="PT"?"Criticos":"Critical", value:critical, accent:"#E74C3C"},
+            ].map(function(kpi) {
+              return (
+                <div key={kpi.label} className="glass" style={{padding:20,position:"relative",overflow:"hidden",borderRadius:12}}>
+                  <div style={{position:"absolute",top:0,left:0,right:0,height:2,
+                    background:'linear-gradient(90deg,'+kpi.accent+',transparent 60%)'}}/>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:40,
+                    color:kpi.accent,lineHeight:1,letterSpacing:"-0.02em"}}>{kpi.value}</div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",
+                    letterSpacing:"0.16em",textTransform:"uppercase",color:"#6b7a82",marginTop:8}}>{kpi.label}</div>
                 </div>
-                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",
-                  letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginTop:10}}>
-                  {label}
-                </div>
-              </div>
-              <div style={{opacity:0.65,paddingTop:4}}>
-                <MiniSpark values={spark} color={accent} width={72} height={28}/>
-              </div>
-            </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
 
-      {/* ── Ministry health cards ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
-        {MINISTRY_HEALTH_DATA.map(m => {
-          const status = ministryHealthStatus(m.current, m.min, m.ideal);
-          const isCritical = m.current < m.min;
-          const aboveMin = m.current >= m.min;
-          const pct = (m.current / m.ideal) * 100;
-          return (
-            <div key={m.name} className={`glass ${isCritical ? "" : "glow-hover"}`}
-              style={{padding:20,position:"relative",overflow:"hidden",borderRadius:12,
-                borderLeft:`2px solid ${status.color}88`,
-                boxShadow:isCritical
-                  ?"0 0 0 1px rgba(248,113,113,0.15), 0 20px 40px -20px rgba(248,113,113,0.2)"
-                  :"0 4px 16px rgba(0,0,0,0.25)"}}>
+          {/* ── Ministry cards ── */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
+            {cards.map(function(card) {
+              var borderColor = card.status.color;
+              return (
+                <div key={card.name} className="glass"
+                  style={{padding:20,borderRadius:12,position:"relative",overflow:"hidden",
+                    borderTop:'2px solid '+borderColor}}>
 
-              {/* Header */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#e6f1f0"}}>
-                  {lang==="PT" ? (MINISTRY_PT[m.name]||m.name) : m.name}
-                </h3>
-                <span style={{fontSize:9.5,padding:"3px 9px",background:status.bg,color:status.color,
-                  borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:`1px solid ${status.color}33`,
-                  fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>
-                  ● {status.label==="Critical" ? t.statusCritical : status.label==="Healthy" ? t.statusHealthy : t.statusNeeds}
-                </span>
-              </div>
-              <div style={{fontSize:11.5,color:"#6b7a82",marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
-                → {m.leader}
-              </div>
-
-              {/* Gauge + metrics */}
-              <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                <RadialGauge value={m.current} max={m.ideal} size={84} thickness={6} color={status.color}/>
-                <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
-                  {/* Bar with min marker */}
-                  <div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9.5px",
-                        letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82"}}>
-                        {t.volunteers}
-                      </span>
-                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#aebac0"}}>
-                        <span style={{color:status.color}}>{m.current}</span> / {m.ideal}
-                      </span>
-                    </div>
-                    <div style={{position:"relative",height:6,background:"rgba(255,255,255,0.04)",borderRadius:999}}>
-                      <div style={{position:"absolute",left:0,top:0,height:"100%",
-                        width:`${Math.min(pct,100)}%`,
-                        background:`linear-gradient(90deg,${status.color},${status.color}aa)`,
-                        borderRadius:999,boxShadow:`0 0 8px ${status.color}66`}}/>
-                      {/* Min marker */}
-                      <div style={{position:"absolute",left:`${(m.min/m.ideal)*100}%`,
-                        top:-3,bottom:-3,width:1,background:"rgba(255,255,255,0.25)"}}/>
-                    </div>
+                  {/* Row 1: name + badge */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:700,color:"#e6f1f0"}}>
+                      {lang==="PT" ? (MH_MINISTRY_PT[card.name]||card.name) : card.name}
+                    </h3>
+                    <span style={{fontSize:9,padding:"3px 8px",background:card.status.bg,color:card.status.color,
+                      borderRadius:999,fontWeight:700,whiteSpace:"nowrap",border:'1px solid '+card.status.color+'33',
+                      fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em",flexShrink:0,marginLeft:8}}>
+                      {card.status.label==="Critical" ? (lang==="PT"?"CRITICO":"CRITICAL")
+                        : card.status.label==="Needs Volunteers" ? (lang==="PT"?"PRECISAM DE VOLUNTARIOS":"NEEDS VOLUNTEERS")
+                        : card.status.label==="Healthy" ? (lang==="PT"?"SAUDAVEL":"HEALTHY")
+                        : (lang==="PT"?"SEM DADOS":"NO DATA")}
+                    </span>
                   </div>
-                  {/* MIN / IDEAL / GAP stats */}
-                  <div style={{display:"flex",gap:14}}>
-                    {[
-                      {label:"MIN",  val:m.min,             color:aboveMin?"#34d399":"#f87171"},
-                      {label:"IDEAL",val:m.ideal,           color:"#aebac0"},
-                      {label:"GAP",  val:`−${m.ideal-m.current}`, color:status.color},
-                    ].map(({label,val,color})=>(
-                      <div key={label} style={{display:"flex",flexDirection:"column",gap:2}}>
-                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9px",
-                          letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82"}}>
-                          {label}
-                        </span>
-                        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,
-                          fontWeight:600,color}}>
-                          {val}
-                        </span>
-                      </div>
-                    ))}
+
+                  {/* Row 2: counts */}
+                  <div style={{display:"flex",gap:12,fontSize:11.5,color:"#aebac0",marginBottom:6,flexWrap:"wrap"}}>
+                    <span>{lang==="PT"?"Atual (avaliado)":"Actual (assessed)"}: <strong style={{color:"#e6f1f0"}}>{card.assessed}</strong></span>
+                    <span>{lang==="PT"?"Atual (informado)":"Actual (reported)"}: <strong style={{color:"#e6f1f0"}}>{card.reported}</strong></span>
+                    <span>Total: <strong style={{color:card.status.color}}>{card.total}</strong></span>
                   </div>
+
+                  {/* Row 3: min / ideal */}
+                  <div style={{display:"flex",gap:12,fontSize:11.5,color:"#6b7a82",marginBottom:8}}>
+                    <span>Min: <span style={{color:card.minCount!==null?"#aebac0":"#475a64"}}>{card.minCount!==null ? card.minCount : (lang==="PT"?"Nao definido":"Not set")}</span></span>
+                    <span>Ideal: <span style={{color:card.idealCount!==null?"#aebac0":"#475a64"}}>{card.idealCount!==null ? card.idealCount : (lang==="PT"?"Nao definido":"Not set")}</span></span>
+                  </div>
+
+                  {/* Row 5: leader + whatsapp */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:12,color:"#6b7a82"}}>
+                      {lang==="PT"?"Lider":"Leader"}: <span style={{color:card.leaderName?"#aebac0":"#475a64"}}>{card.leaderName || (lang==="PT"?"Nao definido":"Not set")}</span>
+                    </span>
+                    {card.whatsapp ? (
+                      <a href={'https://wa.me/' + card.whatsapp.replace(/\D/g,'')}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:6,
+                          background:"#25D366",color:"#fff",fontSize:11,fontWeight:600,textDecoration:"none",flexShrink:0}}>
+                        WhatsApp
+                      </a>
+                    ) : (
+                      <span style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:6,
+                        background:"rgba(255,255,255,0.04)",color:"#475a64",fontSize:11,fontWeight:600,flexShrink:0,
+                        border:"1px solid rgba(255,255,255,0.06)"}}>
+                        WhatsApp
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row 6: coaching notes */}
+                  <textarea
+                    value={card.notes}
+                    placeholder={lang==="PT"?"Notas pastorais sobre este ministerio...":"Pastoral notes about this ministry..."}
+                    onChange={function(e) {
+                      var v = e.target.value;
+                      setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.name]=v; return n; });
+                    }}
+                    onBlur={function(e) { saveNotes(card.name, e.target.value); }}
+                    rows={2}
+                    style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",
+                      border:"1px solid rgba(255,255,255,0.06)",borderRadius:7,color:"#aebac0",
+                      fontSize:12,padding:"7px 10px",resize:"vertical",fontFamily:"inherit",
+                      marginBottom:8,outline:"none"}} />
+
+                  {/* Row 7: survey */}
+                  {card.surveyCount > 0 ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:11.5,color:"#6b7a82"}}>{card.surveyCount} {lang==="PT"?"respostas":"responses"}</span>
+                      <button onClick={function(){setSurveyModal(card.name);}}
+                        style={{padding:"3px 10px",borderRadius:6,background:"rgba(94,234,212,0.08)",
+                          border:"1px solid rgba(94,234,212,0.2)",color:"#5eead4",fontSize:11,
+                          fontWeight:600,cursor:"pointer"}}>
+                        {lang==="PT"?"Ver Respostas":"View Responses"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{fontSize:11,color:"#475a64",fontStyle:"italic"}}>
+                      {lang==="PT"?"Resultados da pesquisa em breve":"Survey results coming soon"}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Survey modal */}
+      {surveyModal && (
+        <SurveyModal ministry={surveyModal} token={token} lang={lang} onClose={function(){setSurveyModal(null);}} />
+      )}
     </div>
   );
 }
@@ -4868,7 +5163,7 @@ export default function App() {
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={role} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />

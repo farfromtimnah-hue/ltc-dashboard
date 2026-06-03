@@ -1797,3 +1797,45 @@ Collapse logic verified via browser JS simulation at 5 widths:
 - `93ee839` — Replace hamburger with Priority+ responsive nav
 
 _Last updated: 2026-06-02 — Priority+ nav complete._
+
+---
+
+## Session — Ministry Health Tab + Ministry Leader Form (2026-06-02)
+
+### Changes to src/App.jsx
+
+- Replaced static `MinistryHealthTab` placeholder with full live implementation
+- `MinistryHealthTab` now accepts `token` and `role` props (call site updated at line ~4871)
+- New constants: `MH_MINISTRIES` (19 canonical names), `MH_DEFAULT_LEADERS`, `MH_GIFTING_MAP`, `MH_MINISTRY_PT`
+- `mhStatusBadge(total, min, ideal)`: Critical (#E74C3C) / Needs Volunteers (#F39C12) / Healthy (#27AE60) / No Data (#666)
+- Cards sorted: Critical -> Needs Volunteers -> Healthy -> No Data
+- Each card shows: assessed count, reported count, total, min, ideal, leader name, WhatsApp link (green if number exists, greyed out if not), coaching notes textarea (auto-saves on blur via PUT), survey count + View Responses button
+- "Send Form to Leaders" WhatsApp button at top; PT/EN template with FORM_LINK_HERE placeholder
+- CSV survey import UI (owner only): file picker, 5-row preview, column mapping dropdowns, Import button
+- Owner-only amber notice for unidentified ministry write-ins (ministry_other_flag)
+- `SurveyModal` component for viewing survey responses
+
+### Commit
+
+- `c53c4c0` — ltc-dashboard Ministry Health tab live implementation
+
+### New file: ministry-leader-form.html
+
+- Created at `/Users/nicolel/ministry-gifting/ministry-leader-form.html`
+- Vanilla HTML/JS, deploys alongside index.html on GitHub Pages
+- PT/EN toggle; LTC1.svg logo; dark background; teal accent #2ABFBF
+- Fields: ministry dropdown (19 + Other/write-in), preferred name, full name, WhatsApp, actual count, min, ideal
+- Submits POST /ministry-leader-form (no auth); thank-you screen on success
+- Commit: `56ead5f` — ministry-gifting repo
+
+### Worker endpoints added (worker.js)
+
+- See ltc-api Progress.md for full endpoint docs
+- Worker version: `daac108b-dda1-455e-a771-a9bd038a4c7b`
+
+### Pending
+
+- Replace `FORM_LINK_HERE` in App.jsx `MinistryHealthTab` (line ~3500) with real GitHub Pages URL once deployed
+- ltc-api has no git remote — worker is deployed via wrangler only
+
+_Last updated: 2026-06-02 — Ministry Health tab + Ministry Leader Form complete._

@@ -5224,7 +5224,7 @@ export default function App() {
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={role} t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />

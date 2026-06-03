@@ -1886,9 +1886,20 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
   const carisma = parseCarisma(person.carisma_completed);
   // PersonCard: use template (skipTemplate = false)
   const waURL = buildWhatsAppURL(person, templatePT, templateEN, false);
+  const isPastor = person.is_pastor == 1;
+  const isLeader = person.is_ministry_leader == 1 && !isPastor;
+  const topBorderColor = isPastor ? "#F0E6D3" : isLeader ? "#5B9BD5" : "#2ABFBF";
 
   return (
-    <div onClick={onClick} className="glass glow-hover" style={{borderRadius:12,padding:"16px 20px",cursor:"pointer",transition:"all 0.2s ease",borderLeft:"3px solid " + stageColor,boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}>
+    <div onClick={onClick} className="glass glow-hover" style={{borderRadius:12,padding:"16px 20px",cursor:"pointer",transition:"all 0.2s ease",borderLeft:"3px solid " + stageColor,borderTop:"2px solid " + topBorderColor,boxShadow:"0 4px 16px rgba(0,0,0,0.25)",position:"relative"}}>
+      {/* ── Role badge top-right ── */}
+      {(isPastor || isLeader) && (
+        <div style={{position:"absolute",top:8,right:8,fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:600,
+          background:isPastor?"#F0E6D3":isLeader?"#5B9BD5":"transparent",
+          color:isPastor?"#3a2e1e":"#fff"}}>
+          {isPastor ? "Pastor/Pastora" : (lang==="PT" ? "Lider" : "Leader")}
+        </div>
+      )}
       {/* ── Header row ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -2005,12 +2016,22 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
   const carisma = parseCarisma(person.carisma_completed);
   // FIX: PlacedCard opens empty chat — no template pre-fill (skipTemplate = true)
   const waURL = buildWhatsAppURL(person, templatePT, templateEN, true);
+  const isPastor = person.is_pastor == 1;
+  const isLeader = person.is_ministry_leader == 1 && !isPastor;
+  const topBorderColor = isPastor ? "#F0E6D3" : isLeader ? "#5B9BD5" : "rgba(94,234,212,0.5)";
 
   return (
-    <div onClick={onClick} className="glass glow-hover" style={{borderRadius:12,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid rgba(94,234,212,0.5)",transition:"all 0.2s ease",position:"relative",boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}>
+    <div onClick={onClick} className="glass glow-hover" style={{borderRadius:12,padding:"18px 20px",cursor:"pointer",borderTop:"2px solid " + topBorderColor,transition:"all 0.2s ease",position:"relative",boxShadow:"0 4px 16px rgba(0,0,0,0.25)"}}>
 
-      {/* Check mark */}
-      <div style={{position:"absolute",top:12,right:12,width:22,height:22,borderRadius:"50%",background:"rgba(94,234,212,0.12)",border:"1px solid rgba(94,234,212,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#5eead4",fontWeight:700}}>✓</div>
+      {/* Check mark or role badge */}
+      {(isPastor || isLeader) ? (
+        <div style={{position:"absolute",top:8,right:8,fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:600,
+          background:isPastor?"#F0E6D3":"#5B9BD5",color:isPastor?"#3a2e1e":"#fff"}}>
+          {isPastor ? "Pastor/Pastora" : (lang==="PT" ? "Lider" : "Leader")}
+        </div>
+      ) : (
+        <div style={{position:"absolute",top:12,right:12,width:22,height:22,borderRadius:"50%",background:"rgba(94,234,212,0.12)",border:"1px solid rgba(94,234,212,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#5eead4",fontWeight:700}}>✓</div>
+      )}
 
       {/* Photo + Name */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
@@ -2306,6 +2327,12 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                       style={{background:"none",border:"none",color:"#475a64",cursor:"pointer",padding:"2px 4px",fontSize:14,lineHeight:1}} title={lang==="PT"?"Editar nome":"Edit name"}>✎</button>
                   )}
                   <CarismaBadge levels={carisma} lang={lang} />
+                  {person.is_pastor == 1 && (
+                    <span style={{fontSize:11,padding:"2px 9px",borderRadius:999,background:"#F0E6D3",color:"#3a2e1e",fontWeight:600}}>Pastor/Pastora</span>
+                  )}
+                  {person.is_ministry_leader == 1 && person.is_pastor != 1 && (
+                    <span style={{fontSize:11,padding:"2px 9px",borderRadius:999,background:"#5B9BD5",color:"#fff",fontWeight:600}}>{lang==="PT"?"Lider":"Leader"}</span>
+                  )}
                 </div>
                 {person.full_name && person.preferred_name &&
                   person.preferred_name.trim() !== person.full_name.trim() && (
@@ -2344,16 +2371,49 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
             </div>
           )}
           {/* Contact actions */}
-          <div style={{display:"flex",gap:10,paddingBottom:18,borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-            {waURL && (
-              <a href={waURL} target="_blank" rel="noreferrer"
-                style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",background:"linear-gradient(180deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08))",color:"#86efac",borderRadius:8,border:"1px solid rgba(34,197,94,0.3)",textDecoration:"none",fontWeight:500}}>
-                💬 {t.whatsappMsg}
-              </a>
-            )}
-            {person.email && (
-              <a href={`mailto:${person.email}`} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",background:"rgba(255,255,255,0.04)",color:"#aebac0",borderRadius:8,border:"1px solid rgba(255,255,255,0.07)",textDecoration:"none"}}>✉ Email</a>
-            )}
+          <div style={{display:"flex",gap:10,paddingBottom:18,borderBottom:"1px solid rgba(255,255,255,0.04)",flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{display:"flex",gap:10,flex:1,flexWrap:"wrap"}}>
+              {waURL && (
+                <a href={waURL} target="_blank" rel="noreferrer"
+                  style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",background:"linear-gradient(180deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08))",color:"#86efac",borderRadius:8,border:"1px solid rgba(34,197,94,0.3)",textDecoration:"none",fontWeight:500}}>
+                  💬 {t.whatsappMsg}
+                </a>
+              )}
+              {person.email && (
+                <a href={`mailto:${person.email}`} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",background:"rgba(255,255,255,0.04)",color:"#aebac0",borderRadius:8,border:"1px solid rgba(255,255,255,0.07)",textDecoration:"none"}}>✉ Email</a>
+              )}
+            </div>
+            {/* Pastor/Leader role toggles */}
+            <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-start"}}>
+              {[
+                {field:"is_pastor", label:lang==="PT"?"Pastor/Pastora":"Pastor/Pastora", other:"is_ministry_leader"},
+                {field:"is_ministry_leader", label:lang==="PT"?"Lider de Ministerio":"Ministry Leader", other:"is_pastor"}
+              ].map(function(tog){
+                var isOn = person[tog.field] == 1;
+                var canEdit = role === "owner" || role === "senior_pastor" || role === "pastor";
+                return (
+                  <div key={tog.field} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <button
+                      disabled={!canEdit || saving}
+                      onClick={function(){
+                        if (!canEdit) return;
+                        var patch = {};
+                        patch[tog.field] = isOn ? 0 : 1;
+                        patch[tog.other] = person[tog.other] != null ? Number(person[tog.other]) : 0;
+                        updateConnection(patch);
+                      }}
+                      style={{
+                        width:36,height:20,borderRadius:999,border:"none",cursor:canEdit?"pointer":"default",
+                        background:isOn?"#2ABFBF":"#333",position:"relative",transition:"background 0.2s",
+                        flexShrink:0,opacity:!canEdit?0.5:1,padding:0
+                      }}>
+                      <span style={{position:"absolute",top:2,left:isOn?18:2,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left 0.2s",display:"block"}} />
+                    </button>
+                    <span style={{fontSize:11,color:"#aebac0",whiteSpace:"nowrap"}}>{tog.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -3058,6 +3118,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
   const [filterLang, setFilterLang] = useState("All");
   const [filterGroup, setFilterGroup] = useState("All");
   const [filterPastor, setFilterPastor] = useState("All");
+  const [filterType, setFilterType] = useState("All");
   const [selectedId, setSelectedId] = useState(null);
   const [showSplit, setShowSplit] = useState(false);
   const [splitRatio, setSplitRatio] = useState("5050");
@@ -3092,6 +3153,9 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
       if (!grps.includes(filterGroup)) return false;
     }
     if (filterPastor !== "All" && p.assigned_pastor !== filterPastor) return false;
+    if (filterType === "Pastors" && p.is_pastor != 1) return false;
+    if (filterType === "Leaders" && (p.is_ministry_leader != 1 || p.is_pastor == 1)) return false;
+    if (filterType === "Congregation" && (p.is_pastor == 1 || p.is_ministry_leader == 1)) return false;
     return true;
   });
 
@@ -3128,6 +3192,22 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
         </button>
       </div>
 
+      {/* Share Assessment button */}
+      <div style={{marginBottom:14}}>
+        <button
+          onClick={function(){
+            var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: https://farfromtimnah-hue.github.io/ministry-gifting/";
+            var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: https://farfromtimnah-hue.github.io/ministry-gifting/";
+            var msg = lang === "PT" ? msgPT : msgEN;
+            window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+          }}
+          style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
+            background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
+            cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+          {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":"Share Assessment"}
+        </button>
+      </div>
+
       {/* Filters */}
       <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
         <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
@@ -3151,6 +3231,28 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
             {opts.map(o=><option key={o} value={o}>{o==="All"?label:disp(o)}</option>)}
           </select>
         ))}
+      </div>
+
+      {/* Type filter chips */}
+      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",color:"#475a64",letterSpacing:"0.12em",textTransform:"uppercase",marginRight:2}}>{lang==="PT"?"Tipo":"Type"}</span>
+        {[
+          {val:"Pastors", labelPT:"Pastores", labelEN:"Pastors"},
+          {val:"Leaders", labelPT:"Lideres", labelEN:"Leaders"},
+          {val:"Congregation", labelPT:"Congregacao", labelEN:"Congregation"}
+        ].map(function(chip){
+          var active = filterType === chip.val;
+          return (
+            <button key={chip.val}
+              onClick={function(){ setFilterType(active ? "All" : chip.val); }}
+              style={{fontSize:11,padding:"4px 12px",borderRadius:999,cursor:"pointer",transition:"all 0.15s",fontWeight:600,
+                background:active?"#2ABFBF":"transparent",
+                color:active?"#0a1a1a":"#6b7a82",
+                border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+              {lang==="PT"?chip.labelPT:chip.labelEN}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>

@@ -3423,7 +3423,7 @@ function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate }
 
 // ─── MINISTRY HEALTH TAB ──────────────────────────────────────────
 const MH_API = 'https://ltc-api.farfromtimnah.workers.dev';
-const FORM_LINK = 'FORM_LINK_HERE';
+const FORM_LINK = 'https://farfromtimnah-hue.github.io/ministry-gifting/ministry-leader-form.html';
 
 const MH_MINISTRIES = [
   "Worship Team","Sound","Lighting","Projection","Streaming",

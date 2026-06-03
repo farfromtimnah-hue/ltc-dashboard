@@ -1934,11 +1934,13 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
               </div>
             )}
             <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || t.noContact}</div>
+            <div style={{fontSize:11,color:"#475a64",marginTop:2}}>
+              {person.language==="EN" ? "🇺🇸 English" : person.language==="Both" ? "🌐 Both" : "🇧🇷 Portugues"}
+            </div>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
           <span style={{fontSize:11,padding:"3px 9px",background:stageColor+"1a",color:stageColor,borderRadius:999,fontWeight:600,whiteSpace:"nowrap",border:"1px solid " + stageColor + "33"}}>{(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[person.stage||"New"]||person.stage||"New"}</span>
-          <span style={{fontSize:11,padding:"3px 9px",background:badge.bg,color:badge.color,borderRadius:999,fontWeight:600,border:"1px solid " + badge.color + "33"}}>{badge.label==="Available"?t.available:badge.label}</span>
           {(isPastor || isLeader) && (
             <span style={{fontSize:10,padding:"2px 7px",borderRadius:999,fontWeight:600,whiteSpace:"nowrap",
               background:isPastor?"#F0E6D3":"#5B9BD5",
@@ -1949,50 +1951,14 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
         </div>
       </div>
 
-      {/* ── Top gifting tags ── */}
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-        {[person.gifting_1,person.gifting_2,person.gifting_3].map(function(g){return typeof g==="object"?null:(g||null);}).filter(Boolean).map(function(g,i){
-          return (
-            <span key={i}
-              style={{fontSize:11,padding:"3px 9px",
-                background:i===0?"rgba(94,234,212,0.1)":"rgba(255,255,255,0.03)",
-                color:i===0?"#c5f5ec":"#aebac0",
-                borderRadius:999,border:"1px solid " + (i===0?"rgba(94,234,212,0.25)":"rgba(255,255,255,0.05)")}}>
-              {GIFTING_ICONS[g]||"◆"} {giftingLabel(g, lang)}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* ── DISC row ── */}
-      {person.disc_primary && (
-        <div onClick={function(e){e.stopPropagation();}} style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4,alignItems:"center"}}>
-          <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",color:"#6b7a82",flexShrink:0,minWidth:52}}>DISC</span>
-          <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,
-              background:DISC_COLORS[person.disc_primary]+"18",
-              border:"1px solid " + DISC_COLORS[person.disc_primary] + "44",
-              color:DISC_COLORS[person.disc_primary],fontWeight:700}}>
-            {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
-          </span>
-          {person.disc_secondary && (
-            <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,
-                background:DISC_COLORS[person.disc_secondary]+"0d",
-                border:"1px solid " + DISC_COLORS[person.disc_secondary] + "28",
-                color:DISC_COLORS[person.disc_secondary],opacity:0.75}}>
-              {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_secondary]}
-            </span>
+      {/* ── Footer: assigned pastor + WA ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+        <div>
+          {person.assigned_pastor && (
+            <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace"}}>
+              {lang==="PT" ? "Atribuido a: " : "Assigned to: "}{person.assigned_pastor}
+            </div>
           )}
-        </div>
-      )}
-
-      {/* ── Footer: pastor / langs / groups / WA ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-          {person.assigned_pastor && <span style={{fontSize:11,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace"}}>{"→ " + person.assigned_pastor}</span>}
-          {langs.map(function(l){return <span key={l} style={{fontSize:10,padding:"2px 7px",background:"rgba(255,255,255,0.03)",color:"#6b7a82",borderRadius:999,border:"1px solid rgba(255,255,255,0.05)"}}>{l}</span>;
-          })}
-          {groups.map(function(g){return <span key={g} style={{fontSize:10,padding:"2px 7px",background:"rgba(94,234,212,0.06)",color:"#5eead4",borderRadius:999,border:"1px solid rgba(94,234,212,0.15)"}}>{g}</span>;
-          })}
         </div>
         {waURL && (
           <button
@@ -2042,23 +2008,19 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
           </div>
         )}
         <div>
-          {/* Name + DISC badge + Carisma badges inline */}
+          {/* Name + Carisma badges inline */}
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:4}}>
             <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:"#e6f1f0"}}>{person.preferred_name || person.name}</span>
-            {person.disc_primary && (
-              <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
-                background:`${DISC_COLORS[person.disc_primary]}1a`,
-                border:`1px solid ${DISC_COLORS[person.disc_primary]}44`,
-                color:DISC_COLORS[person.disc_primary],fontWeight:700}}>
-                {(DISC_TYPE[lang||"PT"]||DISC_TYPE.PT)[person.disc_primary]}
-              </span>
-            )}
             <CarismaBadge levels={carisma} lang={lang} />
           </div>
-          {person.gifting_1 && (
-            <span style={{fontSize:11,padding:"3px 9px",background:"rgba(94,234,212,0.1)",color:"#c5f5ec",borderRadius:999,border:"1px solid rgba(94,234,212,0.25)"}}>
-              {GIFTING_ICONS[person.gifting_1]||"◆"} {giftingLabel(person.gifting_1, person.language)}
-            </span>
+          <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || ""}</div>
+          <div style={{fontSize:11,color:"#475a64",marginTop:2}}>
+            {person.language==="EN" ? "🇺🇸 English" : person.language==="Both" ? "🌐 Both" : "🇧🇷 Portugues"}
+          </div>
+          {person.assigned_pastor && (
+            <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>
+              {lang==="PT" ? "Atribuido a: " : "Assigned to: "}{person.assigned_pastor}
+            </div>
           )}
         </div>
       </div>
@@ -3531,7 +3493,7 @@ const MH_MINISTRIES = [
   "Photo & Video","Social Media","Service Experience","Consolidation",
   "Translation","Lagoinha Kids","Intercession","Volunteer Coffee",
   "Hospitality - Welcome","Parking","Setup & Teardown",
-  "WE CARE - Helps","WE CARE - Evangelism","GC Leader",
+  "WE CARE","GC Leader",
 ];
 
 const MH_DEFAULT_LEADERS = {
@@ -3540,7 +3502,7 @@ const MH_DEFAULT_LEADERS = {
   "Social Media":"Marjorie","Service Experience":"Fabi","Consolidation":"Petito",
   "Translation":"Pastora Paula","Lagoinha Kids":"Babi","Intercession":"Vania",
   "Volunteer Coffee":"Juliana","Hospitality - Welcome":"Fabi","Parking":"Anderson",
-  "Setup & Teardown":"Anderson","WE CARE - Helps":null,"WE CARE - Evangelism":null,
+  "Setup & Teardown":"Anderson","WE CARE":null,
   "GC Leader":null,
 };
 
@@ -3561,8 +3523,7 @@ const MH_GIFTING_MAP = {
   "Hospitality - Welcome":"Hospitality",
   "Parking":"Gift of Helps",
   "Setup & Teardown":"Gift of Helps",
-  "WE CARE - Helps":"Gift of Helps",
-  "WE CARE - Evangelism":"Evangelism",
+  "WE CARE":null,
   "GC Leader":"Influence & Servant Leadership",
 };
 
@@ -3583,8 +3544,7 @@ const MH_MINISTRY_PT = {
   "Hospitality - Welcome":"Recepcao",
   "Parking":"Estacionamento",
   "Setup & Teardown":"Montagem",
-  "WE CARE - Helps":"WE CARE - Ajuda Pratica",
-  "WE CARE - Evangelism":"WE CARE - Evangelismo",
+  "WE CARE":"WE CARE",
   "GC Leader":"Lider de GC",
 };
 

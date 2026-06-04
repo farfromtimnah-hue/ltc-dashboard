@@ -2462,6 +2462,48 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
             </div>
           </div>
 
+          {/* GC Connected — display + pastor edit */}
+          {(person.gc_connected === 1 || person.gc_connected === 0 || role === "owner" || role === "senior_pastor" || role === "pastor") && (
+            <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>
+                {lang==="PT" ? "GC" : "GC"}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                {person.gc_connected === 1 && (
+                  <span style={{fontSize:12,padding:"5px 12px",borderRadius:999,fontWeight:600,
+                    background:"rgba(42,191,191,0.12)",border:"1px solid rgba(42,191,191,0.3)",color:"#2ABFBF"}}>
+                    {lang==="PT" ? "Conectado" : "Connected"}
+                  </span>
+                )}
+                {person.gc_connected === 0 && (
+                  <span style={{fontSize:12,padding:"5px 12px",borderRadius:999,fontWeight:600,
+                    background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",color:"#6b7a82"}}>
+                    {lang==="PT" ? "Nao conectado" : "Not connected"}
+                  </span>
+                )}
+                {(role==="owner"||role==="senior_pastor"||role==="pastor") && (
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={function(){updateConnection({gc_connected:1});}} disabled={saving}
+                      style={{padding:"5px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                        border:person.gc_connected===1?"1px solid rgba(42,191,191,0.35)":"1px solid rgba(255,255,255,0.04)",
+                        background:person.gc_connected===1?"linear-gradient(180deg,rgba(42,191,191,0.18),rgba(42,191,191,0.08))":"rgba(255,255,255,0.02)",
+                        color:person.gc_connected===1?"#2ABFBF":"#aebac0",
+                        boxShadow:person.gc_connected===1?"0 0 14px rgba(42,191,191,0.18)":"none"}}>
+                      {lang==="PT" ? "Sim" : "Yes"}
+                    </button>
+                    <button onClick={function(){updateConnection({gc_connected:0});}} disabled={saving}
+                      style={{padding:"5px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                        border:person.gc_connected===0?"1px solid rgba(255,255,255,0.18)":"1px solid rgba(255,255,255,0.04)",
+                        background:person.gc_connected===0?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.02)",
+                        color:person.gc_connected===0?"#aebac0":"#6b7a82"}}>
+                      {lang==="PT" ? "Nao" : "No"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Languages */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.langSpoken}</div>
@@ -2491,8 +2533,51 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
             </button>
             {groupsRolesOpen && (
               <>
+          {/* GC Connected display + pastor toggle */}
+          <div style={{paddingBottom:18}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>
+              {lang==="PT" ? "GC" : "GC"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              {/* Read-only chip for all roles when value is set */}
+              {person.gc_connected === 1 && (
+                <span style={{fontSize:12,padding:"5px 12px",borderRadius:999,fontWeight:600,
+                  background:"rgba(42,191,191,0.12)",border:"1px solid rgba(42,191,191,0.3)",color:"#2ABFBF"}}>
+                  {lang==="PT" ? "Conectado" : "Connected"}
+                </span>
+              )}
+              {person.gc_connected === 0 && (
+                <span style={{fontSize:12,padding:"5px 12px",borderRadius:999,fontWeight:600,
+                  background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",color:"#6b7a82"}}>
+                  {lang==="PT" ? "Nao conectado" : "Not connected"}
+                </span>
+              )}
+              {/* Pastor-only Yes/No edit toggle */}
+              {(role==="owner"||role==="senior_pastor"||role==="pastor") && (
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>updateConnection({gc_connected:1})} disabled={saving}
+                    style={{padding:"5px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                      border:person.gc_connected===1?"1px solid rgba(42,191,191,0.35)":"1px solid rgba(255,255,255,0.04)",
+                      background:person.gc_connected===1?"linear-gradient(180deg,rgba(42,191,191,0.18),rgba(42,191,191,0.08))":"rgba(255,255,255,0.02)",
+                      color:person.gc_connected===1?"#2ABFBF":"#aebac0",
+                      boxShadow:person.gc_connected===1?"0 0 14px rgba(42,191,191,0.18)":"none"}}>
+                    {lang==="PT" ? "Sim" : "Yes"}
+                  </button>
+                  <button onClick={()=>updateConnection({gc_connected:0})} disabled={saving}
+                    style={{padding:"5px 13px",borderRadius:7,fontSize:12,fontWeight:500,cursor:"pointer",transition:"all 0.18s",
+                      border:person.gc_connected===0?"1px solid rgba(255,255,255,0.18)":"1px solid rgba(255,255,255,0.04)",
+                      background:person.gc_connected===0?"rgba(255,255,255,0.06)":"rgba(255,255,255,0.02)",
+                      color:person.gc_connected===0?"#aebac0":"#6b7a82",
+                      boxShadow:"none"}}>
+                    {lang==="PT" ? "Nao" : "No"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Group Attendance (edit) */}
-          <div style={{paddingBottom:22}}>
+          <div style={{paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)",paddingTop:18}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:10,fontWeight:500}}>{t.groupsAttendedHd||"Groups Attended"}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
               {ATTENDANCE_GROUPS_DASH.map(g => {

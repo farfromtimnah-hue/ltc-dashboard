@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -798,6 +799,30 @@ function timeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
   return `${Math.floor(diff/86400)}d ago`;
+}
+
+function formatNoteDate(ts, lang) {
+  if (!ts) return "";
+  const d = new Date(ts + (ts.includes("Z") ? "" : "Z"));
+  if (lang === "PT") {
+    const day = d.getDate();
+    const months = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+    const mon = months[d.getMonth()];
+    const yr = d.getFullYear();
+    const h = String(d.getHours()).padStart(2,"0");
+    const m = String(d.getMinutes()).padStart(2,"0");
+    return `${day} ${mon} ${yr} as ${h}:${m}`;
+  } else {
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const mon = months[d.getMonth()];
+    const day = d.getDate();
+    const yr = d.getFullYear();
+    var h = d.getHours();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    const m = String(d.getMinutes()).padStart(2,"0");
+    return `${mon} ${day}, ${yr} at ${h}:${m} ${ampm}`;
+  }
 }
 
 // ─── FIX: buildWhatsAppURL now accepts skipTemplate flag ──────────
@@ -2119,11 +2144,10 @@ function GcNameEditor({ person, updateConnection, saving, lang }) {
 }
 
 // ─── PERSON DETAIL PANEL ──────────────────────────────────────────
-function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templatePT, templateEN, onNavigate }) {
+function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templatePT, templateEN, onNavigate, fbUser }) {
   const [person, setPerson] = useState(null);
   const [saving, setSaving] = useState(false);
   const [noteText, setNoteText] = useState("");
-  const [pastorName, setPastorName] = useState("");
   const [newMinistry, setNewMinistry] = useState("");
   const [showMinistryInput, setShowMinistryInput] = useState(false);
   const [labelPopup, setLabelPopup] = useState(null); // {type, value} or null
@@ -2203,10 +2227,11 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
   async function addNote() {
     if (!noteText.trim()) return;
     setSaving(true);
+    var autoName = (fbUser && fbUser.displayName) ? fbUser.displayName : (fbUser && fbUser.email) ? fbUser.email : "Pastor";
     await fetch(`${API}/person/${personId}/note`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ pastor_name: pastorName || "Pastor", note_text: noteText, stage_at_time: person.stage })
+      body: JSON.stringify({ pastor_name: autoName, note_text: noteText, stage_at_time: person.stage })
     });
     setNoteText(""); load(); setSaving(false);
   }
@@ -3169,8 +3194,6 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.notesAudit}</div>
             <div style={{marginBottom:16}}>
-              <input placeholder={t.yourName} value={pastorName} onChange={e=>setPastorName(e.target.value)}
-                style={{width:"100%",padding:"10px 14px",marginBottom:8}}/>
               <textarea placeholder={t.addNote} value={noteText} onChange={e=>setNoteText(e.target.value)} rows={3}
                 style={{width:"100%",padding:"10px 14px",resize:"vertical"}}/>
               <button onClick={addNote} disabled={saving||!noteText.trim()}
@@ -3181,9 +3204,9 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
             </div>
             {(person.notes||[]).map(note=>(
               <div key={note.id} style={{borderLeft:"2px solid rgba(94,234,212,0.2)",paddingLeft:14,marginBottom:16}}>
-                <div style={{display:"flex",gap:8,marginBottom:5,alignItems:"center"}}>
-                  <span style={{fontSize:12,fontWeight:600,color:"#5eead4"}}>{note.pastor_name}</span>
-                  <span style={{fontSize:11,color:"#475a64"}}>{timeAgo(note.created_at)}</span>
+                <div style={{display:"flex",gap:8,marginBottom:4,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,fontWeight:700,color:"#5eead4"}}>{note.pastor_name}</span>
+                  <span style={{fontSize:11,color:"#475a64"}}>{formatNoteDate(note.created_at, lang)}</span>
                   {note.stage_at_time && <span style={{fontSize:10,padding:"2px 7px",background:"rgba(255,255,255,0.03)",color:"#6b7a82",borderRadius:6,border:"1px solid rgba(255,255,255,0.05)"}}>{note.stage_at_time}</span>}
                 </div>
                 <div style={{fontSize:13,color:"#e6f1f0",lineHeight:1.6}}>{note.note_text}</div>
@@ -3244,7 +3267,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
-function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate }) {
+function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("All");
@@ -3254,6 +3277,24 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
   const [filterPastor, setFilterPastor] = useState("All");
   const [filterType, setFilterType] = useState("All");
   const [selectedId, setSelectedId] = useState(null);
+  const [qrModal, setQrModal] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const ASSESSMENT_URL = "https://farfromtimnah-hue.github.io/ministry-gifting/";
+
+  function openQrModal() {
+    QRCode.toDataURL(ASSESSMENT_URL, { width: 300, margin: 2 }).then(function(url) {
+      setQrDataUrl(url);
+      setQrModal(true);
+    });
+  }
+
+  function downloadQr() {
+    if (!qrDataUrl) return;
+    var a = document.createElement("a");
+    a.href = qrDataUrl;
+    a.download = "lagoinha-tampa-avaliacao-qr.png";
+    a.click();
+  }
   const [showSplit, setShowSplit] = useState(false);
   const [splitRatio, setSplitRatio] = useState("5050");
   const [splitDone, setSplitDone] = useState("");
@@ -3326,8 +3367,8 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
         </button>
       </div>
 
-      {/* Share Assessment button */}
-      <div style={{marginBottom:14}}>
+      {/* Share Assessment + QR Code buttons */}
+      <div style={{marginBottom:14,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
         <button
           onClick={function(){
             var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: https://farfromtimnah-hue.github.io/ministry-gifting/";
@@ -3340,7 +3381,50 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
             cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
           {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":"Share Assessment"}
         </button>
+        <button
+          onClick={openQrModal}
+          style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
+            background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
+            cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8">
+            <rect x="1" y="1" width="7" height="7" rx="1"/>
+            <rect x="12" y="1" width="7" height="7" rx="1"/>
+            <rect x="1" y="12" width="7" height="7" rx="1"/>
+            <rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+            <rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+            <rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+            <line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
+          </svg>
+          {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+        </button>
       </div>
+
+      {/* QR Code Modal */}
+      {qrModal && (
+        <div onClick={function(){setQrModal(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+          <div onClick={function(e){e.stopPropagation();}} style={{background:"#0c1a24",border:"1px solid rgba(94,234,212,0.18)",borderRadius:12,padding:28,display:"flex",flexDirection:"column",alignItems:"center",gap:16,maxWidth:300,width:"90%"}}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:16,color:"#e6f1f0"}}>
+              {lang==="PT"?"QR Code da Avaliacao":"Assessment QR Code"}
+            </div>
+            {qrDataUrl && <img src={qrDataUrl} alt="QR Code" style={{width:200,height:200,borderRadius:8}}/>}
+            <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>farfromtimnah-hue.github.io/ministry-gifting/</div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={downloadQr} className="btn-primary" style={{padding:"9px 20px",fontSize:13}}>
+                {lang==="PT"?"Baixar":"Download"}
+              </button>
+              <button onClick={function(){setQrModal(false);}} className="btn-ghost" style={{padding:"9px 20px",fontSize:13}}>
+                {lang==="PT"?"Fechar":"Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
@@ -3464,14 +3548,14 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate })
       </div>
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
+        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={load} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} fbUser={fbUser} />
       )}
     </div>
   );
 }
 
 // ─── GIFTING FILTER TAB ───────────────────────────────────────────
-function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate }) {
+function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser }) {
   const [selectedGifting, setSelectedGifting] = useState(null);
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -3651,7 +3735,7 @@ function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate }
       )}
 
       {selectedId && (
-        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} />
+        <PersonPanel personId={selectedId} token={token} role={role} onClose={()=>setSelectedId(null)} onUpdated={()=>load(selectedGifting)} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={onNavigate} fbUser={fbUser} />
       )}
     </div>
   );
@@ -5176,6 +5260,7 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [fbUser, setFbUser] = useState(null);
   const [tab, setTab] = useState("analytics");
   const [refAnchor, setRefAnchor] = useState(null);
   const [lang, setLang] = useState("PT");
@@ -5201,14 +5286,17 @@ export default function App() {
           const result = await user.getIdTokenResult();
           setToken(idToken);
           setRole(result.claims.role || 'pastor');
+          setFbUser(user);
           if (user.email === 'nicoleylepage@gmail.com') setLang('EN');
         } catch(e) {
           setToken(null);
           setRole(null);
+          setFbUser(null);
         }
       } else {
         setToken(null);
         setRole(null);
+        setFbUser(null);
       }
       setAuthReady(true);
     });
@@ -5419,8 +5507,8 @@ export default function App() {
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>

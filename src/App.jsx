@@ -82,8 +82,16 @@ const DISC_TYPE = {
 const DISC_COLORS = { D:"#f87171", I:"#f59e0b", S:"#34d399", C:"#60a5fa" };
 
 const LANGUAGE_DISPLAY = {
-  PT: { "English":"Inglês", "Português":"Português", "Both":"Ambos" },
-  EN: { "English":"English", "Português":"Português", "Both":"Both" }
+  PT: { "Portugues":"🇧🇷 Portugues", "English":"🇺🇸 Ingles", "Espanol":"🌎 Espanol", "Português":"🇧🇷 Portugues", "Both":"🌐 Ambos" },
+  EN: { "Portugues":"🇧🇷 Portugues", "English":"🇺🇸 English", "Espanol":"🌎 Espanol", "Português":"🇧🇷 Portugues", "Both":"🌐 Both" }
+};
+
+const COUNTRY_FLAGS = {
+  "Mexico":"🇲🇽","Colombia":"🇨🇴","Spain":"🇪🇸","Argentina":"🇦🇷","Peru":"🇵🇪",
+  "Venezuela":"🇻🇪","Chile":"🇨🇱","Ecuador":"🇪🇨","Guatemala":"🇬🇹","Cuba":"🇨🇺",
+  "Bolivia":"🇧🇴","Dominican Republic":"🇩🇴","Honduras":"🇭🇳","Paraguay":"🇵🇾",
+  "El Salvador":"🇸🇻","Nicaragua":"🇳🇮","Costa Rica":"🇨🇷","Panama":"🇵🇦",
+  "Uruguay":"🇺🇾","Puerto Rico":"🇵🇷","Equatorial Guinea":"🇬🇶"
 };
 
 // ─── GIFTING ANCHOR MAP ───────────────────────────────────────────
@@ -284,7 +292,7 @@ function ministryLabel(name, lang, personLang) {
 }
 
 const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other","CRIE","Gerações","Carisma Serve Team"];
-const LANGUAGES = ["English","Português","Both"];
+const LANGUAGES = ["Portugues","English","Espanol"];
 
 const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE"];
 const GROUP_ROLE_MAP_DASH = {
@@ -741,6 +749,30 @@ const css = `
 `;
 
 // ─── HELPERS ─────────────────────────────────────────────────────
+function renderLangFlags(person, lang) {
+  var ls = person.languages_spoken;
+  var arr = [];
+  try {
+    if (typeof ls === "string") arr = JSON.parse(ls);
+    else if (Array.isArray(ls)) arr = ls;
+  } catch(e) { arr = []; }
+  // Legacy single-string "Both"
+  if (arr.length === 0 && ls === "Both") arr = ["Portugues","English"];
+  if (arr.length === 0) {
+    // Fall back to submission language field
+    return person.language === "EN" ? "🇺🇸 English" : "🇧🇷 Portugues";
+  }
+  return arr.map(function(l) {
+    if (l === "English") return "🇺🇸 English";
+    if (l === "Espanol") {
+      var flag = person.country_of_origin ? (COUNTRY_FLAGS[person.country_of_origin] || "🌎") : "🌎";
+      var country = person.country_of_origin ? " (" + person.country_of_origin + ")" : "";
+      return flag + " Espanol" + country;
+    }
+    return "🇧🇷 Portugues";
+  }).join(" · ");
+}
+
 function parseJSON(str, fallback = []) {
   try { return JSON.parse(str) || fallback; } catch { return fallback; }
 }
@@ -807,7 +839,7 @@ function getMinistryRecommendations(person, lang) {
     if (typeof ls === 'string') langsSpoken = JSON.parse(ls);
     else if (Array.isArray(ls)) langsSpoken = ls;
   } catch(e) { langsSpoken = []; }
-  var isBilingual = langsSpoken.indexOf('Both') > -1;
+  var isBilingual = langsSpoken.indexOf('Both') > -1 || (langsSpoken.indexOf('Portugues') > -1 && langsSpoken.indexOf('English') > -1);
 
   // Reliability flag
   var isReliable = person.reliability_flag === 1;
@@ -1935,7 +1967,7 @@ function PersonCard({ person, onClick, templatePT, templateEN, t, lang }) {
             )}
             <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || t.noContact}</div>
             <div style={{fontSize:11,color:"#475a64",marginTop:2}}>
-              {person.language==="EN" ? "🇺🇸 English" : person.language==="Both" ? "🌐 Both" : "🇧🇷 Portugues"}
+              {renderLangFlags(person, lang)}
             </div>
           </div>
         </div>
@@ -2015,7 +2047,7 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
           </div>
           <div style={{fontSize:11.5,color:"#6b7a82",marginTop:2}}>{person.whatsapp || person.email || ""}</div>
           <div style={{fontSize:11,color:"#475a64",marginTop:2}}>
-            {person.language==="EN" ? "🇺🇸 English" : person.language==="Both" ? "🌐 Both" : "🇧🇷 Portugues"}
+            {renderLangFlags(person, lang)}
           </div>
           {person.assigned_pastor && (
             <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>
@@ -2051,6 +2083,36 @@ function PlacedCard({ person, onClick, templatePT, templateEN, t, lang }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── GC NAME EDITOR ───────────────────────────────────────────────
+function GcNameEditor({ person, updateConnection, saving, lang }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(person.gc_name || "");
+  useEffect(() => { setVal(person.gc_name || ""); }, [person.gc_name]);
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} disabled={saving}
+        style={{marginTop:8,background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"4px 10px",fontSize:11,color:"#6b7a82",cursor:"pointer"}}>
+        {person.gc_name ? (lang==="PT"?"Editar nome do GC":"Edit GC name") : (lang==="PT"?"Adicionar nome do GC":"Add GC name")}
+      </button>
+    );
+  }
+  return (
+    <div style={{marginTop:10,display:"flex",gap:6,alignItems:"center"}}>
+      <input value={val} onChange={e=>setVal(e.target.value)}
+        placeholder={lang==="PT"?"Nome do GC":"GC name"}
+        style={{flex:1,padding:"6px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(94,234,212,0.3)",borderRadius:6,color:"#e6f1f0",fontSize:12,fontFamily:"'Space Grotesk',sans-serif",outline:"none"}} />
+      <button onClick={()=>{updateConnection({gc_name:val.trim()||null});setEditing(false);}} disabled={saving}
+        style={{padding:"6px 12px",background:"rgba(42,191,191,0.18)",border:"1px solid rgba(42,191,191,0.35)",borderRadius:6,color:"#2ABFBF",fontSize:12,cursor:"pointer"}}>
+        {lang==="PT"?"Salvar":"Save"}
+      </button>
+      <button onClick={()=>setEditing(false)}
+        style={{padding:"6px 10px",background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:"#6b7a82",fontSize:12,cursor:"pointer"}}>
+        {lang==="PT"?"Cancelar":"Cancel"}
+      </button>
     </div>
   );
 }
@@ -2501,6 +2563,17 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                   </div>
                 )}
               </div>
+              {/* GC Name — display */}
+              {person.gc_connected === 1 && person.gc_name && (
+                <div style={{marginTop:10,fontSize:12,color:"#aebac0"}}>
+                  <span style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",marginRight:6}}>{lang==="PT"?"GC:":"GC:"}</span>
+                  {person.gc_name}
+                </div>
+              )}
+              {/* GC Name — editable by pastor */}
+              {person.gc_connected === 1 && (role==="owner"||role==="senior_pastor"||role==="pastor") && (
+                <GcNameEditor person={person} updateConnection={updateConnection} saving={saving} lang={lang} />
+              )}
             </div>
           )}
 
@@ -2574,6 +2647,16 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                 </div>
               )}
             </div>
+            {/* GC Name display + edit */}
+            {person.gc_connected === 1 && person.gc_name && (
+              <div style={{marginTop:8,fontSize:12,color:"#aebac0"}}>
+                <span style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",marginRight:6}}>GC:</span>
+                {person.gc_name}
+              </div>
+            )}
+            {person.gc_connected === 1 && (role==="owner"||role==="senior_pastor"||role==="pastor") && (
+              <GcNameEditor person={person} updateConnection={updateConnection} saving={saving} lang={lang} />
+            )}
           </div>
 
           {/* Group Attendance (edit) */}
@@ -3120,12 +3203,16 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("");
   const unassigned = people.filter(p => !p.assigned_pastor);
   const englishSpeakers = unassigned.filter(p => {
-    const langs = JSON.parse(p.languages_spoken || "[]");
-    return langs.includes("English") || langs.includes("Both");
+    var ls = p.languages_spoken;
+    var langs = [];
+    try { langs = JSON.parse(ls || "[]"); } catch { langs = []; }
+    return langs.includes("English") || langs.includes("Both") || ls === "Both";
   });
   const ptOnly = unassigned.filter(p => {
-    const langs = JSON.parse(p.languages_spoken || "[]");
-    return !langs.includes("English") && !langs.includes("Both");
+    var ls = p.languages_spoken;
+    var langs = [];
+    try { langs = JSON.parse(ls || "[]"); } catch { langs = []; }
+    return !langs.includes("English") && !langs.includes("Both") && ls !== "Both";
   });
 
   const aliceList = [...englishSpeakers];

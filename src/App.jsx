@@ -294,7 +294,7 @@ function ministryLabel(name, lang, personLang) {
 const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other","CRIE","Gerações","Carisma Serve Team"];
 const LANGUAGES = ["Portugues","English","Espanol"];
 
-const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE"];
+const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Esportes"];
 const GROUP_ROLE_MAP_DASH = {
   "Legacy":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Kids","Translation"],
   "Rocket":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
@@ -305,10 +305,11 @@ const GROUP_ROLE_MAP_DASH = {
   "Culto Fe":        ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "English Service": ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "CRIE":            ["Welcome","Set Up","Sound","Projection","Streaming","Photo & Video","Social Media","Service Experience","Intercession"],
+  "Esportes":        ["Welcome","Set Up","Photo & Video","Social Media","Intercession"],
   "Carisma Serve Team": ["Welcome","Set Up","Sound","Projection","Photo & Video","Social Media","Kids","Cafe/Food"]
 };
 
-const GL_GROUPS = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Carisma Serve Team"];
+const GL_GROUPS = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Esportes","Carisma Serve Team"];
 
 const MINISTRY_TO_GL_ROLE = {
   "Worship Team":         "Worship",
@@ -656,7 +657,7 @@ const css = `
   }
 
   .pp-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#1a1a1a; border:1px solid rgba(42,191,191,0.18); border-radius:8px; padding:6px; z-index:200; min-width:200px; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
-  .pp-item { display:block; width:100%; background:transparent; border:none; padding:9px 14px; color:#aebac0; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; text-align:left; border-radius:6px; transition:background 0.12s,color 0.12s; white-space:nowrap; box-sizing:border-box; }
+  .pp-item { display:block; width:100%; background:transparent; border:none; padding:9px 14px; min-height:44px; color:#aebac0; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; text-align:left; border-radius:6px; transition:background 0.12s,color 0.12s; white-space:nowrap; box-sizing:border-box; }
   .pp-item:hover { background:rgba(42,191,191,0.10); color:#2ABFBF; }
   .pp-active { color:#2ABFBF; background:rgba(42,191,191,0.08); }
   .pp-divider { height:1px; background:rgba(255,255,255,0.06); margin:5px 8px; }
@@ -3666,6 +3667,7 @@ const MH_MINISTRIES = [
   "Translation","Lagoinha Kids","Intercession","Volunteer Coffee",
   "Hospitality - Welcome","Parking","Setup & Teardown",
   "WE CARE","GC Leader",
+  "Art Factory","Decoracao","Diaconia","Esportes","Eventos","Geracoes","Lakestore",
 ];
 
 const MH_DEFAULT_LEADERS = {
@@ -3676,6 +3678,7 @@ const MH_DEFAULT_LEADERS = {
   "Volunteer Coffee":"Juliana","Hospitality - Welcome":"Fabi","Parking":"Anderson",
   "Setup & Teardown":"Anderson","WE CARE":null,
   "GC Leader":null,
+  "Art Factory":null,"Decoracao":null,"Diaconia":null,"Esportes":null,"Eventos":null,"Geracoes":null,"Lakestore":null,
 };
 
 const MH_GIFTING_MAP = {
@@ -3697,6 +3700,13 @@ const MH_GIFTING_MAP = {
   "Setup & Teardown":"Gift of Helps",
   "WE CARE":null,
   "GC Leader":"Influence & Servant Leadership",
+  "Art Factory":null,
+  "Lakestore":["Gift of Helps","Administration"],
+  "Decoracao":"Creativity",
+  "Diaconia":["Gift of Helps","Hospitality"],
+  "Eventos":"Administration",
+  "Esportes":null,
+  "Geracoes":null,
 };
 
 const MH_MINISTRY_PT = {
@@ -3718,6 +3728,13 @@ const MH_MINISTRY_PT = {
   "Setup & Teardown":"Montagem",
   "WE CARE":"WE CARE",
   "GC Leader":"Lider de GC",
+  "Art Factory":"Art Factory",
+  "Decoracao":"Decoracao",
+  "Diaconia":"Diaconia",
+  "Esportes":"Esportes",
+  "Eventos":"Eventos",
+  "Geracoes":"Geracoes",
+  "Lakestore":"Lakestore",
 };
 
 function mhStatusBadge(total, minCount, idealCount) {
@@ -5251,7 +5268,7 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1100 ? 0 : navW >= 800 ? 1 : navW >= 600 ? 2 : 3;
+  const collapseLevel = navW >= 1100 ? 0 : navW >= 1024 ? 1 : navW >= 820 ? 2 : 3;
   const tabsInMore    = collapseLevel >= 3;
   const switcherInMore = collapseLevel >= 2;
   const auxInMore     = collapseLevel >= 1;

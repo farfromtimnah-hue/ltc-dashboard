@@ -3999,15 +3999,23 @@ function LabelDescriptionPopup({ type, value, lang, onClose, pastoralFlag, confi
     if (type === "disc") {
       item = (refContent.discProfiles||[]).find(function(p){ return p.id === discIdMap[value]; });
     } else if (type === "natural_strength") {
-      item = (refContent.naturalStrengths||[]).find(function(p){ return p.labelEN === value; });
+      // Stored value may be PT or EN — normalise to EN via map
+      var nsEN = (NATURAL_STRENGTH_MAP[value] || {}).EN || value;
+      item = (refContent.naturalStrengths||[]).find(function(p){ return p.labelEN === nsEN; });
     } else if (type === "leadership_tendency") {
-      item = (refContent.leadershipTendencies||[]).find(function(p){ return p.labelEN === value; });
+      // Stored value may be PT or EN — normalise to EN via map
+      var ldEN = (LEADERSHIP_MAP[value] || {}).EN || value;
+      item = (refContent.leadershipTendencies||[]).find(function(p){ return p.labelEN === ldEN; });
     } else if (type === "emotional_profile") {
-      item = (refContent.emotionalProfiles||[]).find(function(p){ return p.labelEN === value; });
+      // Stored value may be PT or EN — normalise to EN via map
+      var emEN = (EMOTIONAL_MAP[value] || {}).EN || value;
+      item = (refContent.emotionalProfiles||[]).find(function(p){ return p.labelEN === emEN; });
     } else if (type === "pairing") {
       item = (refContent.pairings||[]).find(function(p){ return p.labelEN === value; });
     } else if (type === "gifting") {
-      item = (refContent.giftings||[]).find(function(p){ return p.labelEN === value; });
+      // Stored gifting names use " & " but JSON labelEN uses " and "
+      var gEN = value.replace(/ & /g, ' and ');
+      item = (refContent.giftings||[]).find(function(p){ return p.labelEN === gEN; });
     } else if (type === "pastoral") {
       item = (refContent.leadershipTendencies||[]).find(function(p){ return p.id === value; });
     }

@@ -5619,7 +5619,7 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1100 ? 0 : navW >= 1024 ? 1 : navW >= 960 ? 2 : 3;
+  const collapseLevel = navW >= 1200 ? 0 : navW >= 1100 ? 1 : navW >= 960 ? 2 : 3;
   const tabsInMore    = collapseLevel >= 3;
   const switcherInMore = collapseLevel >= 2;
   const auxInMore     = collapseLevel >= 1;
@@ -5642,7 +5642,7 @@ export default function App() {
 
           {/* Center: Tab nav (collapses at level 3) */}
           {!tabsInMore && (
-            <nav style={{display:"flex",gap:8,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
+            <nav style={{display:"flex",gap:4,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
               {tabs.map(t2=>(
                 <button key={t2.id} onClick={()=>setTab(t2.id)}
                   style={{background:"transparent",border:"none",padding:"8px 4px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.16em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}

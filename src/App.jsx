@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import SchedulingPrototype from './SchedulingPrototype';
 
 const API = "https://ltc-api.farfromtimnah.workers.dev";
@@ -425,6 +425,12 @@ const L = {
     usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",scheduling:"Agendamento",
     addUser:"Adicionar Usuário",userCreated:"Usuário criado com sucesso.",sendCredentials:"Envie as credenciais via WhatsApp.",
     userRoleSenior:"Pastor Sênior",userRolePastor:"Pastor",userRoleGroupLeader:"Líder de Grupo",
+    attendance:"Presença",attOpenForm:"Abrir formulário",attQrLabel:"QR",
+    attSunday10:"Último Domingo 10h",attEnglish:"Último Culto Inglês",
+    attAvgVol:"Média de Voluntários",attAvgKids:"Média de Kids",
+    attTrend:"Tendência por Culto",attByService:"Média de Presença por Culto",
+    attVolRatio:"Proporção de Voluntários",attLog:"Histórico Completo",
+    attDate:"Data",attService:"Culto",attTemplo:"Templo",attVol:"Voluntários",attKids:"Kids",attTotal:"Total",attVolPct:"Vol%",
   },
   EN: {
     dashboard:"Ministry Dashboard",analytics:"Analytics",people:"People",byGifting:"By Gifting",
@@ -498,6 +504,12 @@ const L = {
     usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",scheduling:"Scheduling",
     addUser:"Add User",userCreated:"User created successfully.",sendCredentials:"Send credentials via WhatsApp.",
     userRoleSenior:"Senior Pastor",userRolePastor:"Pastor",userRoleGroupLeader:"Group Leader",
+    attendance:"Attendance",attOpenForm:"Open form",attQrLabel:"QR",
+    attSunday10:"Latest Sunday 10AM",attEnglish:"Latest English Service",
+    attAvgVol:"Avg Volunteers",attAvgKids:"Avg Kids",
+    attTrend:"Trend by Service",attByService:"Avg Attendance by Service",
+    attVolRatio:"Volunteer Ratio",attLog:"Full Log",
+    attDate:"Date",attService:"Service",attTemplo:"Sanctuary",attVol:"Volunteers",attKids:"Kids",attTotal:"Total",attVolPct:"Vol%",
   }
 };
 
@@ -1553,6 +1565,254 @@ function RadialGauge({ value, max, color="#5eead4", size=84, thickness=6 }) {
 }
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────
+// ─── SERVICE ATTENDANCE TAB ───────────────────────────────────────
+const ATTENDANCE_DATA = [
+  { date:'2026-06-04', service:'Culto Fé', templo:106, volunteers:23, kids:12, total:118 },
+  { date:'2026-06-03', service:'Culto Hope', templo:116, volunteers:26, kids:14, total:130 },
+  { date:'2026-06-01', service:'Sunday 6:30PM', templo:103, volunteers:30, kids:11, total:114 },
+  { date:'2026-06-01', service:'Sunday 10AM', templo:198, volunteers:46, kids:22, total:220 },
+  { date:'2026-05-31', service:'English Service', templo:18, volunteers:16, kids:2, total:20 },
+  { date:'2026-05-31', service:'Rocket', templo:63, volunteers:17, kids:null, total:63 },
+  { date:'2026-05-30', service:'Legacy', templo:84, volunteers:21, kids:null, total:84 },
+  { date:'2026-05-28', service:'Culto Fé', templo:109, volunteers:24, kids:14, total:123 },
+  { date:'2026-05-27', service:'Culto Hope', templo:124, volunteers:27, kids:16, total:140 },
+  { date:'2026-05-25', service:'Sunday 6:30PM', templo:108, volunteers:33, kids:12, total:120 },
+  { date:'2026-05-25', service:'Sunday 10AM', templo:211, volunteers:47, kids:24, total:235 },
+  { date:'2026-05-24', service:'English Service', templo:21, volunteers:16, kids:2, total:23 },
+  { date:'2026-05-24', service:'Rocket', templo:58, volunteers:16, kids:null, total:58 },
+  { date:'2026-05-23', service:'Legacy', templo:79, volunteers:20, kids:null, total:79 },
+  { date:'2026-05-21', service:'Culto Fé', templo:102, volunteers:23, kids:10, total:112 },
+  { date:'2026-05-18', service:'Sunday 10AM', templo:195, volunteers:44, kids:20, total:215 },
+  { date:'2026-05-17', service:'English Service', templo:22, volunteers:17, kids:3, total:25 },
+  { date:'2026-05-11', service:'Sunday 10AM', templo:203, volunteers:45, kids:21, total:224 },
+  { date:'2026-05-10', service:'English Service', templo:18, volunteers:16, kids:2, total:20 },
+  { date:'2026-05-04', service:'Sunday 10AM', templo:187, volunteers:42, kids:18, total:205 },
+];
+
+const ALL_SERVICES = ['Sunday 10AM','Sunday 6:30PM','Culto Hope','Culto Fé','Legacy','Rocket','English Service'];
+const NO_KIDS_SERVICES = new Set(['Rocket','Legacy']);
+
+const SERVICE_CHIP_COLORS = {
+  'Sunday 10AM':   { bg:'rgba(94,234,212,0.08)',  border:'rgba(94,234,212,0.22)',  color:'#c5f5ec' },
+  'Sunday 6:30PM': { bg:'rgba(96,165,250,0.08)',  border:'rgba(96,165,250,0.22)',  color:'#bcd5f8' },
+  'Culto Hope':    { bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.22)', color:'#d8cffd' },
+  'Culto Fé':      { bg:'rgba(248,113,113,0.08)', border:'rgba(248,113,113,0.22)', color:'#fcb6b6' },
+  'Legacy':        { bg:'rgba(245,158,11,0.08)',  border:'rgba(245,158,11,0.22)',  color:'#fbd590' },
+  'Rocket':        { bg:'rgba(251,146,60,0.08)',  border:'rgba(251,146,60,0.22)',  color:'#fed5ae' },
+  'English Service':{ bg:'rgba(52,211,153,0.08)', border:'rgba(52,211,153,0.22)', color:'#a7eccc' },
+};
+
+function ServiceChip({ service }) {
+  const c = SERVICE_CHIP_COLORS[service] || { bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.1)', color:'#aebac0' };
+  return (
+    <span style={{display:'inline-block',padding:'3px 10px',borderRadius:999,fontSize:11,fontWeight:600,
+      background:c.bg,border:`1px solid ${c.border}`,color:c.color,whiteSpace:'nowrap'}}>
+      {service}
+    </span>
+  );
+}
+
+function volPctColor(pct) {
+  if (pct >= 40) return '#5eead4';
+  if (pct >= 25) return '#6b7a82';
+  return '#f87171';
+}
+
+function ServiceAttendanceTab({ t, lang }) {
+  const [selectedService, setSelectedService] = useState('Sunday 10AM');
+
+  // Section 2 metrics
+  const latestSunday10 = ATTENDANCE_DATA.find(d => d.service === 'Sunday 10AM');
+  const latestEnglish  = ATTENDANCE_DATA.find(d => d.service === 'English Service');
+  const cutoff = '2026-05-06'; // 30 days before 2026-06-05
+  const last30 = ATTENDANCE_DATA.filter(d => d.date >= cutoff);
+  const avgVol = last30.length ? Math.round(last30.reduce((s,d) => s + d.volunteers, 0) / last30.length) : 0;
+  const kidsRows = last30.filter(d => d.kids !== null);
+  const avgKids = kidsRows.length ? Math.round(kidsRows.reduce((s,d) => s + d.kids, 0) / kidsRows.length) : 0;
+
+  const metrics = [
+    { label: t.attSunday10, value: latestSunday10 ? latestSunday10.total : '—', accent: '#5eead4' },
+    { label: t.attEnglish,  value: latestEnglish  ? latestEnglish.total  : '—', accent: '#34d399' },
+    { label: t.attAvgVol,   value: avgVol,                                       accent: '#a78bfa' },
+    { label: t.attAvgKids,  value: avgKids,                                      accent: '#f59e0b' },
+  ];
+
+  // Section 3 trend chart data
+  const trendData = ATTENDANCE_DATA
+    .filter(d => d.service === selectedService)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .map(d => ({ date: d.date.slice(5), templo: d.templo, volunteers: d.volunteers, kids: d.kids }));
+  const showKids = !NO_KIDS_SERVICES.has(selectedService);
+
+  // Section 4 — avg total by service
+  const avgByService = ALL_SERVICES.map(svc => {
+    const rows = ATTENDANCE_DATA.filter(d => d.service === svc);
+    const avg = rows.length ? Math.round(rows.reduce((s,d) => s + d.total, 0) / rows.length) : 0;
+    return { service: svc, avg };
+  }).sort((a,b) => b.avg - a.avg);
+
+  // Section 4 — volunteer ratio by service
+  const volRatioByService = ALL_SERVICES.map(svc => {
+    const rows = ATTENDANCE_DATA.filter(d => d.service === svc);
+    if (!rows.length) return { service: svc, ratio: 0 };
+    const ratio = Math.round(rows.reduce((s,d) => s + (d.volunteers / (d.total||1)) * 100, 0) / rows.length);
+    return { service: svc, ratio };
+  }).sort((a,b) => b.ratio - a.ratio);
+
+  // Section 5 log — most recent first
+  const logRows = [...ATTENDANCE_DATA].sort((a,b) => b.date.localeCompare(a.date) || a.service.localeCompare(b.service));
+
+  const monoSm = { fontFamily:"'JetBrains Mono',monospace", fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase' };
+  const sectionTitle = (label) => (
+    <div style={{...monoSm, fontSize:12, fontWeight:700, color:'#e6f1f0', letterSpacing:'0.16em', marginBottom:16}}>
+      {label}
+    </div>
+  );
+
+  return (
+    <div style={{padding:'32px 28px', display:'flex', flexDirection:'column', gap:20}}>
+
+      {/* Section 1 — Header bar */}
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12}}>
+        <h2 style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:22, color:'#e6f1f0', margin:0, letterSpacing:'-0.01em'}}>
+          {lang === 'PT' ? 'Presença' : 'Attendance'}
+        </h2>
+        <div style={{display:'flex', alignItems:'center', gap:12}}>
+          <a href="https://farfromtimnah-hue.github.io/ministry-gifting/service-attendance-form.html"
+            target="_blank" rel="noreferrer"
+            style={{padding:'8px 16px', borderRadius:8, background:'rgba(94,234,212,0.1)', border:'1px solid rgba(94,234,212,0.25)',
+              color:'#5eead4', fontSize:12, fontFamily:"'JetBrains Mono',monospace", fontWeight:600,
+              letterSpacing:'0.12em', textDecoration:'none', textTransform:'uppercase', whiteSpace:'nowrap'}}>
+            {t.attOpenForm} ↗
+          </a>
+          <div style={{width:64, height:64, border:'1px solid rgba(255,255,255,0.12)', borderRadius:8,
+            display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:2,
+            background:'rgba(255,255,255,0.02)'}}>
+            <span style={{fontSize:9, color:'#475a64', fontFamily:"'JetBrains Mono',monospace", letterSpacing:'0.1em'}}>{t.attQrLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2 — Metric cards */}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16}}>
+        {metrics.map(({label, value, accent}) => (
+          <div key={label} className="glass" style={{padding:24, position:'relative', overflow:'hidden', borderRadius:12}}>
+            <div style={{position:'absolute',top:0,left:0,right:0,height:2,
+              background:`linear-gradient(90deg, ${accent}, transparent 60%)`,
+              boxShadow:`0 0 12px ${accent}66`}} />
+            <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:44,
+              color:accent, lineHeight:1, letterSpacing:'-0.02em', textShadow:`0 0 24px ${accent}33`}}>
+              {value}
+            </div>
+            <div style={{...monoSm, color:'#6b7a82', marginTop:10}}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section 3 — Trend chart */}
+      <div className="glass" style={{padding:28, borderRadius:12}}>
+        {sectionTitle(t.attTrend)}
+        <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:20}}>
+          <select value={selectedService} onChange={e => setSelectedService(e.target.value)}
+            style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+              color:'#e6f1f0', borderRadius:8, padding:'7px 12px', fontSize:12,
+              fontFamily:"'JetBrains Mono',monospace", outline:'none', cursor:'pointer'}}>
+            {ALL_SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <div style={{display:'flex', gap:16}}>
+            {[['#534AB7', lang==='PT'?'Templo':'Sanctuary'], ['#1D9E75', lang==='PT'?'Voluntários':'Volunteers'], ...(showKids?[['#D85A30','Kids']]:[])].map(([c,l])=>(
+              <span key={l} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#6b7a82',fontFamily:"'JetBrains Mono',monospace"}}>
+                <span style={{width:16,height:2,borderRadius:1,background:c,display:'inline-block'}} />{l}
+              </span>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={trendData} margin={{top:4,right:8,bottom:4,left:0}}>
+            <XAxis dataKey="date" tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+            <YAxis tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} width={32} />
+            <Tooltip contentStyle={{background:'#0c1a24',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:'#aebac0'}} itemStyle={{color:'#e6f1f0'}} />
+            <Line type="monotone" dataKey="templo" stroke="#534AB7" strokeWidth={2} dot={{r:3,fill:'#534AB7'}} activeDot={{r:5}} name={lang==='PT'?'Templo':'Sanctuary'} />
+            <Line type="monotone" dataKey="volunteers" stroke="#1D9E75" strokeWidth={2} dot={{r:3,fill:'#1D9E75'}} activeDot={{r:5}} name={lang==='PT'?'Voluntários':'Volunteers'} />
+            {showKids && <Line type="monotone" dataKey="kids" stroke="#D85A30" strokeWidth={2} dot={{r:3,fill:'#D85A30'}} activeDot={{r:5}} name="Kids" />}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Section 4 — Two side-by-side bar charts */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+        {/* Left: avg total by service */}
+        <div className="glass" style={{padding:28, borderRadius:12}}>
+          {sectionTitle(t.attByService)}
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={avgByService} layout="vertical" margin={{top:0,right:16,bottom:0,left:0}}>
+              <XAxis type="number" tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="service" width={110} tick={{fill:'#aebac0',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{background:'#0c1a24',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:'#aebac0'}} itemStyle={{color:'#e6f1f0'}} />
+              <Bar dataKey="avg" name={lang==='PT'?'Média':'Avg'} radius={[0,4,4,0]}>
+                {avgByService.map((entry) => {
+                  const c = SERVICE_CHIP_COLORS[entry.service];
+                  return <Cell key={entry.service} fill={c ? c.color.replace(')',',0.7)').replace('rgb','rgba') : '#5eead4'} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Right: volunteer ratio by service */}
+        <div className="glass" style={{padding:28, borderRadius:12}}>
+          {sectionTitle(t.attVolRatio)}
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={volRatioByService} layout="vertical" margin={{top:0,right:16,bottom:0,left:0}}>
+              <XAxis type="number" unit="%" tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="service" width={110} tick={{fill:'#aebac0',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{background:'#0c1a24',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:'#aebac0'}} itemStyle={{color:'#e6f1f0'}} formatter={(v)=>`${v}%`} />
+              <Bar dataKey="ratio" name="Vol%" radius={[0,4,4,0]}>
+                {volRatioByService.map((entry) => (
+                  <Cell key={entry.service} fill={volPctColor(entry.ratio)} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Section 5 — Full log table */}
+      <div className="glass" style={{padding:28, borderRadius:12}}>
+        {sectionTitle(t.attLog)}
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', fontSize:13}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+                {[t.attDate, t.attService, t.attTemplo, t.attVol, t.attKids, t.attTotal, t.attVolPct].map(h => (
+                  <th key={h} style={{...monoSm, color:'#475a64', padding:'6px 12px', textAlign:'left', fontWeight:600}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logRows.map((row, i) => {
+                const pct = row.total > 0 ? Math.round((row.volunteers / row.total) * 100) : 0;
+                return (
+                  <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.03)'}}>
+                    <td style={{padding:'8px 12px', color:'#6b7a82', fontFamily:"'JetBrains Mono',monospace", fontSize:12}}>{row.date}</td>
+                    <td style={{padding:'8px 12px'}}><ServiceChip service={row.service} /></td>
+                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.templo}</td>
+                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.volunteers}</td>
+                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.kids !== null ? row.kids : '—'}</td>
+                    <td style={{padding:'8px 12px', fontWeight:600, color:'#e6f1f0'}}>{row.total}</td>
+                    <td style={{padding:'8px 12px', fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:600, color:volPctColor(pct)}}>{pct}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 function AnalyticsTab({ token, t, lang }) {
   const [data, setData] = useState(null);
 
@@ -5348,6 +5608,7 @@ export default function App() {
 
   const tabs = [
     { id: "analytics", label: t.analytics },
+    ...(effectiveRole === 'pastor' || effectiveRole === 'senior_pastor' || effectiveRole === 'owner' ? [{ id: "attendance", label: t.attendance }] : []),
     { id: "people", label: t.people },
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
@@ -5509,6 +5770,7 @@ export default function App() {
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />}

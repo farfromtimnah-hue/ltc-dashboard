@@ -5529,9 +5529,9 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [navW, setNavW] = useState(window.innerWidth);
+  const [navW, setNavW] = useState(window.innerWidth - 220);
   useEffect(() => {
-    function onResize() { setNavW(window.innerWidth); }
+    function onResize() { setNavW(window.innerWidth - 220); }
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

@@ -5619,7 +5619,7 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1600 ? 0 : navW >= 1100 ? 1 : navW >= 820 ? 2 : 3;
+  const collapseLevel = navW >= 1380 ? 0 : navW >= 900 ? 1 : navW >= 600 ? 2 : 3;
   const tabsInMore    = collapseLevel >= 3;
   const switcherInMore = collapseLevel >= 2;
   const auxInMore     = collapseLevel >= 1;

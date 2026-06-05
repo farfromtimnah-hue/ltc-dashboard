@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import SchedulingPrototype from './SchedulingPrototype';
 
 const API = "https://ltc-api.farfromtimnah.workers.dev";
 
@@ -421,7 +422,7 @@ const L = {
     loginRestricted:"Acesso Restrito",loginEmail:"Email",loginPassword:"Senha",
     loginSignIn:"Entrar",loginSignInGoogle:"Entrar com Google",loginOr:"ou",loginSigningIn:"Entrando...",
     roleOwner:"Desenvolvedor",roleSeniorPastor:"Pastor Sênior",rolePastor:"Pastor",roleGroupLeader:"Líder de Grupo",
-    usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",
+    usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",scheduling:"Agendamento",
     addUser:"Adicionar Usuário",userCreated:"Usuário criado com sucesso.",sendCredentials:"Envie as credenciais via WhatsApp.",
     userRoleSenior:"Pastor Sênior",userRolePastor:"Pastor",userRoleGroupLeader:"Líder de Grupo",
   },
@@ -494,7 +495,7 @@ const L = {
     loginRestricted:"Restricted Access",loginEmail:"Email",loginPassword:"Password",
     loginSignIn:"Sign In",loginSignInGoogle:"Sign in with Google",loginOr:"or",loginSigningIn:"Signing in...",
     roleOwner:"Developer",roleSeniorPastor:"Senior Pastor",rolePastor:"Pastor",roleGroupLeader:"Group Leader",
-    usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",
+    usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",scheduling:"Scheduling",
     addUser:"Add User",userCreated:"User created successfully.",sendCredentials:"Send credentials via WhatsApp.",
     userRoleSenior:"Senior Pastor",userRolePastor:"Pastor",userRoleGroupLeader:"Group Leader",
   }
@@ -5351,6 +5352,7 @@ export default function App() {
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
+    { id: "scheduling", label: t.scheduling },
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
@@ -5515,6 +5517,7 @@ export default function App() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "scheduling" && <SchedulingPrototype />}
         {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
 

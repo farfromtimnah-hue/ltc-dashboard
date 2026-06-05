@@ -5619,7 +5619,7 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1600 ? 0 : navW >= 1400 ? 1 : 3;
+  const collapseLevel = navW >= 1600 ? 0 : navW >= 1100 ? 1 : navW >= 820 ? 2 : 3;
   const tabsInMore    = collapseLevel >= 3;
   const switcherInMore = collapseLevel >= 2;
   const auxInMore     = collapseLevel >= 1;
@@ -5645,7 +5645,7 @@ export default function App() {
             <nav style={{display:"flex",gap:4,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
               {tabs.map(t2=>(
                 <button key={t2.id} onClick={()=>setTab(t2.id)}
-                  style={{background:"transparent",border:"none",padding:"4px 8px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:11,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.03em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
+                  style={{background:"transparent",border:"none",padding:"6px 8px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
                   onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
                   onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
                   {t2.label}

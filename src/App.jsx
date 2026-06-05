@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -5529,11 +5529,17 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [navW, setNavW] = useState(window.innerWidth - 220);
+  const navRef = useRef(null);
+  const [navW, setNavW] = useState(800);
   useEffect(() => {
-    function onResize() { setNavW(window.innerWidth - 220); }
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    if (!navRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setNavW(entry.contentRect.width);
+      }
+    });
+    observer.observe(navRef.current);
+    return () => observer.disconnect();
   }, []);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -5619,7 +5625,7 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1380 ? 0 : navW >= 900 ? 1 : navW >= 600 ? 2 : 3;
+  const collapseLevel = navW >= 1100 ? 0 : navW >= 800 ? 1 : navW >= 500 ? 2 : 3;
   const tabsInMore    = collapseLevel >= 3;
   const switcherInMore = collapseLevel >= 2;
   const auxInMore     = collapseLevel >= 1;
@@ -5630,7 +5636,7 @@ export default function App() {
       <style>{css}</style>
 
       {/* Nav — Priority+ pattern */}
-      <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
+      <div ref={navRef} className="nav" style={{position:"sticky",top:0,zIndex:50}}>
         <div style={{maxWidth:1600,margin:"0 auto",padding:"12px 32px",display:"flex",alignItems:"center",gap:16}}>
 
           {/* Left: Logo (always) + title (collapses at level 1) */}
@@ -5645,7 +5651,7 @@ export default function App() {
             <nav style={{display:"flex",gap:4,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
               {tabs.map(t2=>(
                 <button key={t2.id} onClick={()=>setTab(t2.id)}
-                  style={{background:"transparent",border:"none",padding:"6px 8px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
+                  style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
                   onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
                   onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
                   {t2.label}

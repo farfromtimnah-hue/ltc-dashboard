@@ -5529,16 +5529,16 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const navRef = useRef(null);
-  const [navW, setNavW] = useState(800);
+  const tabStripRef = useRef(null);
+  const [tabStripW, setTabStripW] = useState(600);
   useEffect(() => {
-    if (!navRef.current) return;
+    if (!tabStripRef.current) return;
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        setNavW(entry.contentRect.width);
+        setTabStripW(entry.contentRect.width);
       }
     });
-    observer.observe(navRef.current);
+    observer.observe(tabStripRef.current);
     return () => observer.disconnect();
   }, []);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
@@ -5625,148 +5625,113 @@ export default function App() {
 
   // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
   // 2=also switcher in More, 3=also tabs in More
-  const collapseLevel = navW >= 1100 ? 0 : navW >= 800 ? 1 : navW >= 500 ? 2 : 3;
-  const tabsInMore    = collapseLevel >= 3;
-  const switcherInMore = collapseLevel >= 2;
-  const auxInMore     = collapseLevel >= 1;
-  const showMore      = collapseLevel > 0;
+  // Per-tab overflow: measure only the tab strip container width.
+  // TAB_BTN_W: estimated px per tab button (font 12px, 0.08em tracking, padding 6/10,
+  // "Ministry Health" is the longest label ~130px; use 120px average + gap).
+  const TAB_BTN_W = 120;
+  const TAB_GAP   = 4;
+  const MORE_BTN_W = 88; // "More ▾" button reserved width
+  // How many tabs fit in the strip? If not all fit, reserve MORE_BTN_W.
+  const allFit = tabs.length * (TAB_BTN_W + TAB_GAP) <= tabStripW;
+  const availForTabs = allFit ? tabStripW : tabStripW - MORE_BTN_W;
+  const maxVisible = allFit ? tabs.length : Math.max(0, Math.floor(availForTabs / (TAB_BTN_W + TAB_GAP)));
+  const visibleTabs  = tabs.slice(0, maxVisible);
+  const overflowTabs = tabs.slice(maxVisible);
+  const hasOverflow  = overflowTabs.length > 0;
+
+  // Aux items (gear, logout, view switcher) always go in More — keeps fixed regions lean.
+  // They appear in the More dropdown alongside any overflow tabs.
+  const showMore = true; // More button always present (contains aux + possibly overflow tabs)
 
   return (
     <div className="app" style={{minHeight:"100vh"}}>
       <style>{css}</style>
 
-      {/* Nav — Priority+ pattern */}
-      <div ref={navRef} className="nav" style={{position:"sticky",top:0,zIndex:50}}>
-        <div style={{maxWidth:1600,margin:"0 auto",padding:"12px 32px",display:"flex",alignItems:"center",gap:16}}>
+      {/* Nav — four fixed regions: [Logo] [TabStrip→flex:1] [LangToggle] [More] */}
+      <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
+        <div style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:0,height:52}}>
 
-          {/* Left: Logo (always) + title (collapses at level 1) */}
-          <div style={{display:"flex",alignItems:"center",gap:16,flexShrink:0}}>
-            <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block"}} />
-            {!auxInMore && <div style={{width:1,height:28,background:"rgba(255,255,255,0.04)"}} />}
-            {!auxInMore && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>}
+          {/* Region 1 — Logo/brand: never shrinks, never collapses */}
+          <div style={{display:"flex",alignItems:"center",gap:12,flex:"0 0 auto",paddingRight:16}}>
+            <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block",flexShrink:0}} />
+            <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
+            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap",flexShrink:0}}>{t.dashboard}</span>
           </div>
 
-          {/* Center: Tab nav (collapses at level 3) */}
-          {!tabsInMore && (
-            <nav style={{display:"flex",gap:4,alignItems:"center",flex:1,justifyContent:"center",minWidth:0}}>
-              {tabs.map(t2=>(
-                <button key={t2.id} onClick={()=>setTab(t2.id)}
-                  style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
-                  onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
-                  onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
-                  {t2.label}
-                  {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
-                </button>
-              ))}
-            </nav>
-          )}
+          {/* Region 2 — Collapsible tab strip: flex:1, min-width:0, observed by ResizeObserver */}
+          <div ref={tabStripRef} style={{flex:"1 1 0",minWidth:0,display:"flex",alignItems:"center",gap:TAB_GAP,overflow:"hidden",position:"relative"}}>
+            {visibleTabs.map(t2=>(
+              <button key={t2.id} onClick={()=>setTab(t2.id)}
+                style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
+                onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
+                onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
+                {t2.label}
+                {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
+              </button>
+            ))}
+          </div>
 
-          {/* Right cluster */}
-          <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:"auto"}}>
-
-            {/* Lang toggle — always visible */}
+          {/* Region 3 — Lang toggle: pinned, always visible */}
+          <div style={{flex:"0 0 auto",paddingLeft:12}}>
             <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
               <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
               <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
             </div>
-
-            {/* View switcher — in nav at levels 0-1, collapses at level 2 */}
-            {!switcherInMore && (role === 'owner' || role === 'pastor') && (
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}
-                  style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"#aebac0",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
-                  <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
-                  {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
-                  {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
-                  <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
-                </select>
-                {viewMode==='group_leader'&&(
-                  <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}
-                    style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(94,234,212,0.25)",color:glGroup?"#5eead4":"#6b7a82",borderRadius:8,padding:"5px 10px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",outline:"none"}}>
-                    <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-                    {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-                  </select>
-                )}
-              </div>
-            )}
-
-            {/* Gear — in nav at level 0, collapses at level 1 */}
-            {!auxInMore && (
-              <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost"
-                style={{padding:"8px 10px",borderRadius:8,fontSize:15,lineHeight:1,color:"#aebac0"}}>
-                ⚙️
-              </button>
-            )}
-
-            {/* Logout — in nav at level 0, collapses at level 1 */}
-            {!auxInMore && (
-              <button onClick={()=>signOut(auth)} className="btn-ghost"
-                style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:6}}>
-                ↪ {t.logout}
-              </button>
-            )}
-
-            {/* More button — appears when anything has collapsed (level >= 1) */}
-            {showMore && (
-              <div style={{position:"relative"}}>
-                <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
-                  style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
-                  {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
-                </button>
-                {moreOpen && (
-                  <>
-                    <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
-                    <div className="pp-dropdown">
-
-                      {/* 1. Tabs (level 3) */}
-                      {tabsInMore && tabs.map(t2=>(
-                        <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
-                          onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
-                          {t2.label}
-                        </button>
-                      ))}
-
-                      {/* 2. View switcher (level 2+) */}
-                      {switcherInMore && (role==='owner'||role==='pastor') && (
-                        <>
-                          {tabsInMore && <div className="pp-divider"/>}
-                          <div className="pp-sub">
-                            <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
-                              <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
-                              {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
-                              {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
-                              <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
-                            </select>
-                            {viewMode==='group_leader'&&(
-                              <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
-                                <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-                                {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-                              </select>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {/* 3-5. Gear + Logout (level 1+) */}
-                      {auxInMore && (
-                        <>
-                          {(tabsInMore||switcherInMore) && <div className="pp-divider"/>}
-                          <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>
-                            &#9881; {t.settings}
-                          </button>
-                          <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>
-                            &#8618; {t.logout}
-                          </button>
-                        </>
-                      )}
-
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
           </div>
+
+          {/* Region 4 — More button: pinned, contains overflow tabs + aux (gear, logout, switcher) */}
+          <div style={{flex:"0 0 auto",paddingLeft:8,position:"relative"}}>
+            <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
+              style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+              {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
+            </button>
+            {moreOpen && (
+              <>
+                <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                <div className="pp-dropdown">
+
+                  {/* Overflow tabs */}
+                  {overflowTabs.map(t2=>(
+                    <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
+                      onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
+                      {t2.label}
+                    </button>
+                  ))}
+
+                  {/* Divider between overflow tabs and aux, only when both present */}
+                  {overflowTabs.length > 0 && <div className="pp-divider"/>}
+
+                  {/* View switcher (owner/pastor only) */}
+                  {(role==='owner'||role==='pastor') && (
+                    <div className="pp-sub">
+                      <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
+                        <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
+                        {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
+                        {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
+                        <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
+                      </select>
+                      {viewMode==='group_leader'&&(
+                        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
+                          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+                          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Gear + Logout */}
+                  <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>
+                    &#9881; {t.settings}
+                  </button>
+                  <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>
+                    &#8618; {t.logout}
+                  </button>
+
+                </div>
+              </>
+            )}
+          </div>
+
         </div>
       </div>
 

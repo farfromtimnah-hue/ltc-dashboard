@@ -4172,8 +4172,8 @@ function MinistryHealthTab({ token, role, t, lang }) {
 
   function toggleExpand(ministry) {
     setExpandedCards(function(prev) {
-      var next = new Set(prev);
-      if (next.has(ministry)) { next.delete(ministry); } else { next.add(ministry); }
+      var next = new Set();
+      if (!prev.has(ministry)) next.add(ministry);
       return next;
     });
   }
@@ -4391,7 +4391,7 @@ function MinistryHealthTab({ token, role, t, lang }) {
           </div>
 
           {/* Ministry cards */}
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14,alignItems:"start"}}>
             {mhList.map(function(card) {
               var isExpanded = expandedCards.has(card.ministry);
               var sc = mhStatusColor(card.card_status);
@@ -4402,10 +4402,11 @@ function MinistryHealthTab({ token, role, t, lang }) {
               var healthyPos = positions.filter(function(p) { return p.status === 'healthy'; }).length;
               var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
               var alertNote = posAlerts[card.ministry] || null;
+              var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
 
               return (
                 <div key={card.ministry} className="glass"
-                  style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc}}>
+                  style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc,cursor:'pointer'}}>
 
                   {/* Clickable header area */}
                   <div onClick={function(){toggleExpand(card.ministry);}}
@@ -4434,23 +4435,17 @@ function MinistryHealthTab({ token, role, t, lang }) {
                     <div style={{display:'flex',alignItems:'center',gap:8}} onClick={function(e){e.stopPropagation();}}>
                       <span style={{fontSize:12,color:'#6b7a82'}}>
                         {lang==='PT'?'Lider':'Leader'}{': '}
-                        <span style={{color:card.leader_name?'#aebac0':'#475a64'}}>
-                          {card.leader_name||(lang==='PT'?'Nao definido':'Not set')}
+                        <span style={{color:leaderName?'#aebac0':'#475a64'}}>
+                          {leaderName||(lang==='PT'?'Nao definido':'Not set')}
                         </span>
                       </span>
-                      {card.leader_whatsapp ? (
+                      {card.leader_whatsapp && (
                         <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
                           target="_blank" rel="noopener noreferrer"
                           style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
                             background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
                           WhatsApp
                         </a>
-                      ) : (
-                        <span style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
-                          background:'rgba(255,255,255,0.04)',color:'#475a64',fontSize:11,fontWeight:600,flexShrink:0,
-                          border:'1px solid rgba(255,255,255,0.06)'}}>
-                          WhatsApp
-                        </span>
                       )}
                     </div>
 

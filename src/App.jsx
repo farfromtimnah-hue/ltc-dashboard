@@ -4097,6 +4097,20 @@ function mhSortOrder(status) {
   return 3;
 }
 
+function mhStatusColor(s) {
+  if (s === 'critical') return '#C0392B';
+  if (s === 'needs_volunteers') return '#E67E22';
+  if (s === 'healthy') return '#27AE60';
+  return '#555555';
+}
+
+function mhStatusLabel(s, l) {
+  if (s === 'critical') return l === 'PT' ? 'CRITICO' : 'CRITICAL';
+  if (s === 'needs_volunteers') return l === 'PT' ? 'PRECISA DE VOLUNTARIOS' : 'NEEDS VOLUNTEERS';
+  if (s === 'healthy') return l === 'PT' ? 'SAUDAVEL' : 'HEALTHY';
+  return l === 'PT' ? 'SEM DADOS' : 'NO DATA';
+}
+
 function SurveyModal({ ministry, token, lang, onClose }) {
   var [rows, setRows] = useState([]);
   useEffect(function() {
@@ -4365,20 +4379,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
       })
       .catch(function() { setCsvMsg(lang==="PT"?"Erro ao importar":"Import error"); })
       .finally(function() { setCsvImporting(false); });
-  }
-
-  function mhStatusColor(s) {
-    if (s === 'critical') return '#C0392B';
-    if (s === 'needs_volunteers') return '#E67E22';
-    if (s === 'healthy') return '#27AE60';
-    return '#555555';
-  }
-
-  function mhStatusLabel(s, l) {
-    if (s === 'critical') return l === 'PT' ? 'CRITICO' : 'CRITICAL';
-    if (s === 'needs_volunteers') return l === 'PT' ? 'PRECISA DE VOLUNTARIOS' : 'NEEDS VOLUNTEERS';
-    if (s === 'healthy') return l === 'PT' ? 'SAUDAVEL' : 'HEALTHY';
-    return l === 'PT' ? 'SEM DADOS' : 'NO DATA';
   }
 
   var healthy = mhList.filter(function(c) { return c.card_status === 'healthy'; }).length;

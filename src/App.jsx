@@ -4125,12 +4125,139 @@ function SurveyModal({ ministry, token, lang, onClose }) {
   );
 }
 
+function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes, posAlerts, onClose }) {
+  var isOwnerRole = role === 'owner';
+  var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
+  var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
+  var displayName = lang === 'PT' ? ptName : card.ministry;
+  var sc = mhStatusColor(card.card_status);
+  var sl = mhStatusLabel(card.card_status, lang);
+  var positions = card.positions || [];
+  var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
+  var alertNote = posAlerts[card.ministry] || null;
+  var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:100,
+      display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 16px 60px'}}
+      onClick={onClose}>
+      <div style={{background:'#08121a',border:'1px solid rgba(94,234,212,0.15)',borderRadius:16,
+        width:'100%',maxWidth:640,padding:'28px 32px',position:'relative',flexShrink:0}}
+        onClick={function(e){e.stopPropagation();}}>
+
+        {/* Modal header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:22,gap:12}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}}>
+              <h2 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color:'#e6f1f0'}}>
+                {displayName}
+              </h2>
+              <span style={{fontSize:10,padding:'3px 10px',background:sc+'22',color:sc,
+                borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
+                fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em'}}>
+                {sl}
+              </span>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,color:'#6b7a82'}}>
+                {lang==='PT'?'Lider':'Leader'}{': '}
+                <span style={{color:leaderName?'#aebac0':'#475a64'}}>
+                  {leaderName||(lang==='PT'?'Nao definido':'Not set')}
+                </span>
+              </span>
+              {card.leader_whatsapp && (
+                <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{display:'inline-flex',alignItems:'center',padding:'4px 12px',borderRadius:6,
+                    background:'#25D366',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none'}}>
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',
+              color:'#aebac0',cursor:'pointer',fontSize:12,fontWeight:600,borderRadius:7,
+              padding:'6px 14px',flexShrink:0,fontFamily:'inherit'}}>
+            {lang==='PT'?'Fechar':'Close'}
+          </button>
+        </div>
+
+        {/* Section 1: Position Health */}
+        <div style={{marginBottom:24}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.14em',
+            textTransform:'uppercase',color:'#6b7a82',marginBottom:14}}>
+            {lang==='PT'?'Saude por Funcao':'Position Health'}
+          </div>
+          <div style={{display:'flex',flexDirection:'column'}}>
+            {positions.map(function(pos) {
+              var actual = (pos.actual_count_form || 0) + (pos.actual_count_system || 0);
+              var pct = pos.ideal_count > 0 ? Math.min(actual / pos.ideal_count, 1) : 0;
+              var pc = mhStatusColor(pos.status);
+              var posName = lang === 'PT' ? pos.position_name_pt : pos.position_name;
+              var hasData = actual > 0 || pos.min_count > 0;
+              return (
+                <div key={pos.position_name}
+                  style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                    <span style={{fontSize:13,color:'#e6f1f0',fontWeight:500}}>{posName}</span>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginLeft:12}}>
+                      <span style={{fontSize:11,color:'#aebac0',whiteSpace:'nowrap'}}>
+                        {hasData ? actual : '--'} / {pos.min_count} min | {pos.ideal_count} ideal
+                      </span>
+                      <span style={{width:8,height:8,borderRadius:'50%',background:pc,display:'inline-block',flexShrink:0}}/>
+                    </div>
+                  </div>
+                  <div style={{height:8,background:'rgba(255,255,255,0.06)',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:(pct*100)+'%',background:pc,borderRadius:4,transition:'width 0.3s'}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {isOwnerRole && alertNote && (
+            <div style={{marginTop:14,padding:'10px 14px',borderRadius:8,
+              background:'rgba(230,126,34,0.1)',border:'1px solid rgba(230,126,34,0.25)'}}>
+              <span style={{color:'#E67E22',fontSize:12,fontWeight:600}}>
+                {lang==='PT'?'Lider reportou funcoes nao listadas: ':'Leader reported unlisted roles: '}
+              </span>
+              <span style={{color:'#aebac0',fontSize:12}}>{alertNote}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Coaching notes (pastor/owner only) */}
+        {isPastorRole && (
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.14em',
+              textTransform:'uppercase',color:'#6b7a82',marginBottom:10}}>
+              {lang==='PT'?'Notas Pastorais':'Pastoral Notes'}
+            </div>
+            <textarea
+              value={notes}
+              placeholder={lang==='PT'?'Notas pastorais sobre este ministerio...':'Pastoral notes about this ministry...'}
+              onChange={function(e) {
+                var v = e.target.value;
+                setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.ministry]=v; return n; });
+              }}
+              onBlur={function(e) { saveNotes(card.ministry, e.target.value); }}
+              rows={3}
+              style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.04)',
+                border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,color:'#aebac0',
+                fontSize:13,padding:'10px 12px',resize:'vertical',fontFamily:'inherit',outline:'none'}} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MinistryHealthTab({ token, role, t, lang }) {
   var [mhList, setMhList] = useState([]);
   var [loading, setLoading] = useState(true);
   var [savingNotes, setSavingNotes] = useState({});
   var [localNotes, setLocalNotes] = useState({});
-  var [expandedCards, setExpandedCards] = useState(new Set());
+  var [modalMinistry, setModalMinistry] = useState(null);
   var [posAlerts, setPosAlerts] = useState({});
   var [surveyModal, setSurveyModal] = useState(null);
   var [otherFlags, setOtherFlags] = useState([]);
@@ -4169,14 +4296,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
   }
 
   useEffect(function() { loadMH(); }, []);
-
-  function toggleExpand(ministry) {
-    setExpandedCards(function(prev) {
-      var next = new Set();
-      if (!prev.has(ministry)) next.add(ministry);
-      return next;
-    });
-  }
 
   function saveNotes(ministryName, notes) {
     setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=true; return n; });
@@ -4393,136 +4512,76 @@ function MinistryHealthTab({ token, role, t, lang }) {
           {/* Ministry cards */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14,alignItems:"start"}}>
             {mhList.map(function(card) {
-              var isExpanded = expandedCards.has(card.ministry);
               var sc = mhStatusColor(card.card_status);
               var sl = mhStatusLabel(card.card_status, lang);
               var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
               var displayName = lang === 'PT' ? ptName : card.ministry;
               var positions = card.positions || [];
               var healthyPos = positions.filter(function(p) { return p.status === 'healthy'; }).length;
-              var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
-              var alertNote = posAlerts[card.ministry] || null;
               var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
 
               return (
                 <div key={card.ministry} className="glass"
-                  style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc,cursor:'pointer'}}>
+                  onClick={function(){setModalMinistry(card);}}
+                  style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc,
+                    cursor:'pointer',padding:'18px 20px',display:'flex',flexDirection:'column',gap:10}}>
 
-                  {/* Clickable header area */}
-                  <div onClick={function(){toggleExpand(card.ministry);}}
-                    style={{padding:'16px 20px 12px',cursor:'pointer',display:'flex',flexDirection:'column',gap:10}}>
-
-                    {/* Row 1: name + badge + chevron */}
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:'#e6f1f0'}}>
-                        {displayName}
-                      </h3>
-                      <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginLeft:8}}>
-                        <span style={{fontSize:9,padding:'3px 9px',background:sc+'22',color:sc,
-                          borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
-                          fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em'}}>
-                          {sl}
-                        </span>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-                          style={{flexShrink:0,transition:'transform 0.2s',color:'#6b7a82',
-                            transform:isExpanded?'rotate(180deg)':'rotate(0deg)'}}>
-                          <path d="M2 5l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* Row 2: leader + whatsapp */}
-                    <div style={{display:'flex',alignItems:'center',gap:8}} onClick={function(e){e.stopPropagation();}}>
-                      <span style={{fontSize:12,color:'#6b7a82'}}>
-                        {lang==='PT'?'Lider':'Leader'}{': '}
-                        <span style={{color:leaderName?'#aebac0':'#475a64'}}>
-                          {leaderName||(lang==='PT'?'Nao definido':'Not set')}
-                        </span>
-                      </span>
-                      {card.leader_whatsapp && (
-                        <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
-                          target="_blank" rel="noopener noreferrer"
-                          style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
-                            background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
-                          WhatsApp
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Row 3: summary */}
-                    <div style={{fontSize:12,color:'#6b7a82'}}>
-                      <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
-                      {' / '}{positions.length}
-                      {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
-                    </div>
+                  {/* Row 1: name + badge */}
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:'#e6f1f0'}}>
+                      {displayName}
+                    </h3>
+                    <span style={{fontSize:9,padding:'3px 9px',background:sc+'22',color:sc,
+                      borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
+                      fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em',flexShrink:0,marginLeft:8}}>
+                      {sl}
+                    </span>
                   </div>
 
-                  {/* Coaching notes — always visible, pastor/owner only */}
-                  {isPastorRole && (
-                    <div style={{padding:'0 20px 12px'}} onClick={function(e){e.stopPropagation();}}>
-                      <textarea
-                        value={notes}
-                        placeholder={lang==="PT"?"Notas pastorais sobre este ministerio...":"Pastoral notes about this ministry..."}
-                        onChange={function(e) {
-                          var v = e.target.value;
-                          setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.ministry]=v; return n; });
-                        }}
-                        onBlur={function(e) { saveNotes(card.ministry, e.target.value); }}
-                        rows={2}
-                        style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.03)',
-                          border:'1px solid rgba(255,255,255,0.06)',borderRadius:7,color:'#aebac0',
-                          fontSize:12,padding:'7px 10px',resize:'vertical',fontFamily:'inherit',outline:'none'}} />
-                    </div>
-                  )}
+                  {/* Row 2: leader + whatsapp */}
+                  <div style={{display:'flex',alignItems:'center',gap:8}} onClick={function(e){e.stopPropagation();}}>
+                    <span style={{fontSize:12,color:'#6b7a82'}}>
+                      {lang==='PT'?'Lider':'Leader'}{': '}
+                      <span style={{color:leaderName?'#aebac0':'#475a64'}}>
+                        {leaderName||(lang==='PT'?'Nao definido':'Not set')}
+                      </span>
+                    </span>
+                    {card.leader_whatsapp && (
+                      <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
+                        target="_blank" rel="noopener noreferrer"
+                        onClick={function(e){e.stopPropagation();}}
+                        style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
+                          background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
+                        WhatsApp
+                      </a>
+                    )}
+                  </div>
 
-                  {/* Expanded position rows */}
-                  {isExpanded && (
-                    <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',padding:'12px 20px 16px',
-                      display:'flex',flexDirection:'column',gap:0}}>
-                      {positions.map(function(pos) {
-                        var actual = (pos.actual_count_form || 0) + (pos.actual_count_system || 0);
-                        var pct = pos.ideal_count > 0 ? Math.min(actual / pos.ideal_count, 1) : 0;
-                        var pc = mhStatusColor(pos.status);
-                        var posName = lang === 'PT' ? pos.position_name_pt : pos.position_name;
-                        var hasData = actual > 0 || pos.min_count > 0;
-                        return (
-                          <div key={pos.position_name}
-                            style={{padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-                              <span style={{fontSize:13,color:'#e6f1f0',fontWeight:500,marginRight:8}}>{posName}</span>
-                              <div style={{display:'flex',alignItems:'center',gap:7,flexShrink:0}}>
-                                <span style={{fontSize:11,color:'#aebac0',whiteSpace:'nowrap'}}>
-                                  {hasData ? actual : '--'} / {pos.min_count} min | {pos.ideal_count} ideal
-                                </span>
-                                <span style={{width:8,height:8,borderRadius:'50%',background:pc,
-                                  display:'inline-block',flexShrink:0}}/>
-                              </div>
-                            </div>
-                            <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}>
-                              <div style={{height:'100%',width:(pct*100)+'%',background:pc,borderRadius:3,
-                                transition:'width 0.3s'}}/>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Custom positions alert (owner only) */}
-                      {isOwnerRole && alertNote && (
-                        <div style={{marginTop:12,padding:'10px 12px',borderRadius:8,
-                          background:'rgba(230,126,34,0.1)',border:'1px solid rgba(230,126,34,0.25)'}}>
-                          <span style={{color:'#E67E22',fontSize:12,fontWeight:600}}>
-                            {lang==='PT'?'Lider reportou funcoes nao listadas: ':'Leader reported unlisted roles: '}
-                          </span>
-                          <span style={{color:'#aebac0',fontSize:12}}>{alertNote}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Row 3: summary */}
+                  <div style={{fontSize:12,color:'#6b7a82'}}>
+                    <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
+                    {' / '}{positions.length}
+                    {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
+                  </div>
                 </div>
               );
             })}
           </div>
         </>
+      )}
+
+      {/* Ministry modal */}
+      {modalMinistry && (
+        <MinistryModal
+          card={modalMinistry}
+          lang={lang}
+          role={role}
+          localNotes={localNotes}
+          setLocalNotes={setLocalNotes}
+          saveNotes={saveNotes}
+          posAlerts={posAlerts}
+          onClose={function(){setModalMinistry(null);}}
+        />
       )}
 
       {/* Survey modal */}

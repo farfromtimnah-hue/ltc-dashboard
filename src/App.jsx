@@ -4055,26 +4055,27 @@ const MH_GIFTING_MAP = {
 };
 
 const MH_MINISTRY_PT = {
-  "Worship Team":"Ministerio de Louvor",
+  "Worship Team":"Equipe de Louvor",
   "Sound":"Som",
   "Lighting":"Luz",
   "Projection":"Projecao",
   "Streaming":"Transmissao",
   "Photo & Video":"Foto e Video",
   "Social Media":"Midias Sociais",
+  "Stage Crew":"Palco",
   "Service Experience":"Experiencia do Culto",
   "Consolidation":"Consolidacao",
   "Translation":"Traducao",
   "Lagoinha Kids":"Lagoinha Kids",
   "Intercession":"Intercessao",
   "Volunteer Coffee":"Cafe dos Voluntarios",
-  "Hospitality - Welcome":"Recepcao",
+  "Welcome":"Recepcao",
   "Parking":"Estacionamento",
   "Setup & Teardown":"Montagem",
   "WE CARE":"WE CARE",
   "GC Leader":"Lider de GC",
   "Art Factory":"Art Factory",
-  "Decoracao":"Decoracao",
+  "Decoration":"Decoracao",
   "Diaconia":"Diaconia",
   "Esportes":"Esportes",
   "Eventos":"Eventos",
@@ -4125,14 +4126,15 @@ function SurveyModal({ ministry, token, lang, onClose }) {
 }
 
 function MinistryHealthTab({ token, role, t, lang }) {
-  var [mhData, setMhData] = useState({});
+  var [mhList, setMhList] = useState([]);
   var [loading, setLoading] = useState(true);
   var [savingNotes, setSavingNotes] = useState({});
   var [localNotes, setLocalNotes] = useState({});
+  var [expandedCards, setExpandedCards] = useState(new Set());
+  var [posAlerts, setPosAlerts] = useState({});
   var [surveyModal, setSurveyModal] = useState(null);
   var [otherFlags, setOtherFlags] = useState([]);
   var [showOtherFlags, setShowOtherFlags] = useState(false);
-  // CSV import state
   var [csvRows, setCsvRows] = useState(null);
   var [csvMapping, setCsvMapping] = useState({});
   var [csvHeaders, setCsvHeaders] = useState([]);
@@ -4140,26 +4142,41 @@ function MinistryHealthTab({ token, role, t, lang }) {
   var [csvMsg, setCsvMsg] = useState(null);
 
   var isOwnerRole = role === 'owner';
+  var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
 
   function loadMH() {
     setLoading(true);
     fetch(MH_API + '/ministry-health', { headers: { Authorization: 'Bearer ' + token } })
       .then(function(r) { return r.json(); })
-      .then(function(rows) {
-        var map = {};
-        var flags = [];
-        (rows || []).forEach(function(row) {
-          map[row.ministry_name] = row;
-          if (row.ministry_other_flag) flags.push(row.ministry_other_flag);
-        });
-        setMhData(map);
-        setOtherFlags(flags);
+      .then(function(list) {
+        setMhList(Array.isArray(list) ? list : []);
       })
-      .catch(function() {})
+      .catch(function() { setMhList([]); })
       .finally(function() { setLoading(false); });
+
+    if (isOwnerRole) {
+      fetch(MH_API + '/ministry-positions-alert', { headers: { Authorization: 'Bearer ' + token } })
+        .then(function(r) { return r.json(); })
+        .then(function(rows) {
+          var map = {};
+          (rows || []).forEach(function(row) {
+            if (!map[row.ministry]) map[row.ministry] = row.custom_positions_notes;
+          });
+          setPosAlerts(map);
+        })
+        .catch(function() {});
+    }
   }
 
   useEffect(function() { loadMH(); }, []);
+
+  function toggleExpand(ministry) {
+    setExpandedCards(function(prev) {
+      var next = new Set(prev);
+      if (next.has(ministry)) { next.delete(ministry); } else { next.add(ministry); }
+      return next;
+    });
+  }
 
   function saveNotes(ministryName, notes) {
     setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=true; return n; });
@@ -4172,7 +4189,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
     });
   }
 
-  // Parse CSV helper
   function parseCSV(text) {
     var lines = text.trim().split('\n');
     if (lines.length < 2) return { headers: [], rows: [] };
@@ -4220,11 +4236,11 @@ function MinistryHealthTab({ token, role, t, lang }) {
       body: JSON.stringify(items),
     })
       .then(function(r) { return r.json(); })
-      .then(function(data) {
+      .then(function() {
         var mSet = new Set(items.map(function(i) { return i.ministry_name; }));
-        setCsvMsg((lang==="PT"
+        setCsvMsg(lang==="PT"
           ? items.length + ' respostas importadas para ' + mSet.size + ' ministerio(s)'
-          : items.length + ' responses imported for ' + mSet.size + ' ministr' + (mSet.size===1?'y':'ies')));
+          : items.length + ' responses imported for ' + mSet.size + ' ministr' + (mSet.size===1?'y':'ies'));
         setCsvRows(null); setCsvHeaders([]); setCsvMapping({});
         loadMH();
       })
@@ -4232,26 +4248,23 @@ function MinistryHealthTab({ token, role, t, lang }) {
       .finally(function() { setCsvImporting(false); });
   }
 
-  // Compute cards
-  var cards = MH_MINISTRIES.map(function(name) {
-    var row = mhData[name] || {};
-    var assessed = row.actual_count_assessed || 0;
-    var reported = row.actual_count_form || 0;
-    var total = assessed + reported;
-    var minCount = row.min_count !== undefined ? row.min_count : null;
-    var idealCount = row.ideal_count || null;
-    var status = mhStatusBadge(total, minCount, idealCount);
-    var leaderName = row.leader_preferred_name || MH_DEFAULT_LEADERS[name] || null;
-    var whatsapp = row.leader_whatsapp || null;
-    var notes = localNotes[name] !== undefined ? localNotes[name] : (row.coaching_notes || '');
-    var surveyCount = row.survey_count || 0;
-    var giftingKey = MH_GIFTING_MAP[name];
-    return { name, row, assessed, reported, total, minCount, idealCount, status, leaderName, whatsapp, notes, surveyCount, giftingKey };
-  }).sort(function(a, b) { return mhSortOrder(a.status) - mhSortOrder(b.status); });
+  function mhStatusColor(s) {
+    if (s === 'critical') return '#C0392B';
+    if (s === 'needs_volunteers') return '#E67E22';
+    if (s === 'healthy') return '#27AE60';
+    return '#555555';
+  }
 
-  var healthy = cards.filter(function(c) { return c.status.label === 'Healthy'; }).length;
-  var needs = cards.filter(function(c) { return c.status.label === 'Needs Volunteers'; }).length;
-  var critical = cards.filter(function(c) { return c.status.label === 'Critical'; }).length;
+  function mhStatusLabel(s, l) {
+    if (s === 'critical') return l === 'PT' ? 'CRITICO' : 'CRITICAL';
+    if (s === 'needs_volunteers') return l === 'PT' ? 'PRECISA DE VOLUNTARIOS' : 'NEEDS VOLUNTEERS';
+    if (s === 'healthy') return l === 'PT' ? 'SAUDAVEL' : 'HEALTHY';
+    return l === 'PT' ? 'SEM DADOS' : 'NO DATA';
+  }
+
+  var healthy = mhList.filter(function(c) { return c.card_status === 'healthy'; }).length;
+  var needs = mhList.filter(function(c) { return c.card_status === 'needs_volunteers'; }).length;
+  var critical = mhList.filter(function(c) { return c.card_status === 'critical'; }).length;
 
   var whatsappTemplatePT = 'Oi! Tudo bem? Preparei um formulario rapido sobre o seu ministerio e seria muito valioso ter a sua visao. Leva menos de 1 minuto. ' + FORM_LINK;
   var whatsappTemplateEN = 'Hi! How are you doing? I put together a quick form about your ministry and your input would mean a lot. It takes less than a minute. ' + FORM_LINK;
@@ -4260,7 +4273,7 @@ function MinistryHealthTab({ token, role, t, lang }) {
   return (
     <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
 
-      {/* ── Other flags notice (owner only) ── */}
+      {/* Other flags notice (owner only) */}
       {isOwnerRole && otherFlags.length > 0 && (
         <div style={{padding:"12px 18px",borderRadius:10,background:"rgba(243,156,18,0.08)",border:"1px solid rgba(243,156,18,0.25)",cursor:"pointer"}}
           onClick={function(){setShowOtherFlags(!showOtherFlags);}}>
@@ -4279,9 +4292,9 @@ function MinistryHealthTab({ token, role, t, lang }) {
         </div>
       )}
 
-      {/* ── Top actions ── */}
+      {/* Top actions */}
       <div style={{display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start"}}>
-        {/* Send Form button */}
+        {/* Send Form button — unchanged */}
         <a href={'https://wa.me/?text=' + encodeURIComponent(sendFormMsg)}
           target="_blank" rel="noopener noreferrer"
           style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",
@@ -4302,7 +4315,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
               style={{fontSize:12,color:"#aebac0",cursor:"pointer"}} />
             {csvRows && csvRows.length > 0 && (
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {/* Preview */}
                 <div style={{overflowX:"auto"}}>
                   <table style={{fontSize:11,color:"#aebac0",borderCollapse:"collapse",width:"100%"}}>
                     <thead>
@@ -4319,7 +4331,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
                     </tbody>
                   </table>
                 </div>
-                {/* Column mapping */}
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
                   {csvHeaders.map(function(h) {
                     return (
@@ -4353,17 +4364,18 @@ function MinistryHealthTab({ token, role, t, lang }) {
         )}
       </div>
 
-      {/* ── KPI row ── */}
+      {/* KPI row + cards */}
       {loading ? (
         <div style={{color:"#6b7a82",fontSize:13,padding:20}}>{lang==="PT"?"Carregando...":"Loading..."}</div>
       ) : (
         <>
+          {/* KPI row */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:14}}>
             {[
-              {label:lang==="PT"?"Total":"Total", value:MH_MINISTRIES.length, accent:"#5eead4"},
+              {label:lang==="PT"?"Total":"Total", value:mhList.length, accent:"#5eead4"},
               {label:lang==="PT"?"Saudaveis":"Healthy", value:healthy, accent:"#27AE60"},
-              {label:lang==="PT"?"Precisam de Voluntarios":"Need Volunteers", value:needs, accent:"#F39C12"},
-              {label:lang==="PT"?"Criticos":"Critical", value:critical, accent:"#E74C3C"},
+              {label:lang==="PT"?"Precisam de Voluntarios":"Need Volunteers", value:needs, accent:"#E67E22"},
+              {label:lang==="PT"?"Criticos":"Critical", value:critical, accent:"#C0392B"},
             ].map(function(kpi) {
               return (
                 <div key={kpi.label} className="glass" style={{padding:20,position:"relative",overflow:"hidden",borderRadius:12}}>
@@ -4378,93 +4390,137 @@ function MinistryHealthTab({ token, role, t, lang }) {
             })}
           </div>
 
-          {/* ── Ministry cards ── */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
-            {cards.map(function(card) {
-              var borderColor = card.status.color;
+          {/* Ministry cards */}
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {mhList.map(function(card) {
+              var isExpanded = expandedCards.has(card.ministry);
+              var sc = mhStatusColor(card.card_status);
+              var sl = mhStatusLabel(card.card_status, lang);
+              var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
+              var displayName = lang === 'PT' ? ptName : card.ministry;
+              var positions = card.positions || [];
+              var healthyPos = positions.filter(function(p) { return p.status === 'healthy'; }).length;
+              var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
+              var alertNote = posAlerts[card.ministry] || null;
+
               return (
-                <div key={card.name} className="glass"
-                  style={{padding:20,borderRadius:12,position:"relative",overflow:"hidden",
-                    borderTop:'2px solid '+borderColor}}>
+                <div key={card.ministry} className="glass"
+                  style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc}}>
 
-                  {/* Row 1: name + badge */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                    <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:700,color:"#e6f1f0"}}>
-                      {lang==="PT" ? (MH_MINISTRY_PT[card.name]||card.name) : card.name}
-                    </h3>
-                    <span style={{fontSize:9,padding:"3px 8px",background:card.status.bg,color:card.status.color,
-                      borderRadius:999,fontWeight:700,whiteSpace:"nowrap",border:'1px solid '+card.status.color+'33',
-                      fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em",flexShrink:0,marginLeft:8}}>
-                      {card.status.label==="Critical" ? (lang==="PT"?"CRITICO":"CRITICAL")
-                        : card.status.label==="Needs Volunteers" ? (lang==="PT"?"PRECISAM DE VOLUNTARIOS":"NEEDS VOLUNTEERS")
-                        : card.status.label==="Healthy" ? (lang==="PT"?"SAUDAVEL":"HEALTHY")
-                        : (lang==="PT"?"SEM DADOS":"NO DATA")}
-                    </span>
-                  </div>
+                  {/* Clickable header area */}
+                  <div onClick={function(){toggleExpand(card.ministry);}}
+                    style={{padding:'16px 20px 12px',cursor:'pointer',display:'flex',flexDirection:'column',gap:10}}>
 
-                  {/* Row 2: counts */}
-                  <div style={{display:"flex",gap:12,fontSize:11.5,color:"#aebac0",marginBottom:6,flexWrap:"wrap"}}>
-                    <span>{lang==="PT"?"Atual (avaliado)":"Actual (assessed)"}: <strong style={{color:"#e6f1f0"}}>{card.assessed}</strong></span>
-                    <span>{lang==="PT"?"Atual (informado)":"Actual (reported)"}: <strong style={{color:"#e6f1f0"}}>{card.reported}</strong></span>
-                    <span>Total: <strong style={{color:card.status.color}}>{card.total}</strong></span>
-                  </div>
-
-                  {/* Row 3: min / ideal */}
-                  <div style={{display:"flex",gap:12,fontSize:11.5,color:"#6b7a82",marginBottom:8}}>
-                    <span>Min: <span style={{color:card.minCount!==null?"#aebac0":"#475a64"}}>{card.minCount!==null ? card.minCount : (lang==="PT"?"Nao definido":"Not set")}</span></span>
-                    <span>Ideal: <span style={{color:card.idealCount!==null?"#aebac0":"#475a64"}}>{card.idealCount!==null ? card.idealCount : (lang==="PT"?"Nao definido":"Not set")}</span></span>
-                  </div>
-
-                  {/* Row 5: leader + whatsapp */}
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <span style={{fontSize:12,color:"#6b7a82"}}>
-                      {lang==="PT"?"Lider":"Leader"}: <span style={{color:card.leaderName?"#aebac0":"#475a64"}}>{card.leaderName || (lang==="PT"?"Nao definido":"Not set")}</span>
-                    </span>
-                    {card.whatsapp ? (
-                      <a href={'https://wa.me/' + card.whatsapp.replace(/\D/g,'')}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:6,
-                          background:"#25D366",color:"#fff",fontSize:11,fontWeight:600,textDecoration:"none",flexShrink:0}}>
-                        WhatsApp
-                      </a>
-                    ) : (
-                      <span style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:6,
-                        background:"rgba(255,255,255,0.04)",color:"#475a64",fontSize:11,fontWeight:600,flexShrink:0,
-                        border:"1px solid rgba(255,255,255,0.06)"}}>
-                        WhatsApp
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Row 6: coaching notes */}
-                  <textarea
-                    value={card.notes}
-                    placeholder={lang==="PT"?"Notas pastorais sobre este ministerio...":"Pastoral notes about this ministry..."}
-                    onChange={function(e) {
-                      var v = e.target.value;
-                      setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.name]=v; return n; });
-                    }}
-                    onBlur={function(e) { saveNotes(card.name, e.target.value); }}
-                    rows={2}
-                    style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",
-                      border:"1px solid rgba(255,255,255,0.06)",borderRadius:7,color:"#aebac0",
-                      fontSize:12,padding:"7px 10px",resize:"vertical",fontFamily:"inherit",
-                      marginBottom:8,outline:"none"}} />
-
-                  {/* Row 7: survey */}
-                  {card.surveyCount > 0 ? (
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:11.5,color:"#6b7a82"}}>{card.surveyCount} {lang==="PT"?"respostas":"responses"}</span>
-                      <button onClick={function(){setSurveyModal(card.name);}}
-                        style={{padding:"3px 10px",borderRadius:6,background:"rgba(94,234,212,0.08)",
-                          border:"1px solid rgba(94,234,212,0.2)",color:"#5eead4",fontSize:11,
-                          fontWeight:600,cursor:"pointer"}}>
-                        {lang==="PT"?"Ver Respostas":"View Responses"}
-                      </button>
+                    {/* Row 1: name + badge + chevron */}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:'#e6f1f0'}}>
+                        {displayName}
+                      </h3>
+                      <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginLeft:8}}>
+                        <span style={{fontSize:9,padding:'3px 9px',background:sc+'22',color:sc,
+                          borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
+                          fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em'}}>
+                          {sl}
+                        </span>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                          style={{flexShrink:0,transition:'transform 0.2s',color:'#6b7a82',
+                            transform:isExpanded?'rotate(180deg)':'rotate(0deg)'}}>
+                          <path d="M2 5l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{fontSize:11,color:"#475a64",fontStyle:"italic"}}>
-                      {lang==="PT"?"Resultados da pesquisa em breve":"Survey results coming soon"}
+
+                    {/* Row 2: leader + whatsapp */}
+                    <div style={{display:'flex',alignItems:'center',gap:8}} onClick={function(e){e.stopPropagation();}}>
+                      <span style={{fontSize:12,color:'#6b7a82'}}>
+                        {lang==='PT'?'Lider':'Leader'}{': '}
+                        <span style={{color:card.leader_name?'#aebac0':'#475a64'}}>
+                          {card.leader_name||(lang==='PT'?'Nao definido':'Not set')}
+                        </span>
+                      </span>
+                      {card.leader_whatsapp ? (
+                        <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
+                            background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
+                          WhatsApp
+                        </a>
+                      ) : (
+                        <span style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
+                          background:'rgba(255,255,255,0.04)',color:'#475a64',fontSize:11,fontWeight:600,flexShrink:0,
+                          border:'1px solid rgba(255,255,255,0.06)'}}>
+                          WhatsApp
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 3: summary */}
+                    <div style={{fontSize:12,color:'#6b7a82'}}>
+                      <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
+                      {' / '}{positions.length}
+                      {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
+                    </div>
+                  </div>
+
+                  {/* Coaching notes — always visible, pastor/owner only */}
+                  {isPastorRole && (
+                    <div style={{padding:'0 20px 12px'}} onClick={function(e){e.stopPropagation();}}>
+                      <textarea
+                        value={notes}
+                        placeholder={lang==="PT"?"Notas pastorais sobre este ministerio...":"Pastoral notes about this ministry..."}
+                        onChange={function(e) {
+                          var v = e.target.value;
+                          setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.ministry]=v; return n; });
+                        }}
+                        onBlur={function(e) { saveNotes(card.ministry, e.target.value); }}
+                        rows={2}
+                        style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.03)',
+                          border:'1px solid rgba(255,255,255,0.06)',borderRadius:7,color:'#aebac0',
+                          fontSize:12,padding:'7px 10px',resize:'vertical',fontFamily:'inherit',outline:'none'}} />
+                    </div>
+                  )}
+
+                  {/* Expanded position rows */}
+                  {isExpanded && (
+                    <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',padding:'12px 20px 16px',
+                      display:'flex',flexDirection:'column',gap:0}}>
+                      {positions.map(function(pos) {
+                        var actual = (pos.actual_count_form || 0) + (pos.actual_count_system || 0);
+                        var pct = pos.ideal_count > 0 ? Math.min(actual / pos.ideal_count, 1) : 0;
+                        var pc = mhStatusColor(pos.status);
+                        var posName = lang === 'PT' ? pos.position_name_pt : pos.position_name;
+                        var hasData = actual > 0 || pos.min_count > 0;
+                        return (
+                          <div key={pos.position_name}
+                            style={{padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                              <span style={{fontSize:13,color:'#e6f1f0',fontWeight:500,marginRight:8}}>{posName}</span>
+                              <div style={{display:'flex',alignItems:'center',gap:7,flexShrink:0}}>
+                                <span style={{fontSize:11,color:'#aebac0',whiteSpace:'nowrap'}}>
+                                  {hasData ? actual : '--'} / {pos.min_count} min | {pos.ideal_count} ideal
+                                </span>
+                                <span style={{width:8,height:8,borderRadius:'50%',background:pc,
+                                  display:'inline-block',flexShrink:0}}/>
+                              </div>
+                            </div>
+                            <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden'}}>
+                              <div style={{height:'100%',width:(pct*100)+'%',background:pc,borderRadius:3,
+                                transition:'width 0.3s'}}/>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Custom positions alert (owner only) */}
+                      {isOwnerRole && alertNote && (
+                        <div style={{marginTop:12,padding:'10px 12px',borderRadius:8,
+                          background:'rgba(230,126,34,0.1)',border:'1px solid rgba(230,126,34,0.25)'}}>
+                          <span style={{color:'#E67E22',fontSize:12,fontWeight:600}}>
+                            {lang==='PT'?'Lider reportou funcoes nao listadas: ':'Leader reported unlisted roles: '}
+                          </span>
+                          <span style={{color:'#aebac0',fontSize:12}}>{alertNote}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

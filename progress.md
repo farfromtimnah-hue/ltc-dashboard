@@ -4,6 +4,31 @@
 
 ---
 
+DATE: 2026-06-05
+SESSION: Scheduling + Training Library Prototype
+STATUS: Complete
+
+WHAT WAS DONE:
+- Created src/SchedulingPrototype.jsx — standalone prototype component
+- Contains 3 main views: Pastor Staffing Command Center, Service Leader Pool, Scheduler (Schedule + Resources)
+- Pastor View: service dropdown switches between all 7 services with unique dummy data per service; ministry cards expand to show positions and scheduling audit logs
+- Group Leader Pool: shows volunteers from other services (Rocket, Culto Hope, Legacy) with 2 pre-filled WhatsApp message options per person
+- Scheduler: inner tab toggle between Schedule panel (Sunday team + other services backup with blast gate) and Resources panel (PT/EN tabbed library of SOPs, training videos, external links — fully add/delete interactive)
+- No backend wiring — all dummy data — placeholder for real scheduling system build
+- New nav tab added: Agendamento / Scheduling / Programacion (visible to owner, senior_pastor, pastor only)
+
+WHAT WAS NOT DONE:
+- No D1 tables created
+- No Worker endpoints added
+- No real data connected
+- This is prototype only
+
+NEXT SESSION SHOULD:
+- Review prototype with pastors for feedback before real build begins
+- Begin scheduling system Phase 1 (real D1 schema design)
+
+---
+
 ## Project Overview
 
 | Item | Value |
@@ -1839,3 +1864,84 @@ _Last updated: 2026-06-02 — Priority+ nav complete._
 - ltc-api has no git remote — worker is deployed via wrangler only
 
 _Last updated: 2026-06-02 — Ministry Health tab + Ministry Leader Form complete._
+
+---
+
+## Session (2026-06-03) — Notes Auto-Stamp + QR Code Download
+
+### Commit
+`c7141c2` — Notes auto-stamp + QR code download
+
+### Files changed
+- `src/App.jsx`
+
+### Change 1 — Notes Auto-Stamp
+
+**Removed:** `pastorName` state + pastor name `<input>` field from the note form in `PersonPanel`. The form now has only the textarea and Save button.
+
+**Added:** `fbUser` prop threaded from App -> PeopleTab -> PersonPanel and App -> GiftingTab -> PersonPanel. `App` now stores the Firebase user object in `fbUser` state (set in the `onAuthStateChanged` callback).
+
+**Auto-name logic in `addNote`:** `fbUser.displayName || fbUser.email || "Pastor"` (priority as specified).
+
+**New `formatNoteDate(ts, lang)` helper** (placed after `timeAgo`):
+- EN: "Jun 3, 2026 at 10:45 PM"
+- PT: "3 jun 2026 as 22:45"
+
+**Note display updated:** pastor name now `fontWeight:700`, date uses `formatNoteDate` (was `timeAgo`), layout unchanged otherwise.
+
+### Change 2 — QR Code Download
+
+**Package:** `npm install qrcode` (added to package.json). Imported as `import QRCode from "qrcode"` at top of App.jsx.
+
+**Button:** Added "Baixar QR Code" / "Download QR Code" button in PeopleTab next to the Share Assessment button. Same teal outline style (`border:1px solid #2ABFBF`, `color:#2ABFBF`). Inline SVG QR icon.
+
+**State added to PeopleTab:** `qrModal`, `qrDataUrl`, `ASSESSMENT_URL` constant, `openQrModal()`, `downloadQr()`.
+
+**Preview modal:** Dark `#0c1a24` background, centered, 200x200px QR image preview, URL label, "Baixar"/"Download" primary button, "Fechar"/"Close" ghost button. Closes on backdrop click.
+
+**Download:** Creates temporary `<a>` element, `download="lagoinha-tampa-avaliacao-qr.png"`, triggers click, no cleanup needed (browser handles temp links).
+
+---
+
+## Session (2026-06-15) — People Tab: 6 Discipleship-Stage Tabs
+
+### Commit
+`c7cab7d` — People tab: 6 mutually exclusive discipleship stage tabs
+
+### Files changed
+- `src/App.jsx`
+
+### Summary
+The People tab pill switcher went from 2 pills (Active / Placed, driven by the volunteer-pipeline `stage` field) to **6 mutually exclusive tabs** driven by a NEW, separate `discipleship_stage` field. Each tab shows ONLY people whose `discipleship_stage` matches that tab — no person appears in more than one tab.
+
+`discipleship_stage` (journey axis) is distinct from `stage` (volunteer placement pipeline). The `stage` field / volunteer pipeline UI is unchanged and only meaningful once `discipleship_stage = "Active"`.
+
+### Changes
+1. **Constants** (after `STAGE_LABEL`, ~line 60): added `DISCIPLESHIP_STAGES` = `["New Believer","Start Class","Baptism","New Members Cafe","Active","Placed"]` and `DISCIPLESHIP_STAGE_LABEL` (PT/EN). PT labels: Novo Crente / Start / Batismo / Cafe de Membros / Voluntarios / Colocados. EN: New Believers / Start Class / Baptism / New Members Cafe / Volunteers / Placed.
+2. **State:** `view` default stays `"active"` (Rafa/Alice landing tab). New view keys: `new_believer`, `start_class`, `baptism`, `cafe`, `active`, `placed`.
+3. **Pools (PeopleTab):** replaced `activePeople`/`placedPeople` split with `STAGE_TO_VIEW` map + `peopleByView(viewKey)` that filters on `p.discipleship_stage || "Active"`. `currentPool = peopleByView(view)`.
+4. **Pill row:** replaced 2-button toggle with a `.map` over `DISCIPLESHIP_STAGES`. Each pill: label from `DISCIPLESHIP_STAGE_LABEL[lang]`, count badge = `peopleByView(vk).length`, onClick sets view + `setFilterStage("All")`. Mobile (375px): container is `overflow-x:auto` + `-webkit-overflow-scrolling:touch` + hidden scrollbar (`scrollbar-width:none` + inline `<style>` `.disc-pill-row::-webkit-scrollbar{display:none}`); pills are `flex:0 0 auto` + `white-space:nowrap` so they scroll horizontally instead of wrapping.
+5. **Filters:** existing search + gifting/language/group/pastor/type filters apply to all tabs as before; the volunteer-pipeline `filterStage` dropdown still only applies (and renders) when `view === "active"`.
+6. **Cards:** `view !== "placed"` → `PersonCard` (covers new_believer/start_class/baptism/cafe/active, all unchanged behavior); `view === "placed"` → `PlacedCard` (unchanged). Stale `placedPeople` reference in the "placed" footer count was switched to `currentPool`.
+7. **PersonPanel:** added a READ-ONLY "Etapa de Discipulado" / "Discipleship Stage" display row ABOVE the existing volunteer Stage section, value = `DISCIPLESHIP_STAGE_LABEL[lang][person.discipleship_stage || "Active"]`. No edit controls this phase. Volunteer Stage section below it is unchanged.
+
+### Verification
+- `npm run build` passes clean (only the pre-existing >500kB chunk-size warning).
+- Nav rebalancing check (Task 6): main dashboard nav unchanged; only the internal PeopleTab pill row went 2→6. On 375px mobile the row uses the `overflow-x-auto` + hidden-scrollbar approach so it scrolls horizontally and does not wrap or break layout. ✅
+
+### ⚠️ REQUIRED D1 MIGRATIONS (Nicole runs manually)
+
+**1. Add the column (assumed already done per task spec):**
+```sql
+ALTER TABLE connections ADD COLUMN discipleship_stage TEXT DEFAULT 'Active';
+```
+
+**2. REQUIRED one-time data migration — MUST run, or the active queue is wrong:**
+```sql
+UPDATE connections SET discipleship_stage = 'Placed' WHERE stage = 'Placed in Ministry';
+```
+
+**Why this is required:** The code falls back to `"Active"` when `discipleship_stage` is NULL. Existing "Placed in Ministry" people (volunteer `stage` field) have `discipleship_stage = NULL` until migrated, so they will currently appear in the **Voluntarios / Volunteers ("active")** tab, NOT in **Colocados / Placed**. This directly contradicts the goal of keeping the active volunteer queue clean. Run the UPDATE above to move them into the Placed tab.
+
+### Deploy
+Deploys via GitHub Actions on push to `main`. **Wait for the green checkmark on the Actions run before testing live.**

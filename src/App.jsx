@@ -3829,6 +3829,23 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
             <button
               onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario de Batismo da Lagoinha Tampa: " + BAPTISM_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the Baptism form at Lagoinha Tampa: " + BAPTISM_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario de Bautismo de Lagoinha Tampa: " + BAPTISM_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario de Batismo":lang==="ES"?"Compartir Formulario de Bautismo":"Share Baptism Form"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(BAPTISM_URL, lang==="PT"?"QR Code - Formulario de Batismo":lang==="ES"?"QR Code - Formulario de Bautismo":"QR Code - Baptism Form", "lagoinha-batismo-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/baptism-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+            <button
+              onClick={function(){
                 var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: " + ASSESSMENT_URL;
                 var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: " + ASSESSMENT_URL;
                 var msgES = "Hola! Me gustaria invitarte a hacer una evaluacion rapida de dones ministeriales aqui en Lagoinha Tampa. Solo toma unos minutos. Accede aqui: " + ASSESSMENT_URL;

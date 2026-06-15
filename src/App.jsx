@@ -3570,11 +3570,19 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
   const [selectedId, setSelectedId] = useState(null);
   const [qrModal, setQrModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [qrLabel, setQrLabel] = useState("");
+  const [qrFileName, setQrFileName] = useState("lagoinha-tampa-qr.png");
+  const [qrUrlLabel, setQrUrlLabel] = useState("");
   const ASSESSMENT_URL = "https://farfromtimnah-hue.github.io/ministry-gifting/";
+  const CAFE_URL = "https://farfromtimnah-hue.github.io/ministry-gifting/cafe-form.html";
+  const BAPTISM_URL = "https://farfromtimnah-hue.github.io/ministry-gifting/baptism-form.html";
 
-  function openQrModal() {
-    QRCode.toDataURL(ASSESSMENT_URL, { width: 300, margin: 2 }).then(function(url) {
-      setQrDataUrl(url);
+  function openQrModal(url, label, fileName, urlLabel) {
+    QRCode.toDataURL(url, { width: 300, margin: 2 }).then(function(dataUrl) {
+      setQrDataUrl(dataUrl);
+      setQrLabel(label || "");
+      setQrFileName(fileName || "lagoinha-tampa-qr.png");
+      setQrUrlLabel(urlLabel || "");
       setQrModal(true);
     });
   }
@@ -3583,7 +3591,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
     if (!qrDataUrl) return;
     var a = document.createElement("a");
     a.href = qrDataUrl;
-    a.download = "lagoinha-tampa-avaliacao-qr.png";
+    a.download = qrFileName;
     a.click();
   }
   const [showSplit, setShowSplit] = useState(false);
@@ -3591,6 +3599,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
   const [splitDone, setSplitDone] = useState("");
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState("active");
+  const [langFilter, setLangFilter] = useState(null);
 
   const load = useCallback(() => {
     fetch(`${API}/people`, { headers: { Authorization: `Bearer ${token}` } })
@@ -3626,6 +3635,10 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
       const langs = parseJSON(p.languages_spoken);
       if (!langs.includes(filterLang)) return false;
     }
+    if (langFilter !== null) {
+      const langs = parseJSON(p.languages_spoken);
+      if (!langs.includes(langFilter)) return false;
+    }
     if (filterGroup !== "All") {
       const grps = parseJSON(p.special_groups);
       if (!grps.includes(filterGroup)) return false;
@@ -3652,7 +3665,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
           const isActive = view === vk;
           const count = peopleByView(vk).length;
           return (
-            <button key={vk} onClick={()=>{ setView(vk); setFilterStage("All"); }}
+            <button key={vk} onClick={()=>{ setView(vk); setFilterStage("All"); setLangFilter(null); }}
               style={{flex:"0 0 auto",whiteSpace:"nowrap",padding:"8px 20px",borderRadius:999,
                 border:`1px solid ${isActive?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.05)"}`,
                 background:isActive?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
@@ -3667,53 +3680,15 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
         })}
       </div>
 
-      {/* Share Assessment + QR Code buttons */}
-      <div style={{marginBottom:14,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-        <button
-          onClick={function(){
-            var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: https://farfromtimnah-hue.github.io/ministry-gifting/";
-            var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: https://farfromtimnah-hue.github.io/ministry-gifting/";
-            var msg = lang === "PT" ? msgPT : msgEN;
-            window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
-          }}
-          style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
-            background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
-            cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
-          {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":"Share Assessment"}
-        </button>
-        <button
-          onClick={openQrModal}
-          style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
-            background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
-            cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8">
-            <rect x="1" y="1" width="7" height="7" rx="1"/>
-            <rect x="12" y="1" width="7" height="7" rx="1"/>
-            <rect x="1" y="12" width="7" height="7" rx="1"/>
-            <rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
-            <rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
-            <rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/>
-            <line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/>
-            <line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
-          </svg>
-          {lang==="PT"?"Baixar QR Code":"Download QR Code"}
-        </button>
-      </div>
-
       {/* QR Code Modal */}
       {qrModal && (
         <div onClick={function(){setQrModal(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
           <div onClick={function(e){e.stopPropagation();}} style={{background:"#0c1a24",border:"1px solid rgba(94,234,212,0.18)",borderRadius:12,padding:28,display:"flex",flexDirection:"column",alignItems:"center",gap:16,maxWidth:300,width:"90%"}}>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:16,color:"#e6f1f0"}}>
-              {lang==="PT"?"QR Code da Avaliacao":"Assessment QR Code"}
+              {qrLabel}
             </div>
             {qrDataUrl && <img src={qrDataUrl} alt="QR Code" style={{width:200,height:200,borderRadius:8}}/>}
-            <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>farfromtimnah-hue.github.io/ministry-gifting/</div>
+            <div style={{fontSize:11,color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>{qrUrlLabel}</div>
             <div style={{display:"flex",gap:10}}>
               <button onClick={downloadQr} className="btn-primary" style={{padding:"9px 20px",fontSize:13}}>
                 {lang==="PT"?"Baixar":"Download"}
@@ -3726,52 +3701,273 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
-        <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
-          style={{padding:"9px 14px"}}/>
-        {view === "active" && (
-          <select value={filterStage} onChange={e=>setFilterStage(e.target.value)} style={{padding:"9px 12px"}}>
-            {["All",...activeStages].map(o=><option key={o} value={o}>{o==="All"?t.allStages:(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[o]||o}</option>)}
-          </select>
-        )}
-        {[
-          {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS],
-            disp:o=>lang==="PT"?GIFTING_PT[o]||o:o},
-          {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES],
-            disp:o=>(LANGUAGE_DISPLAY[lang]||LANGUAGE_DISPLAY.EN)[o]||o},
-          {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS],
-            disp:o=>lang==="PT"?SPECIAL_GROUP_PT[o]||o:o},
-          {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:pastorOptions,
-            disp:o=>o},
-        ].map(({label,val,set,opts,disp})=>(
-          <select key={label} value={val} onChange={e=>set(e.target.value)} style={{padding:"9px 12px"}}>
-            {opts.map(o=><option key={o} value={o}>{o==="All"?label:disp(o)}</option>)}
-          </select>
-        ))}
-      </div>
+      {/* Per-tab toolbars */}
 
-      {/* Type filter chips */}
-      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",color:"#475a64",letterSpacing:"0.12em",textTransform:"uppercase",marginRight:2}}>{lang==="PT"?"Tipo":"Type"}</span>
-        {[
-          {val:"Pastors", labelPT:"Pastores", labelEN:"Pastors"},
-          {val:"Leaders", labelPT:"Lideres", labelEN:"Leaders"},
-          {val:"Congregation", labelPT:"Congregacao", labelEN:"Congregation"}
-        ].map(function(chip){
-          var active = filterType === chip.val;
-          return (
-            <button key={chip.val}
-              onClick={function(){ setFilterType(active ? "All" : chip.val); }}
-              style={{fontSize:11,padding:"4px 12px",borderRadius:999,cursor:"pointer",transition:"all 0.15s",fontWeight:600,
-                background:active?"#2ABFBF":"transparent",
-                color:active?"#0a1a1a":"#6b7a82",
-                border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
-              {lang==="PT"?chip.labelPT:chip.labelEN}
+      {/* TABS 1 & 2 — New Believer + Start Class */}
+      {(view === "new_believer" || view === "start_class") && (
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario de Batismo da Lagoinha Tampa: " + BAPTISM_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the Baptism form at Lagoinha Tampa: " + BAPTISM_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario de Bautismo de Lagoinha Tampa: " + BAPTISM_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario de Batismo":lang==="ES"?"Compartir Formulario de Bautismo":"Share Baptism Form"}
             </button>
-          );
-        })}
-      </div>
+            <button
+              onClick={function(){ openQrModal(BAPTISM_URL, lang==="PT"?"QR Code - Formulario de Batismo":lang==="ES"?"QR Code - Formulario de Bautismo":"QR Code - Baptism Form", "lagoinha-batismo-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/baptism-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario do Cafe de Novos Membros da Lagoinha Tampa: " + CAFE_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the New Members Cafe form at Lagoinha Tampa: " + CAFE_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario del Cafe de Nuevos Miembros de Lagoinha Tampa: " + CAFE_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario do Cafe":lang==="ES"?"Compartir Formulario del Cafe":"Share Cafe Form"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(CAFE_URL, lang==="PT"?"QR Code - Formulario do Cafe":lang==="ES"?"QR Code - Formulario del Cafe":"QR Code - Cafe Form", "lagoinha-cafe-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/cafe-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+          </div>
+          <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{padding:"9px 14px",width:"100%",marginBottom:10}}/>
+          {/* Language tally chips */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+            {[{key:"Portugues",flag:"🇧🇷",label:"Portugues"},{key:"English",flag:"🇺🇸",label:"English"},{key:"Espanol",flag:"🌐",label:"Espanol"}].map(function(lo){
+              var count = currentPool.filter(function(p){ return parseJSON(p.languages_spoken).includes(lo.key); }).length;
+              var active = langFilter === lo.key;
+              return (
+                <button key={lo.key}
+                  onClick={function(){ setLangFilter(active ? null : lo.key); }}
+                  style={{fontSize:12,padding:"5px 14px",borderRadius:999,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
+                    background:active?"#2ABFBF":"transparent",color:active?"#0a1a1a":"#6b7a82",
+                    border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+                  {lo.flag} {lo.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3 — Baptism */}
+      {view === "baptism" && (
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario do Cafe de Novos Membros da Lagoinha Tampa: " + CAFE_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the New Members Cafe form at Lagoinha Tampa: " + CAFE_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario del Cafe de Nuevos Miembros de Lagoinha Tampa: " + CAFE_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario do Cafe":lang==="ES"?"Compartir Formulario del Cafe":"Share Cafe Form"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(CAFE_URL, lang==="PT"?"QR Code - Formulario do Cafe":lang==="ES"?"QR Code - Formulario del Cafe":"QR Code - Cafe Form", "lagoinha-cafe-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/cafe-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: " + ASSESSMENT_URL;
+                var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: " + ASSESSMENT_URL;
+                var msgES = "Hola! Me gustaria invitarte a hacer una evaluacion rapida de dones ministeriales aqui en Lagoinha Tampa. Solo toma unos minutos. Accede aqui: " + ASSESSMENT_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":lang==="ES"?"Compartir Evaluacion":"Share Assessment"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(ASSESSMENT_URL, lang==="PT"?"QR Code da Avaliacao":lang==="ES"?"QR Code de la Evaluacion":"Assessment QR Code", "lagoinha-tampa-avaliacao-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+          </div>
+          <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{padding:"9px 14px",width:"100%",marginBottom:10}}/>
+          {/* Language tally chips */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+            {[{key:"Portugues",flag:"🇧🇷",label:"Portugues"},{key:"English",flag:"🇺🇸",label:"English"},{key:"Espanol",flag:"🌐",label:"Espanol"}].map(function(lo){
+              var count = currentPool.filter(function(p){ return parseJSON(p.languages_spoken).includes(lo.key); }).length;
+              var active = langFilter === lo.key;
+              return (
+                <button key={lo.key}
+                  onClick={function(){ setLangFilter(active ? null : lo.key); }}
+                  style={{fontSize:12,padding:"5px 14px",borderRadius:999,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
+                    background:active?"#2ABFBF":"transparent",color:active?"#0a1a1a":"#6b7a82",
+                    border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+                  {lo.flag} {lo.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4 — New Members Cafe */}
+      {view === "cafe" && (
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: " + ASSESSMENT_URL;
+                var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: " + ASSESSMENT_URL;
+                var msgES = "Hola! Me gustaria invitarte a hacer una evaluacion rapida de dones ministeriales aqui en Lagoinha Tampa. Solo toma unos minutos. Accede aqui: " + ASSESSMENT_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":lang==="ES"?"Compartir Evaluacion":"Share Assessment"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(ASSESSMENT_URL, lang==="PT"?"QR Code da Avaliacao":lang==="ES"?"QR Code de la Evaluacion":"Assessment QR Code", "lagoinha-tampa-avaliacao-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+          </div>
+          <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{padding:"9px 14px",width:"100%",marginBottom:10}}/>
+          {/* Language tally chips */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+            {[{key:"Portugues",flag:"🇧🇷",label:"Portugues"},{key:"English",flag:"🇺🇸",label:"English"},{key:"Espanol",flag:"🌐",label:"Espanol"}].map(function(lo){
+              var count = currentPool.filter(function(p){ return parseJSON(p.languages_spoken).includes(lo.key); }).length;
+              var active = langFilter === lo.key;
+              return (
+                <button key={lo.key}
+                  onClick={function(){ setLangFilter(active ? null : lo.key); }}
+                  style={{fontSize:12,padding:"5px 14px",borderRadius:999,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
+                    background:active?"#2ABFBF":"transparent",color:active?"#0a1a1a":"#6b7a82",
+                    border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+                  {lo.flag} {lo.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5 — Volunteers (Active) — UNCHANGED */}
+      {view === "active" && (
+        <div style={{marginBottom:4}}>
+          <div style={{marginBottom:14,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: " + ASSESSMENT_URL;
+                var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: " + ASSESSMENT_URL;
+                var msg = lang === "PT" ? msgPT : msgEN;
+                window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
+                background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
+                cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":"Share Assessment"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(ASSESSMENT_URL, lang==="PT"?"QR Code da Avaliacao":"Assessment QR Code", "lagoinha-tampa-avaliacao-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",
+                background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",
+                cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8">
+                <rect x="1" y="1" width="7" height="7" rx="1"/>
+                <rect x="12" y="1" width="7" height="7" rx="1"/>
+                <rect x="1" y="12" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+                <rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+                <rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/>
+                <line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/>
+                <line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/>
+              </svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
+            <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+              style={{padding:"9px 14px"}}/>
+            <select value={filterStage} onChange={e=>setFilterStage(e.target.value)} style={{padding:"9px 12px"}}>
+              {["All",...activeStages].map(o=><option key={o} value={o}>{o==="All"?t.allStages:(STAGE_LABEL[lang||"PT"]||STAGE_LABEL.PT)[o]||o}</option>)}
+            </select>
+            {[
+              {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS],
+                disp:o=>lang==="PT"?GIFTING_PT[o]||o:o},
+              {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES],
+                disp:o=>(LANGUAGE_DISPLAY[lang]||LANGUAGE_DISPLAY.EN)[o]||o},
+              {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS],
+                disp:o=>lang==="PT"?SPECIAL_GROUP_PT[o]||o:o},
+              {label:t.allPastors,val:filterPastor,set:setFilterPastor,opts:pastorOptions,
+                disp:o=>o},
+            ].map(({label,val,set,opts,disp})=>(
+              <select key={label} value={val} onChange={e=>set(e.target.value)} style={{padding:"9px 12px"}}>
+                {opts.map(o=><option key={o} value={o}>{o==="All"?label:disp(o)}</option>)}
+              </select>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,fontFamily:"'JetBrains Mono',monospace",color:"#475a64",letterSpacing:"0.12em",textTransform:"uppercase",marginRight:2}}>{lang==="PT"?"Tipo":"Type"}</span>
+            {[
+              {val:"Pastors", labelPT:"Pastores", labelEN:"Pastors"},
+              {val:"Leaders", labelPT:"Lideres", labelEN:"Leaders"},
+              {val:"Congregation", labelPT:"Congregacao", labelEN:"Congregation"}
+            ].map(function(chip){
+              var active = filterType === chip.val;
+              return (
+                <button key={chip.val}
+                  onClick={function(){ setFilterType(active ? "All" : chip.val); }}
+                  style={{fontSize:11,padding:"4px 12px",borderRadius:999,cursor:"pointer",transition:"all 0.15s",fontWeight:600,
+                    background:active?"#2ABFBF":"transparent",
+                    color:active?"#0a1a1a":"#6b7a82",
+                    border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+                  {lang==="PT"?chip.labelPT:chip.labelEN}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6 — Placed */}
+      {view === "placed" && (
+        <div style={{display:"grid",gridTemplateColumns:"1fr repeat(3,auto)",gap:10,marginBottom:12,alignItems:"center"}}>
+          <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{padding:"9px 14px"}}/>
+          {[
+            {label:t.allGiftings,val:filterGifting,set:setFilterGifting,opts:["All",...GIFTINGS],
+              disp:o=>lang==="PT"?GIFTING_PT[o]||o:o},
+            {label:t.allLanguages,val:filterLang,set:setFilterLang,opts:["All",...LANGUAGES],
+              disp:o=>(LANGUAGE_DISPLAY[lang]||LANGUAGE_DISPLAY.EN)[o]||o},
+            {label:t.allGroups,val:filterGroup,set:setFilterGroup,opts:["All",...SPECIAL_GROUPS],
+              disp:o=>lang==="PT"?SPECIAL_GROUP_PT[o]||o:o},
+          ].map(({label,val,set,opts,disp})=>(
+            <select key={label} value={val} onChange={e=>set(e.target.value)} style={{padding:"9px 12px"}}>
+              {opts.map(o=><option key={o} value={o}>{o==="All"?label:disp(o)}</option>)}
+            </select>
+          ))}
+        </div>
+      )}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div style={{fontSize:12,fontFamily:"'JetBrains Mono',monospace",color:"#475a64"}}>{filtered.length} / {currentPool.length}</div>

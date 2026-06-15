@@ -59,6 +59,28 @@ const STAGE_LABEL = {
   EN: {"New":"New","Reached Out":"Reached Out","Responded":"Responded","Meeting Scheduled":"Meeting Scheduled","Meeting Done":"Meeting Done","Placed in Ministry":"Placed in Ministry"}
 };
 
+// Discipleship journey axis — separate from the volunteer placement `stage` field above.
+const DISCIPLESHIP_STAGES = ["New Believer", "Start Class", "Baptism", "New Members Cafe", "Active", "Placed"];
+
+const DISCIPLESHIP_STAGE_LABEL = {
+  PT: {
+    "New Believer": "Novo Crente",
+    "Start Class": "Start",
+    "Baptism": "Batismo",
+    "New Members Cafe": "Cafe de Membros",
+    "Active": "Voluntarios",
+    "Placed": "Colocados"
+  },
+  EN: {
+    "New Believer": "New Believers",
+    "Start Class": "Start Class",
+    "Baptism": "Baptism",
+    "New Members Cafe": "New Members Cafe",
+    "Active": "Volunteers",
+    "Placed": "Placed"
+  }
+};
+
 const GIFTING_LABEL_PT = {
   "Worship & Music":"Louvor & Música","Gift of Helps":"Dom de Ajudar","Visual Storytelling":"Narrativa Visual",
   "Digital Communication":"Comunicação Digital","Intercession":"Intercessão","Hospitality":"Hospitalidade",
@@ -2729,6 +2751,14 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
 
         <div style={{padding:"24px 28px",display:"flex",flexDirection:"column",gap:0}}>
 
+          {/* Discipleship Stage — read-only display (separate axis from volunteer pipeline Stage below) */}
+          <div style={{paddingBottom:22,marginBottom:0}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{lang==="PT"?"Etapa de Discipulado":"Discipleship Stage"}</div>
+            <div style={{display:"inline-flex",alignItems:"center",padding:"8px 14px",borderRadius:8,border:"1px solid rgba(94,234,212,0.22)",background:"rgba(94,234,212,0.08)",color:"#5eead4",fontSize:12,fontWeight:500}}>
+              {(DISCIPLESHIP_STAGE_LABEL[lang||"EN"]||DISCIPLESHIP_STAGE_LABEL.EN)[person.discipleship_stage||"Active"]||(person.discipleship_stage||"Active")}
+            </div>
+          </div>
+
           {/* Stage */}
           <div style={{paddingBottom:22,marginBottom:0}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.connStage}</div>
@@ -3569,9 +3599,21 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
 
   useEffect(() => { load(); }, [load]);
 
-  const activePeople = people.filter(p => p.stage !== "Placed in Ministry");
-  const placedPeople = people.filter(p => p.stage === "Placed in Ministry");
-  const currentPool = view === "active" ? activePeople : placedPeople;
+  const STAGE_TO_VIEW = {
+    "New Believer": "new_believer",
+    "Start Class": "start_class",
+    "Baptism": "baptism",
+    "New Members Cafe": "cafe",
+    "Active": "active",
+    "Placed": "placed"
+  };
+
+  const peopleByView = (viewKey) => people.filter(p => {
+    const ds = p.discipleship_stage || "Active";
+    return STAGE_TO_VIEW[ds] === viewKey;
+  });
+
+  const currentPool = peopleByView(view);
 
   const filtered = currentPool.filter(p => {
     const s = search.toLowerCase();
@@ -3602,30 +3644,27 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
     <div style={{padding:"24px 28px"}}>
       <style>{css}</style>
 
-      {/* Active / Placed sub-view toggle */}
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        <button onClick={()=>{ setView("active"); setFilterStage("All"); }}
-          style={{padding:"8px 20px",borderRadius:999,
-            border:`1px solid ${view==="active"?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.05)"}`,
-            background:view==="active"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
-            color:view==="active"?"#5eead4":"#6b7a82",
-            fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.12em",textTransform:"uppercase",
-            cursor:"pointer",transition:"all 0.18s",
-            boxShadow:view==="active"?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
-          {lang==="PT" ? "Em Andamento" : "Active"}
-          <span style={{marginLeft:8,fontSize:11,padding:"1px 7px",background:view==="active"?"rgba(94,234,212,0.22)":"rgba(255,255,255,0.04)",borderRadius:999,color:view==="active"?"#5eead4":"#6b7a82"}}>{activePeople.length}</span>
-        </button>
-        <button onClick={()=>{ setView("placed"); setFilterStage("All"); }}
-          style={{padding:"8px 20px",borderRadius:999,
-            border:`1px solid ${view==="placed"?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.05)"}`,
-            background:view==="placed"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
-            color:view==="placed"?"#5eead4":"#6b7a82",
-            fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.12em",textTransform:"uppercase",
-            cursor:"pointer",transition:"all 0.18s",
-            boxShadow:view==="placed"?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
-          {lang==="PT" ? "Colocados" : "Placed"}
-          <span style={{marginLeft:8,fontSize:11,padding:"1px 7px",background:view==="placed"?"rgba(94,234,212,0.22)":"rgba(255,255,255,0.04)",borderRadius:999,color:view==="placed"?"#5eead4":"#6b7a82"}}>{placedPeople.length}</span>
-        </button>
+      {/* Discipleship-stage sub-view toggle — 6 mutually exclusive tabs */}
+      <style>{`.disc-pill-row::-webkit-scrollbar{display:none;}`}</style>
+      <div className="disc-pill-row" style={{display:"flex",flexWrap:"nowrap",gap:8,marginBottom:20,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",paddingBottom:2}}>
+        {DISCIPLESHIP_STAGES.map(ds => {
+          const vk = STAGE_TO_VIEW[ds];
+          const isActive = view === vk;
+          const count = peopleByView(vk).length;
+          return (
+            <button key={vk} onClick={()=>{ setView(vk); setFilterStage("All"); }}
+              style={{flex:"0 0 auto",whiteSpace:"nowrap",padding:"8px 20px",borderRadius:999,
+                border:`1px solid ${isActive?"rgba(94,234,212,0.35)":"rgba(255,255,255,0.05)"}`,
+                background:isActive?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                color:isActive?"#5eead4":"#6b7a82",
+                fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.12em",textTransform:"uppercase",
+                cursor:"pointer",transition:"all 0.18s",
+                boxShadow:isActive?"0 0 14px rgba(94,234,212,0.18)":"none"}}>
+              {(DISCIPLESHIP_STAGE_LABEL[lang||"EN"]||DISCIPLESHIP_STAGE_LABEL.EN)[ds]||ds}
+              <span style={{marginLeft:8,fontSize:11,padding:"1px 7px",background:isActive?"rgba(94,234,212,0.22)":"rgba(255,255,255,0.04)",borderRadius:999,color:isActive?"#5eead4":"#6b7a82"}}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Share Assessment + QR Code buttons */}
@@ -3742,8 +3781,8 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
             {"⚡ "}{lang==="PT"?"Distribuir Pessoas":"Split Assignments"}
           </button>
         )}
-        {view === "placed" && placedPeople.length > 0 && (
-          <div style={{fontSize:12,color:"#5eead4"}}>{"🏠 "}{lang==="PT" ? `${placedPeople.length} pessoa${placedPeople.length!==1?"s":""} colocada${placedPeople.length!==1?"s":""}` : `${placedPeople.length} person${placedPeople.length!==1?"s":""} placed`}</div>
+        {view === "placed" && currentPool.length > 0 && (
+          <div style={{fontSize:12,color:"#5eead4"}}>{"🏠 "}{lang==="PT" ? `${currentPool.length} pessoa${currentPool.length!==1?"s":""} colocada${currentPool.length!==1?"s":""}` : `${currentPool.length} person${currentPool.length!==1?"s":""} placed`}</div>
         )}
       </div>
 
@@ -3793,7 +3832,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
 
       {/* Cards grid */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
-        {view === "active" && filtered.map(p => (
+        {view !== "placed" && filtered.map(p => (
           <PersonCard key={p.id} person={p} onClick={()=>setSelectedId(p.id)} templatePT={templatePT} templateEN={templateEN} t={t} lang={lang} />
         ))}
         {view === "placed" && filtered.map(p => (

@@ -6296,6 +6296,120 @@ function GroupHealthBox({ attending, serving, lang, groupName }) {
   );
 }
 
+// ─── MINISTRY LEADER VIEW ──────────────────────────────────────────────────────
+// Shell only. Pool/Roster (Mode 1/2/3 assignment UI) plugs into MinistryTeamTab below.
+function MinistryLeaderView({ lang, grants }) {
+  const ministryGrants = (grants || []).filter(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
+
+  // Access guard — should never be reachable without a grant, but guard anyway.
+  if (!ministryGrants.length) {
+    return (
+      <div style={{padding:"60px 32px",textAlign:"center",color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>
+        {lang === "PT" ? "Voce nao tem acesso a esta visao." : "You don't have access to this view."}
+      </div>
+    );
+  }
+
+  const getScope = (g) => g.scope_name || g.scopeName || g.scope || "";
+  const ministries = ministryGrants.map(getScope).filter(Boolean);
+
+  // If multi-grant, track which ministry is selected; default to first.
+  const [activeMinistry, setActiveMinistry] = React.useState(ministries[0] || "");
+  const [mlTab, setMlTab] = React.useState("team");
+
+  const tx = {
+    team:      lang === "PT" ? "Equipe"   : "Team",
+    schedule:  lang === "PT" ? "Agenda"   : "Schedule",
+    resources: lang === "PT" ? "Recursos" : "Resources",
+    soon:      lang === "PT" ? "Em breve" : "Coming soon",
+    viewLabel: lang === "PT" ? "VISAO DO LIDER DE MINISTERIO" : "MINISTRY LEADER VIEW",
+  };
+
+  const pillStyle = (active) => ({
+    padding:"6px 14px",
+    borderRadius:20,
+    border: active ? "1px solid rgba(94,234,212,0.4)" : "1px solid rgba(255,255,255,0.07)",
+    background: active ? "linear-gradient(180deg,rgba(94,234,212,0.15),rgba(94,234,212,0.07))" : "rgba(255,255,255,0.02)",
+    color: active ? "#5eead4" : "#6b7a82",
+    fontSize:12,
+    fontFamily:"'JetBrains Mono',monospace",
+    fontWeight: active ? 600 : 400,
+    cursor:"pointer",
+    letterSpacing:"0.05em",
+    transition:"all 0.18s",
+  });
+
+  const subTabStyle = (active) => ({
+    background:"transparent",
+    border:"none",
+    padding:"6px 10px",
+    position:"relative",
+    color: active ? "#e6f1f0" : "#6b7a82",
+    fontSize:12,
+    fontFamily:"'JetBrains Mono',monospace",
+    fontWeight:600,
+    letterSpacing:"0.08em",
+    textTransform:"uppercase",
+    cursor:"pointer",
+    transition:"color 0.18s",
+    whiteSpace:"nowrap",
+  });
+
+  return (
+    <div style={{padding:"28px 32px",maxWidth:1200}}>
+      {/* View label */}
+      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#475a64",marginBottom:20}}>
+        {tx.viewLabel}
+      </div>
+
+      {/* Ministry selector — pills when multiple grants, plain header when one */}
+      {ministries.length === 1 ? (
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:22,color:"#e6f1f0",marginBottom:24,lineHeight:1.25}}>
+          {activeMinistry}
+        </div>
+      ) : (
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:24}}>
+          {ministries.map(m => (
+            <button key={m} onClick={() => setActiveMinistry(m)} style={pillStyle(activeMinistry === m)}>
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-tab bar */}
+      <div style={{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:28}}>
+        {[["team", tx.team], ["schedule", tx.schedule], ["resources", tx.resources]].map(([id, label]) => (
+          <button key={id} onClick={() => setMlTab(id)} style={subTabStyle(mlTab === id)}>
+            {label}
+            {mlTab === id && <span style={{position:"absolute",left:0,right:0,bottom:-1,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {mlTab === "team" && (
+        <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
+          {/* POOL/ROSTER UI GOES HERE — next session will build Mode 1/2/3 assignment
+              logic here: Pool tab (unassigned volunteers), Roster (confirmed for service),
+              mode switching, and date-based scheduling. Ministry context: activeMinistry. */}
+          {tx.soon}
+        </div>
+      )}
+      {mlTab === "schedule" && (
+        <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
+          {tx.soon}
+        </div>
+      )}
+      {mlTab === "resources" && (
+        <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
+          {tx.soon}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GroupLeaderView({ token, lang, groupName }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -6559,6 +6673,10 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [welcomeBlessing] = useState(() => Math.floor(Math.random() * 3));
   const [welcomeVision] = useState(() => Math.floor(Math.random() * 4));
+  // Banner shows only on the initial post-login screen; dismissed on first navigation.
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Grants fetched on login to drive view-switcher options (e.g. ministry_leader_view).
+  const [myGrants, setMyGrants] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   // Priority+ nav: measure the actual rendered width of the nav row and of every
@@ -6606,11 +6724,22 @@ export default function App() {
           setToken(idToken);
           setRole(result.claims.role || 'pastor');
           setFbUser(user);
+          setBannerDismissed(false);
           if (user.email === 'nicoleylepage@gmail.com') setLang('EN');
+          // Fetch grants to determine which view-switcher options to show.
+          try {
+            const gr = await fetch(`${API}/user/${user.uid}/grants`, { headers: { Authorization: `Bearer ${idToken}` } });
+            if (gr.ok) {
+              const gd = await gr.json();
+              const list = Array.isArray(gd) ? gd : (Array.isArray(gd?.grants) ? gd.grants : []);
+              setMyGrants(list);
+            }
+          } catch(_) { setMyGrants([]); }
         } catch(e) {
           setToken(null);
           setRole(null);
           setFbUser(null);
+          setMyGrants([]);
         }
       } else {
         setToken(null);
@@ -6623,6 +6752,7 @@ export default function App() {
   }, []);
 
   function handleNavigate(tabId, anchor) {
+    setBannerDismissed(true);
     setTab(tabId);
     if (anchor) setRefAnchor(anchor);
   }
@@ -6681,7 +6811,7 @@ export default function App() {
   // The More button appears only once something has collapsed into it.
   const TAB_GAP = 4;
   const REGION_GAP = 10;
-  const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor');
+  const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor') || hasMinistryLeaderGrant;
 
   let showTitle = true, showSwitcher = hasSwitcher, showAux = true, visibleTabCount = tabs.length, showMore = false;
   if (navMeas && navRowW > 0) {
@@ -6715,7 +6845,7 @@ export default function App() {
 
   // ── Shared renderers (live nav + hidden measurement mirror use the same markup) ──
   const tabBtn = (t2) => (
-    <button key={t2.id} onClick={() => setTab(t2.id)}
+    <button key={t2.id} onClick={() => { setBannerDismissed(true); setTab(t2.id); }}
       style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
       onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
       onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
@@ -6723,7 +6853,8 @@ export default function App() {
       {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
     </button>
   );
-  const onViewChange = (e) => { const v=e.target.value; setViewMode(v); if(v==='my_view') setGlGroup(""); if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
+  const onViewChange = (e) => { const v=e.target.value; setBannerDismissed(true); setViewMode(v); if(v==='my_view') setGlGroup(""); if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
+  const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const VIEW_OPTS = [
     ['my_view', lang==="PT"?"Minha visao":"My View"],
     ['senior_pastor_view', lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"],
@@ -6733,6 +6864,7 @@ export default function App() {
     ['baptism_view', lang==="PT"?"Vista Batismo":"Baptism View"],
     ['cafe_view', lang==="PT"?"Vista Cafe":"Cafe View"],
     ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
+    ...(hasMinistryLeaderGrant ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
   ];
   const selStyle = {background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",borderRadius:8,padding:"6px 8px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",maxWidth:170};
   const switcherNav = () => (
@@ -6827,7 +6959,7 @@ export default function App() {
                   <div className="pp-dropdown">
                     {overflowTabs.map(t2=>(
                       <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
-                        onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
+                        onClick={()=>{setBannerDismissed(true);setTab(t2.id);setMoreOpen(false);}}>
                         {t2.label}
                       </button>
                     ))}
@@ -6865,8 +6997,8 @@ export default function App() {
       {/* Content */}
       <div style={{maxWidth:1600,margin:"0 auto"}}>
 
-        {/* Welcome banner — rendered once per login, random lines stable for the session */}
-        {fbUser && (() => {
+        {/* Welcome banner — shown only on the initial post-login screen; dismissed on first tab/view navigation */}
+        {fbUser && !bannerDismissed && (() => {
           const h = new Date().getHours();
           const greeting = h >= 5 && h < 12 ? "Bom dia" : h >= 12 && h < 18 ? "Boa tarde" : "Boa noite";
           const name = (fbUser.displayName || fbUser.email || "").trim();
@@ -6889,21 +7021,26 @@ export default function App() {
         {viewMode === 'group_leader' && glGroup
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && (
+        {viewMode === 'ministry_leader_view' && (
+          <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>
+            <MinistryLeaderView lang={lang} grants={myGrants} />
+          </RefErrorBoundary>
+        )}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "health" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "scheduling" && <SchedulingPrototype />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && <SchedulingPrototype />}
         {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
 

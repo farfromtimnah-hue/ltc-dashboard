@@ -4,6 +4,39 @@ import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, sign
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import SchedulingPrototype from './SchedulingPrototype';
 
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ * D1: ministry_notes table — RUN MANUALLY IN THE CLOUDFLARE D1 CONSOLE
+ *     (ltc-db) BEFORE TESTING the Ministry Modal "Notes" section.
+ *
+ * No timestamped notes table exists yet (only a single `coaching_notes` TEXT
+ * column per ministry). The Notes section persists one row per saved note:
+ *
+ *   CREATE TABLE IF NOT EXISTS ministry_notes (
+ *     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+ *     ministry    TEXT NOT NULL,
+ *     pastor_name TEXT,
+ *     note_text   TEXT NOT NULL,
+ *     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+ *   );
+ *   CREATE INDEX IF NOT EXISTS idx_ministry_notes_ministry
+ *     ON ministry_notes (ministry);
+ *
+ * WORKER ENDPOINTS STILL REQUIRED (worker.js lives in /Users/nicolel/ltc-api,
+ * outside this repo — add them there, then redeploy via wrangler):
+ *   GET  /ministry-health
+ *        -> include `notes` (array, newest first) on each card:
+ *           SELECT id, pastor_name, note_text, created_at FROM ministry_notes
+ *           WHERE ministry = ?1 ORDER BY created_at DESC
+ *   POST /ministry-health/:ministry/notes   body { pastor_name, note_text }
+ *        -> INSERT INTO ministry_notes (ministry, pastor_name, note_text)
+ *           VALUES (?1, ?2, ?3)
+ *
+ * Until the table + endpoints exist, saving a note still updates the UI
+ * optimistically but will not persist across reloads.
+ * ──────────────────────────────────────────────────────────────────────────
+ */
+
 const API = "https://ltc-api.farfromtimnah.workers.dev";
 
 // ─── CARISMA LOGO (embedded) ──────────────────────────────────────
@@ -4640,18 +4673,50 @@ function SurveyModal({ ministry, token, lang, onClose }) {
   );
 }
 
-function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes, posAlerts, onClose }) {
+function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose }) {
   var isOwnerRole = role === 'owner';
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
-  var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
-  var displayName = lang === 'PT' ? ptName : card.ministry;
-  var positions = card.positions || [];
+  var ministryKey = (card && card.ministry) || '';
+  var ptName = MH_MINISTRY_PT[ministryKey] || ministryKey;
+  var displayName = lang === 'PT' ? ptName : ministryKey;
+  // Step 3: every .map() guards the array first; every access is null-safe.
+  var positions = (card && card.positions) || [];
   var worst = mhWorstStatus(positions);
   var sc = mhStatusColor(worst);
   var sl = mhStatusLabel(worst, lang);
-  var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
-  var alertNote = posAlerts[card.ministry] || null;
-  var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
+  var leaderName = (card && card.leader_name) || MH_DEFAULT_LEADERS[ministryKey] || null;
+  var leaderPhone = (card && card.leader_whatsapp) ? String(card.leader_whatsapp).replace(/\D/g, '') : '';
+  var alertNote = (posAlerts && posAlerts[ministryKey]) || null;
+
+  var seedNotes = Array.isArray(card && card.notes) ? card.notes : [];
+  var [noteList, setNoteList] = useState(seedNotes);
+  var [noteText, setNoteText] = useState('');
+  var [savingNote, setSavingNote] = useState(false);
+
+  // Newest first (ISO timestamps sort lexicographically = chronologically).
+  var sortedNotes = (Array.isArray(noteList) ? noteList.slice() : []).sort(function(a, b) {
+    return String((b && b.created_at) || '').localeCompare(String((a && a.created_at) || ''));
+  });
+
+  function addMinistryNote() {
+    var text = noteText.trim();
+    if (!text) return;
+    setSavingNote(true);
+    // Auto-stamp the author from Firebase — never ask the pastor to type their name.
+    var authorName = (fbUser && fbUser.displayName) ? fbUser.displayName
+      : (fbUser && fbUser.email) ? fbUser.email : 'Pastor';
+    var optimistic = { id: 'tmp-' + Date.now(), pastor_name: authorName, note_text: text, created_at: new Date().toISOString() };
+    fetch(MH_API + '/ministry-health/' + encodeURIComponent(ministryKey) + '/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ pastor_name: authorName, note_text: text }),
+    }).catch(function() {}).finally(function() { setSavingNote(false); });
+    setNoteList(function(prev) { return [optimistic].concat(Array.isArray(prev) ? prev : []); });
+    setNoteText('');
+  }
+
+  var sectionLabel = {fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.14em',
+    textTransform:'uppercase',color:'#6b7a82',marginBottom:12};
 
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:100,
@@ -4661,35 +4726,17 @@ function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes,
         width:'100%',maxWidth:640,padding:'28px 32px',position:'relative',flexShrink:0}}
         onClick={function(e){e.stopPropagation();}}>
 
-        {/* Modal header */}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:22,gap:12}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}}>
-              <h2 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color:'#e6f1f0'}}>
-                {displayName}
-              </h2>
-              <span style={{fontSize:10,padding:'3px 10px',background:sc+'22',color:sc,
-                borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
-                fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em'}}>
-                {sl}
-              </span>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:13,color:'#6b7a82'}}>
-                {lang==='PT'?'Lider':'Leader'}{': '}
-                <span style={{color:leaderName?'#aebac0':'#475a64'}}>
-                  {leaderName||(lang==='PT'?'Nao definido':'Not set')}
-                </span>
-              </span>
-              {card.leader_whatsapp && (
-                <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{display:'inline-flex',alignItems:'center',padding:'4px 12px',borderRadius:6,
-                    background:'#25D366',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none'}}>
-                  WhatsApp
-                </a>
-              )}
-            </div>
+        {/* SECTION 1 — Header: name + worst-status badge + close */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24,gap:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',flex:1,minWidth:0}}>
+            <h2 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color:'#e6f1f0'}}>
+              {displayName}
+            </h2>
+            <span style={{fontSize:10,padding:'3px 10px',background:sc+'22',color:sc,
+              borderRadius:999,fontWeight:700,whiteSpace:'nowrap',border:'1px solid '+sc+'44',
+              fontFamily:"'JetBrains Mono',monospace",letterSpacing:'0.06em'}}>
+              {sl}
+            </span>
           </div>
           <button onClick={onClose}
             style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',
@@ -4699,28 +4746,30 @@ function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes,
           </button>
         </div>
 
-        {/* Section 1: Position Health */}
+        {/* SECTION 2 — Per-Position Breakdown */}
         <div style={{marginBottom:24}}>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.14em',
-            textTransform:'uppercase',color:'#6b7a82',marginBottom:14}}>
-            {lang==='PT'?'Saude por Funcao':'Position Health'}
-          </div>
+          <div style={sectionLabel}>{lang==='PT'?'Saude por Funcao':'Position Health'}</div>
           <div style={{display:'flex',flexDirection:'column'}}>
-            {positions.map(function(pos) {
-              var actual = mhPosFilled(pos);
-              var pct = (pos && pos.ideal_count > 0) ? Math.min(actual / pos.ideal_count, 1) : 0;
-              var pc = mhStatusColor(mhPosStatus(actual, pos && pos.min_count, pos && pos.ideal_count));
-              var posName = lang === 'PT' ? pos.position_name_pt : pos.position_name;
-              var hasData = actual > 0 || (pos && pos.min_count > 0);
+            {positions.length === 0 && (
+              <div style={{fontSize:13,color:'#475a64'}}>{lang==='PT'?'Sem funcoes cadastradas':'No positions on file'}</div>
+            )}
+            {positions.map(function(pos, pi) {
+              var filled = mhPosFilled(pos);
+              var minC = (pos && pos.min_count) || 0;
+              var idealC = (pos && pos.ideal_count) || 0;
+              var pc = mhStatusColor(mhPosStatus(filled, minC, idealC));
+              // Never divide by 0 — denominator fallback: ideal -> min -> 1.
+              var denom = idealC > 0 ? idealC : (minC > 0 ? minC : 1);
+              var pct = Math.min(filled / denom, 1);
+              var posName = (lang === 'PT' ? (pos && pos.position_name_pt) : (pos && pos.position_name))
+                || (pos && pos.position_name) || (lang==='PT'?'Funcao':'Position');
               return (
-                <div key={pos.position_name}
+                <div key={(pos && pos.position_name) || pi}
                   style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <span style={{fontSize:13,color:'#e6f1f0',fontWeight:500}}>{posName}</span>
-                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginLeft:12}}>
-                      <span style={{fontSize:11,color:'#aebac0',whiteSpace:'nowrap'}}>
-                        {hasData ? actual : '--'} / {pos.min_count} min | {pos.ideal_count} ideal
-                      </span>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,gap:10}}>
+                    <span style={{fontSize:13,color:'#e6f1f0',fontWeight:500,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{posName}</span>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                      <span style={{fontSize:11,color:'#aebac0',fontFamily:"'JetBrains Mono',monospace",whiteSpace:'nowrap'}}>{filled}/{minC}</span>
                       <span style={{width:8,height:8,borderRadius:'50%',background:pc,display:'inline-block',flexShrink:0}}/>
                     </div>
                   </div>
@@ -4742,37 +4791,76 @@ function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes,
           )}
         </div>
 
-        {/* Section 2: Coaching notes (pastor/owner only) */}
-        {isPastorRole && (
-          <div>
-            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.14em',
-              textTransform:'uppercase',color:'#6b7a82',marginBottom:10}}>
-              {lang==='PT'?'Notas Pastorais':'Pastoral Notes'}
-            </div>
-            <textarea
-              value={notes}
-              placeholder={lang==='PT'?'Notas pastorais sobre este ministerio...':'Pastoral notes about this ministry...'}
-              onChange={function(e) {
-                var v = e.target.value;
-                setLocalNotes(function(prev) { var n=Object.assign({},prev); n[card.ministry]=v; return n; });
-              }}
-              onBlur={function(e) { saveNotes(card.ministry, e.target.value); }}
-              rows={3}
-              style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.04)',
-                border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,color:'#aebac0',
-                fontSize:13,padding:'10px 12px',resize:'vertical',fontFamily:'inherit',outline:'none'}} />
+        {/* SECTION 3 — Contact leader (only if a phone number exists) */}
+        <div style={{marginBottom:24}}>
+          <div style={sectionLabel}>{lang==='PT'?'Lider do Ministerio':'Ministry Leader'}</div>
+          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <span style={{fontSize:13,color:leaderName?'#aebac0':'#475a64'}}>
+              {leaderName||(lang==='PT'?'Lider nao definido':'Leader not set')}
+            </span>
+            {leaderPhone && (
+              <a href={'https://wa.me/'+leaderPhone} target="_blank" rel="noreferrer"
+                style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",
+                  background:"linear-gradient(180deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08))",color:"#86efac",
+                  borderRadius:8,border:"1px solid rgba(34,197,94,0.3)",textDecoration:"none",fontWeight:500}}>
+                💬 {lang==='PT'?'Contatar lider':'Contact leader'}
+              </a>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* SECTION 4 — Notes (auto-stamped from Firebase) */}
+        <div style={{marginBottom:24}}>
+          <div style={sectionLabel}>{lang==='PT'?'Notas':'Notes'}</div>
+          {isPastorRole && (
+            <div style={{marginBottom:16}}>
+              <textarea
+                value={noteText}
+                placeholder={lang==='PT'?'Escrever uma nota sobre este ministerio...':'Write a note about this ministry...'}
+                onChange={function(e){ setNoteText(e.target.value); }}
+                rows={3}
+                style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.04)',
+                  border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,color:'#e6f1f0',
+                  fontSize:13,padding:'10px 12px',resize:'vertical',fontFamily:'inherit',outline:'none'}} />
+              <button onClick={addMinistryNote} disabled={savingNote||!noteText.trim()}
+                className={noteText.trim()?'btn-primary':'btn-ghost'}
+                style={{marginTop:8,padding:'9px 20px',opacity:noteText.trim()?1:0.45,cursor:noteText.trim()?'pointer':'default'}}>
+                {lang==='PT'?'Salvar nota':'Save note'}
+              </button>
+            </div>
+          )}
+          {sortedNotes.map(function(note, ni) {
+            return (
+              <div key={(note && note.id) || ni} style={{borderLeft:'2px solid rgba(94,234,212,0.2)',paddingLeft:14,marginBottom:16}}>
+                <div style={{display:'flex',gap:8,marginBottom:4,alignItems:'center',flexWrap:'wrap'}}>
+                  <span style={{fontSize:12,fontWeight:700,color:'#5eead4'}}>{(note && note.pastor_name) || 'Pastor'}</span>
+                  <span style={{fontSize:11,color:'#475a64'}}>{formatNoteDate(note && note.created_at, lang)}</span>
+                </div>
+                <div style={{fontSize:13,color:'#e6f1f0',lineHeight:1.6}}>{(note && note.note_text) || ''}</div>
+              </div>
+            );
+          })}
+          {sortedNotes.length === 0 && (
+            <div style={{fontSize:13,color:'#475a64'}}>{lang==='PT'?'Nenhuma nota ainda':'No notes yet'}</div>
+          )}
+        </div>
+
+        {/* SECTION 5 — Profile synthesis placeholder */}
+        <div style={{paddingTop:18,borderTop:'1px solid rgba(255,255,255,0.05)'}}>
+          <div style={sectionLabel}>{lang==='PT'?'Resumo do Ministerio':'Ministry Summary'}</div>
+          <div style={{fontSize:13,color:'#475a64',fontStyle:'italic'}}>
+            {lang==='PT'?'Em breve':'Coming soon'}
+          </div>
+        </div>
+
       </div>
     </div>
   );
 }
 
-function MinistryHealthTab({ token, role, t, lang }) {
+function MinistryHealthTab({ token, role, t, lang, fbUser }) {
   var [mhList, setMhList] = useState([]);
   var [loading, setLoading] = useState(true);
-  var [savingNotes, setSavingNotes] = useState({});
-  var [localNotes, setLocalNotes] = useState({});
   var [modalMinistry, setModalMinistry] = useState(null);
   var [posAlerts, setPosAlerts] = useState({});
   var [surveyModal, setSurveyModal] = useState(null);
@@ -4783,7 +4871,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
   var [csvHeaders, setCsvHeaders] = useState([]);
   var [csvImporting, setCsvImporting] = useState(false);
   var [csvMsg, setCsvMsg] = useState(null);
-  var [expanded, setExpanded] = useState({});
 
   var isOwnerRole = role === 'owner';
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
@@ -4813,17 +4900,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
   }
 
   useEffect(function() { loadMH(); }, []);
-
-  function saveNotes(ministryName, notes) {
-    setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=true; return n; });
-    fetch(MH_API + '/ministry-health/' + encodeURIComponent(ministryName), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ coaching_notes: notes }),
-    }).finally(function() {
-      setSavingNotes(function(prev) { var n=Object.assign({},prev); n[ministryName]=false; return n; });
-    });
-  }
 
   function parseCSV(text) {
     var lines = text.trim().split('\n');
@@ -5017,7 +5093,7 @@ function MinistryHealthTab({ token, role, t, lang }) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14,alignItems:"start"}}>
             {mhList.map(function(card) {
               var positions = Array.isArray(card && card.positions) ? card.positions : [];
-              // Card status = the WORST position status (not card.card_status, not an average).
+              // Card color = the WORST position status (not card.card_status, not an average).
               var worst = mhWorstStatus(positions);
               var sc = mhStatusColor(worst);
               var sl = mhStatusLabel(worst, lang);
@@ -5027,15 +5103,17 @@ function MinistryHealthTab({ token, role, t, lang }) {
                 return mhPosStatus(mhPosFilled(p), p && p.min_count, p && p.ideal_count) === 'healthy';
               }).length;
               var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
-              var isOpen = !!expanded[card.ministry];
 
+              // Compact, non-expanding card — clicking anywhere opens the Ministry Modal.
               return (
-                <div key={card.ministry} className="glass"
+                <div key={card.ministry} className="glass glow-hover"
+                  onClick={function(){ setModalMinistry(card); }}
                   style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc,
+                    background: sc+'0d',
                     boxShadow: worst === 'critical' ? '0 0 0 1px '+sc+'33, 0 8px 28px '+sc+'22' : 'none',
-                    padding:'18px 20px',display:'flex',flexDirection:'column',gap:10}}>
+                    cursor:'pointer',padding:'18px 20px',display:'flex',flexDirection:'column',gap:10}}>
 
-                  {/* Row 1: name + badge */}
+                  {/* Name + worst-status badge */}
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <h3 style={{margin:0,fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:'#e6f1f0'}}>
                       {displayName}
@@ -5047,77 +5125,20 @@ function MinistryHealthTab({ token, role, t, lang }) {
                     </span>
                   </div>
 
-                  {/* Row 2: leader + whatsapp */}
-                  <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{fontSize:12,color:'#6b7a82'}}>
-                      {lang==='PT'?'Lider':'Leader'}{': '}
-                      <span style={{color:leaderName?'#aebac0':'#475a64'}}>
-                        {leaderName||(lang==='PT'?'Nao definido':'Not set')}
-                      </span>
+                  {/* Leader */}
+                  <div style={{fontSize:12,color:'#6b7a82'}}>
+                    {lang==='PT'?'Lider':'Leader'}{': '}
+                    <span style={{color:leaderName?'#aebac0':'#475a64'}}>
+                      {leaderName||(lang==='PT'?'Nao definido':'Not set')}
                     </span>
-                    {card.leader_whatsapp && (
-                      <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
-                          background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
-                        WhatsApp
-                      </a>
-                    )}
                   </div>
 
-                  {/* Row 3: summary + expand toggle */}
-                  <button
-                    onClick={function(){ setExpanded(function(prev){ var n=Object.assign({},prev); n[card.ministry]=!prev[card.ministry]; return n; }); }}
-                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',
-                      background:'transparent',border:'none',cursor:'pointer',padding:'2px 0',
-                      color:'#6b7a82',fontSize:12,fontFamily:'inherit',textAlign:'left'}}>
-                    <span>
-                      <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
-                      {' / '}{positions.length}
-                      {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
-                    </span>
-                    <span style={{fontSize:9,transform:isOpen?'rotate(180deg)':'none',transition:'transform 0.2s',marginLeft:8,flexShrink:0}}>&#9660;</span>
-                  </button>
-
-                  {/* Per-position breakdown (inline expand) */}
-                  {isOpen && (
-                    <div style={{display:'flex',flexDirection:'column',gap:10,paddingTop:2}}>
-                      {positions.length === 0 && (
-                        <div style={{fontSize:12,color:'#475a64'}}>{lang==='PT'?'Sem funcoes cadastradas':'No positions on file'}</div>
-                      )}
-                      {positions.map(function(pos, pi) {
-                        var filled = mhPosFilled(pos);
-                        var minC = (pos && pos.min_count) || 0;
-                        var idealC = (pos && pos.ideal_count) || 0;
-                        var pst = mhPosStatus(filled, minC, idealC);
-                        var pc = mhStatusColor(pst);
-                        var denom = idealC > 0 ? idealC : (minC > 0 ? minC : 0);
-                        var pct = denom > 0 ? Math.min(filled / denom, 1) : 0;
-                        var posName = (lang === 'PT' ? (pos && pos.position_name_pt) : (pos && pos.position_name))
-                          || (pos && pos.position_name) || (lang==='PT'?'Funcao':'Position');
-                        return (
-                          <div key={(pos && pos.position_name) || pi}>
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,gap:8}}>
-                              <span style={{fontSize:12,color:'#e6f1f0',fontWeight:500,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{posName}</span>
-                              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                                <span style={{fontSize:11,color:'#aebac0',fontFamily:"'JetBrains Mono',monospace",whiteSpace:'nowrap'}}>{filled}/{minC}</span>
-                                <span style={{width:8,height:8,borderRadius:'50%',background:pc,display:'inline-block',flexShrink:0}}/>
-                              </div>
-                            </div>
-                            <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:4,overflow:'hidden'}}>
-                              <div style={{height:'100%',width:(pct*100)+'%',background:pc,borderRadius:4,transition:'width 0.3s'}}/>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <button onClick={function(){setModalMinistry(card);}}
-                        style={{alignSelf:'flex-start',marginTop:2,background:'rgba(94,234,212,0.1)',
-                          border:'1px solid rgba(94,234,212,0.25)',color:'#5eead4',borderRadius:7,
-                          padding:'5px 12px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                        {lang==='PT'?'Detalhes e notas':'Details & notes'}
-                      </button>
-                    </div>
-                  )}
+                  {/* Compact summary (static, not a toggle) */}
+                  <div style={{fontSize:12,color:'#6b7a82'}}>
+                    <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
+                    {' / '}{positions.length}
+                    {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
+                  </div>
                 </div>
               );
             })}
@@ -5131,9 +5152,8 @@ function MinistryHealthTab({ token, role, t, lang }) {
           card={modalMinistry}
           lang={lang}
           role={role}
-          localNotes={localNotes}
-          setLocalNotes={setLocalNotes}
-          saveNotes={saveNotes}
+          token={token}
+          fbUser={fbUser}
           posAlerts={posAlerts}
           onClose={function(){setModalMinistry(null);}}
         />
@@ -6570,7 +6590,7 @@ export default function App() {
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
-            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />
+            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} />
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (

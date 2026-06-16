@@ -4,6 +4,61 @@
 
 ---
 
+DATE: 2026-06-16
+SESSION: Ministry Health REGRESSION FIX — restore tap-to-open Ministry Modal
+STATUS: Complete (frontend, src/App.jsx only) — REQUIRES D1 table + Worker endpoints before notes persist (see below)
+
+REGRESSION (introduced by Stage 1, commit d491bbf): Stage 1 replaced the tap-to-open
+Ministry Modal with inline card expand/collapse. The modal became reachable only via a
+buried "Details & notes" button, effectively breaking the expected card-click → modal flow.
+(Note: MinistryModal itself was never deleted in Stage 1 — only the whole-card onClick was.)
+
+WHAT WAS FIXED (all in src/App.jsx):
+
+Step 1 — Cards are compact and non-expanding again:
+- Removed the chevron toggle, the `expanded` state, the inline per-position rows, and the
+  "Details & notes" button from the card face.
+- Whole card is clickable again (onClick -> setModalMinistry(card)), `.glow-hover` restored.
+- Card still colored by mhWorstStatus(positions): green=all healthy, amber=any warning,
+  red=any critical; added a subtle status-tinted background (sc+'0d') + critical glow.
+- Worst-status + per-position helpers (mhPosFilled / mhPosStatus / mhWorstStatus) are
+  null-guarded; progress-bar denominator falls back ideal -> min -> 1, never divides by 0.
+
+Step 2 — Ministry Modal rebuilt with 5 sections in order:
+- SECTION 1 Header: translated name + worst-status badge + Close (leader/WhatsApp moved out).
+- SECTION 2 Per-Position Breakdown: one row per position — name | filled/min | colored dot
+  (green filled>=ideal, amber filled>=min, red filled<min) | mini bar (fills to ideal, caps
+  100%, denom fallback ideal->min->1). Empty-array guard; owner "unlisted roles" alert kept.
+- SECTION 3 Contact leader: "Contatar lider / Contact leader" WhatsApp button using the SAME
+  style as the Person Modal (green gradient, 💬). Renders ONLY if leader_whatsapp exists.
+- SECTION 4 Notes: list newest-first; each note = pastor name + formatNoteDate(ts,lang) on one
+  line, text below. Textarea + "Salvar nota / Save note". Author auto-stamped from
+  fbUser.displayName || fbUser.email || "Pastor" (never typed). POSTs to
+  /ministry-health/:ministry/notes and prepends optimistically. fbUser threaded App ->
+  MinistryHealthTab -> MinistryModal.
+- SECTION 5 Placeholder: "Resumo do Ministerio / Ministry Summary" heading + muted italic
+  "Em breve / Coming soon".
+
+Step 3 — Null guards + error boundary:
+- positions = (card && card.positions) || []; every .map guards the array; every property
+  access is null-safe (ministryKey, leaderPhone, note fields).
+- MinistryHealthTab render already wrapped in <RefErrorBoundary> (from Stage 1) — confirmed.
+
+Cleanup: removed now-dead single-field coaching_notes state (localNotes/savingNotes/saveNotes)
+from MinistryHealthTab; the modal's multi-note system replaces it.
+
+⚠️ REQUIRED BEFORE NOTES PERSIST (worker.js is in /Users/nicolel/ltc-api — OUTSIDE this repo,
+could not be edited here). A CREATE TABLE comment block was added at the TOP of src/App.jsx:
+- Run in the Cloudflare D1 console (ltc-db): CREATE TABLE ministry_notes (...) — see file header.
+- Add Worker endpoints: GET /ministry-health must return a `notes[]` array (newest first) per
+  card; POST /ministry-health/:ministry/notes { pastor_name, note_text } inserts a row.
+Until both exist, saving a note updates the UI optimistically but will not survive a reload.
+
+BUILD: `npm run build` clean (only the pre-existing >500kB chunk-size warning). 827 modules.
+VERIFICATION: behind Firebase auth — no live browser verification possible this session.
+
+---
+
 DATE: 2026-06-15
 SESSION: Stage 1 Dashboard Quick Wins — nav overflow fix, weekly bar chart, ministry health per-position cards
 STATUS: Complete (frontend, src/App.jsx only — no Worker, no D1 changes)

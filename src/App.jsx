@@ -5687,6 +5687,179 @@ function ReferenceTab({ t, lang, anchor, onAnchorConsumed, onBack }) {
 
 
 
+// ─── USER GRANTS SECTION ─────────────────────────────────────────
+// Stacks ministry_leader / group_leader grants on top of a user's base role.
+// Rendered inside the per-user inline-edit state of UserManagementTab.
+function UserGrantsSection({ token, uid, lang }) {
+  const [grants, setGrants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState("");
+  const [addType, setAddType] = useState("ministry_leader");
+  const [addScope, setAddScope] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addErr, setAddErr] = useState("");
+  const [removingId, setRemovingId] = useState(null);
+  const [removeErr, setRemoveErr] = useState("");
+
+  // Defensive field accessors — exact shapes aren't documented anywhere.
+  const gId = (g) => (g && (g.id ?? g.grant_id ?? g.grantId ?? g.ID)) ?? null;
+  const gType = (g) => (g && (g.grant_type ?? g.grantType ?? g.type)) || "";
+  const gScope = (g) => (g && (g.scope_name ?? g.scopeName ?? g.scope)) || "";
+
+  const typeLabel = (gt) =>
+    gt === "group_leader"
+      ? (lang === "PT" ? "Lider de Grupo" : "Group Leader")
+      : (lang === "PT" ? "Lider de Ministerio" : "Ministry Leader");
+
+  function load() {
+    setLoading(true); setLoadErr("");
+    fetch(`${API}/user/${uid}/grants`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        if (!r.ok) return r.json().catch(() => ({})).then(d => { throw new Error(d.error || r.status); });
+        return r.json();
+      })
+      .then(d => {
+        const arr = Array.isArray(d) ? d : (d && Array.isArray(d.grants) ? d.grants : []);
+        setGrants(arr || []);
+        setLoading(false);
+      })
+      .catch(e => {
+        setLoadErr((lang === "PT" ? "Erro ao carregar permissoes" : "Error loading grants") + (e.message ? ` (${e.message})` : ""));
+        setLoading(false);
+      });
+  }
+
+  useEffect(() => { load(); }, [uid, token]);
+
+  async function handleAdd() {
+    if (!addScope) return;
+    setAdding(true); setAddErr("");
+    try {
+      const r = await fetch(`${API}/user/${uid}/grants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ grant_type: addType, scope_name: addScope })
+      });
+      if (r.status === 409) {
+        setAddErr(lang === "PT" ? "Ja atribuido" : "Already assigned");
+        setAdding(false);
+        return;
+      }
+      if (!r.ok) {
+        let m = r.status;
+        try { const d = await r.json(); m = d.error || m; } catch (e) {}
+        throw new Error(m);
+      }
+      setAddScope("");
+      load(); // refetch so the new chip appears immediately
+    } catch (e) {
+      setAddErr((lang === "PT" ? "Erro ao adicionar" : "Error adding") + (e.message ? ` (${e.message})` : ""));
+    }
+    setAdding(false);
+  }
+
+  async function handleRemove(g) {
+    const id = gId(g);
+    if (id == null) { setRemoveErr(lang === "PT" ? "Nao foi possivel remover" : "Could not remove"); return; }
+    setRemovingId(id); setRemoveErr("");
+    try {
+      const r = await fetch(`${API}/user/${uid}/grants/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!r.ok) {
+        let m = r.status;
+        try { const d = await r.json(); m = d.error || m; } catch (e) {}
+        throw new Error(m);
+      }
+      setGrants(prev => (prev || []).filter(x => gId(x) !== id));
+    } catch (e) {
+      setRemoveErr((lang === "PT" ? "Erro ao remover" : "Error removing") + (e.message ? ` (${e.message})` : ""));
+    }
+    setRemovingId(null);
+  }
+
+  const scopeOptions = addType === "group_leader" ? GL_GROUPS : MH_MINISTRIES;
+  // Group existing grants by type for display.
+  const safeGrants = grants || [];
+  const ministryGrants = safeGrants.filter(g => gType(g) !== "group_leader");
+  const groupGrants = safeGrants.filter(g => gType(g) === "group_leader");
+
+  const labelStyle = { fontFamily: "'JetBrains Mono',monospace", fontSize: "10px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b7a82", marginBottom: 8 };
+  const selStyle = { background: "rgba(5,10,16,0.8)", border: "1px solid rgba(94,234,212,0.25)", borderRadius: 6, color: "#e6f1f0", fontSize: 12, padding: "5px 8px", fontFamily: "'JetBrains Mono',monospace" };
+
+  function chip(g) {
+    const id = gId(g);
+    return (
+      <span key={id ?? `${gType(g)}:${gScope(g)}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 6px 4px 10px", borderRadius: 999, fontSize: 11.5, fontFamily: "'JetBrains Mono',monospace", background: "rgba(94,234,212,0.1)", border: "1px solid rgba(94,234,212,0.25)", color: "#5eead4" }}>
+        <span>{typeLabel(gType(g))}: <span style={{ color: "#e6f1f0" }}>{gScope(g)}</span></span>
+        <button
+          onClick={() => handleRemove(g)}
+          disabled={removingId === id}
+          title={lang === "PT" ? "Remover" : "Remove"}
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: 999, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.06)", color: "#aebac0", fontSize: 11, lineHeight: 1, padding: 0 }}>
+          {removingId === id ? "…" : "✕"}
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "10.5px", letterSpacing: "0.16em", textTransform: "uppercase", color: "#5eead4", marginBottom: 12 }}>
+        {lang === "PT" ? "Permissoes" : "Grants"}
+      </div>
+
+      {loadErr ? (
+        <div style={{ color: "#f87171", fontSize: 12 }}>{loadErr}</div>
+      ) : loading ? (
+        <div style={{ color: "#6b7a82", fontSize: 12 }}>{lang === "PT" ? "Carregando..." : "Loading..."}</div>
+      ) : (
+        <>
+          {safeGrants.length === 0 ? (
+            <div style={{ color: "#6b7a82", fontSize: 12, marginBottom: 14 }}>{lang === "PT" ? "Nenhuma permissao atribuida." : "No grants assigned."}</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+              {ministryGrants.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{ministryGrants.map(chip)}</div>
+              )}
+              {groupGrants.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{groupGrants.map(chip)}</div>
+              )}
+            </div>
+          )}
+          {removeErr && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10 }}>{removeErr}</div>}
+
+          {/* Add grant control */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12 }}>
+            <div>
+              <div style={labelStyle}>{lang === "PT" ? "Tipo" : "Type"}</div>
+              <select value={addType} onChange={e => { setAddType(e.target.value); setAddScope(""); setAddErr(""); }} style={selStyle}>
+                <option value="ministry_leader">{lang === "PT" ? "Lider de Ministerio" : "Ministry Leader"}</option>
+                <option value="group_leader">{lang === "PT" ? "Lider de Grupo" : "Group Leader"}</option>
+              </select>
+            </div>
+            <div>
+              <div style={labelStyle}>{addType === "group_leader" ? (lang === "PT" ? "Grupo" : "Group") : (lang === "PT" ? "Ministerio" : "Ministry")}</div>
+              <select value={addScope} onChange={e => { setAddScope(e.target.value); setAddErr(""); }} style={{ ...selStyle, minWidth: 170 }}>
+                <option value="">{lang === "PT" ? "Selecionar..." : "Select..."}</option>
+                {(scopeOptions || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button
+              onClick={handleAdd}
+              disabled={adding || !addScope}
+              style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontFamily: "'JetBrains Mono',monospace", cursor: addScope ? "pointer" : "not-allowed", border: "1px solid rgba(94,234,212,0.3)", background: "rgba(94,234,212,0.1)", color: "#5eead4", opacity: (adding || !addScope) ? 0.5 : 1 }}>
+              {adding ? "…" : (lang === "PT" ? "Adicionar" : "Add")}
+            </button>
+          </div>
+          {addErr && <div style={{ color: "#f87171", fontSize: 12, marginTop: 10 }}>{addErr}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── USER MANAGEMENT TAB ─────────────────────────────────────────
 function UserManagementTab({ token, t, lang }) {
   const [users, setUsers] = useState([]);
@@ -5830,7 +6003,8 @@ function UserManagementTab({ token, t, lang }) {
                 var lastSignIn = u.lastLoginAt || u.lastSignedInAt;
                 var isEditing = editingUid === u.localId;
                 return (
-                  <tr key={u.localId||i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                  <React.Fragment key={u.localId||i}>
+                  <tr style={{borderBottom: isEditing ? "none" : "1px solid rgba(255,255,255,0.03)"}}>
                     <td style={{padding:"12px 8px 12px 0",color:"#e6f1f0"}}>{u.email}</td>
                     <td style={{padding:"12px 8px 12px 0",color:"#aebac0"}}>{u.displayName || "—"}</td>
                     <td style={{padding:"12px 8px 12px 0"}}>
@@ -5860,6 +6034,16 @@ function UserManagementTab({ token, t, lang }) {
                       )}
                     </td>
                   </tr>
+                  {isEditing && customAttrs.role !== "owner" && (
+                    <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                      <td colSpan={5} style={{padding:"0 0 16px"}}>
+                        <RefErrorBoundary lang={lang} onBack={()=>setEditingUid(null)}>
+                          <UserGrantsSection token={token} uid={u.localId} lang={lang} />
+                        </RefErrorBoundary>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

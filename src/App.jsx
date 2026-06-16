@@ -4867,6 +4867,8 @@ function MinistryHealthTab({ token, role, t, lang, fbUser }) {
   var [loading, setLoading] = useState(true);
   var [modalMinistry, setModalMinistry] = useState(null);
   var [posAlerts, setPosAlerts] = useState({});
+  var [posAlertRows, setPosAlertRows] = useState([]);
+  var [showPosAlerts, setShowPosAlerts] = useState(false);
   var [surveyModal, setSurveyModal] = useState(null);
   var [otherFlags, setOtherFlags] = useState([]);
   var [showOtherFlags, setShowOtherFlags] = useState(false);
@@ -4893,13 +4895,15 @@ function MinistryHealthTab({ token, role, t, lang, fbUser }) {
       fetch(MH_API + '/ministry-positions-alert', { headers: { Authorization: 'Bearer ' + token } })
         .then(function(r) { return r.json(); })
         .then(function(rows) {
+          var list = Array.isArray(rows) ? rows : [];
           var map = {};
-          (rows || []).forEach(function(row) {
-            if (!map[row.ministry]) map[row.ministry] = row.custom_positions_notes;
+          list.forEach(function(row) {
+            if (row && row.ministry && !map[row.ministry]) map[row.ministry] = row.custom_positions_notes;
           });
           setPosAlerts(map);
+          setPosAlertRows(list);
         })
-        .catch(function() {});
+        .catch(function() { setPosAlertRows([]); });
     }
   }
 
@@ -4989,6 +4993,40 @@ function MinistryHealthTab({ token, role, t, lang, fbUser }) {
             <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
               {otherFlags.map(function(f,i) {
                 return <span key={i} style={{color:"#aebac0",fontSize:12}}>{f}</span>;
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom position submissions alert (owner only) — review queue for unlisted positions
+          reported by ministry leaders via the Leader Form free-text field. */}
+      {isOwnerRole && posAlertRows.length > 0 && (
+        <div style={{padding:"12px 18px",borderRadius:10,background:"rgba(243,156,18,0.08)",border:"1px solid rgba(243,156,18,0.25)",cursor:"pointer"}}
+          onClick={function(){setShowPosAlerts(!showPosAlerts);}}>
+          <span style={{color:"#F39C12",fontSize:13,fontWeight:600}}>
+            {lang==="PT"
+              ? posAlertRows.length + ' ministerio(s) relataram posicoes nao listadas'
+              : posAlertRows.length + ' ministr' + (posAlertRows.length===1?'y':'ies') + ' reported unlisted position' + (posAlertRows.length===1?'':'s')}
+          </span>
+          {showPosAlerts && (
+            <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:12}}>
+              {posAlertRows.map(function(row,i) {
+                var ministryRaw = (row && row.ministry) || (lang==="PT"?"Ministerio desconhecido":"Unknown ministry");
+                var ministryName = (lang==="PT" && MH_MINISTRY_PT[ministryRaw]) ? MH_MINISTRY_PT[ministryRaw] : ministryRaw;
+                var leader = (row && row.preferred_name) || (lang==="PT"?"Lider desconhecido":"Unknown leader");
+                var noteTxt = (row && row.custom_positions_notes) || "";
+                var when = (row && row.submitted_at) ? formatNoteDate(row.submitted_at, lang) : "";
+                return (
+                  <div key={(row && row.id) || i} style={{padding:"10px 12px",borderRadius:8,background:"rgba(0,0,0,0.18)",borderLeft:"2px solid #F39C12"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                      <span style={{color:"#e6f1f0",fontSize:13,fontWeight:600}}>{ministryName}</span>
+                      {when && <span style={{color:"#6b7a82",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{when}</span>}
+                    </div>
+                    <div style={{color:"#aebac0",fontSize:12,marginTop:2}}>{leader}</div>
+                    {noteTxt && <div style={{color:"#e6f1f0",fontSize:13,marginTop:6,whiteSpace:"pre-wrap"}}>{noteTxt}</div>}
+                  </div>
+                );
               })}
             </div>
           )}

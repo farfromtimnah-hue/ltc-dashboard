@@ -5,6 +5,49 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Welcome banner fix + Ministry Leader View shell
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: 3896649 (pushed to main)
+
+PART 1 — Welcome banner fix:
+- Added bannerDismissed state (bool, starts false, resets to false on each login in onAuthStateChanged).
+- Banner condition changed from `{fbUser && ...}` to `{fbUser && !bannerDismissed && ...}`.
+- Banner dismissed (set to true) on: any tab button click (tabBtn onClick), More-dropdown tab click,
+  handleNavigate(), onViewChange(). Greeting logic, blessing lines, vision lines unchanged.
+
+PART 2 — Ministry Leader View shell (src/App.jsx, MinistryLeaderView component):
+- On login: fetches GET /user/:uid/grants with the fresh idToken; stores result in myGrants state.
+  Defensive parse: accepts top-level array or .grants array (matching UserGrantsSection pattern).
+- hasMinistryLeaderGrant derived from myGrants; gates the switcher option and hasSwitcher flag.
+- VIEW_OPTS: "Ministry Leader View" / "Visao do Lider de Ministerio" appended conditionally only
+  when hasMinistryLeaderGrant is true. Stacks alongside any other view options the user has.
+- hasSwitcher now: (owner|senior_pastor|pastor role) OR hasMinistryLeaderGrant.
+- onViewChange: handles ministry_leader_view (no special side-effect beyond dismissing banner).
+- Content render: viewMode === 'ministry_leader_view' shows MinistryLeaderView (wrapped in
+  RefErrorBoundary); all other tab renders guard with viewMode !== 'ministry_leader_view' so
+  they don't bleed through.
+- MinistryLeaderView component (inserted just before GroupLeaderView ~line 6299):
+  - Props: lang, grants (the myGrants array from App state).
+  - Null guard: if no ministry_leader grants → graceful access-denied message (not a crash).
+  - Single grant: ministry name displayed as a plain 22px header.
+  - Multiple grants (e.g. Marjorie with Projection + Photo & Video): pill selector at the top;
+    clicking a pill sets activeMinistry state. Pill style matches existing pill/toggle patterns.
+  - Three sub-tabs: Equipe/Team · Agenda/Schedule · Recursos/Resources. Sub-tab bar style matches
+    the main nav tab pattern (underline glow on active, same font/size/letter-spacing).
+  - All three sub-tabs show "Em breve" / "Coming soon" placeholder text for this stage.
+  - POOL/ROSTER placeholder comment in the "team" sub-tab marks exactly where Mode 1/2/3
+    assignment UI will plug in next session: look for the comment "POOL/ROSTER UI GOES HERE".
+  - Wrapped in RefErrorBoundary with onBack={() => setViewMode('my_view')}.
+
+WHAT IS NOT YET BUILT:
+  - Pool/Roster assignment functionality (Mode 1/2/3) — NEXT STAGE. Find insertion point via
+    the "POOL/ROSTER UI GOES HERE" comment inside MinistryLeaderView's "team" sub-tab branch.
+  - Agenda/Schedule sub-tab content (separate work, partially prototyped in SchedulingPrototype).
+  - Recursos/Resources sub-tab content (training library, later phase).
+
+---
+
+DATE: 2026-06-16
 SESSION: Welcome banner — time-of-day greeting + blessing + vision lines
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: 8fadee3 (pushed to main)

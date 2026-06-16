@@ -5874,7 +5874,9 @@ function UserManagementTab({ token, t, lang }) {
   const [createdUser, setCreatedUser] = useState(null);
   const [editingUid, setEditingUid] = useState(null);
   const [editRole, setEditRole] = useState("");
+  const [editName, setEditName] = useState("");
   const [savingRole, setSavingRole] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const roleNames = {
     senior_pastor: t.userRoleSenior,
@@ -5901,18 +5903,34 @@ function UserManagementTab({ token, t, lang }) {
 
   useEffect(() => { loadUsers(); }, [token]);
 
-  async function handleSaveRole(uid) {
-    setSavingRole(true);
+  async function handleSave(uid, originalName) {
+    setSavingRole(true); setSaveError("");
+    const trimmedName = editName.trim();
+    const hadName = (originalName || "").trim() !== "";
+    if (hadName && trimmedName === "") {
+      setSaveError(lang === "PT" ? "Nome não pode ficar vazio." : "Name cannot be blank.");
+      setSavingRole(false);
+      return;
+    }
     try {
-      const r = await fetch(`${API}/admin/user/${uid}/role`, {
+      const rr = await fetch(`${API}/admin/user/${uid}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ role: editRole })
       });
-      const d = await r.json();
-      if (d.success) { setEditingUid(null); loadUsers(); }
-      else setFetchError(d.error || fetchErrMsg);
-    } catch { setFetchError(fetchErrMsg); }
+      const rd = await rr.json();
+      if (!rd.success) { setSaveError(rd.error || fetchErrMsg); setSavingRole(false); return; }
+      if (trimmedName) {
+        const nr = await fetch(`${API}/admin/user/${uid}/name`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name: trimmedName })
+        });
+        const nd = await nr.json();
+        if (!nd.success) { setSaveError(nd.error || (lang === "PT" ? "Erro ao salvar nome." : "Error saving name.")); setSavingRole(false); return; }
+      }
+      setEditingUid(null); setSaveError(""); loadUsers();
+    } catch(e) { setSaveError(e.message || fetchErrMsg); }
     setSavingRole(false);
   }
 
@@ -6006,7 +6024,11 @@ function UserManagementTab({ token, t, lang }) {
                   <React.Fragment key={u.localId||i}>
                   <tr style={{borderBottom: isEditing ? "none" : "1px solid rgba(255,255,255,0.03)"}}>
                     <td style={{padding:"12px 8px 12px 0",color:"#e6f1f0"}}>{u.email}</td>
-                    <td style={{padding:"12px 8px 12px 0",color:"#aebac0"}}>{u.displayName || "—"}</td>
+                    <td style={{padding:"12px 8px 12px 0",color:"#aebac0"}}>
+                      {isEditing ? (
+                        <input type="text" value={editName} onChange={e=>{setEditName(e.target.value);setSaveError("");}} placeholder={lang==="PT"?"Nome completo":"Full name"} style={{background:"rgba(5,10,16,0.8)",border:"1px solid rgba(94,234,212,0.25)",borderRadius:6,color:"#e6f1f0",fontSize:12,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace",width:160}} />
+                      ) : (u.displayName || "—")}
+                    </td>
                     <td style={{padding:"12px 8px 12px 0"}}>
                       {isEditing ? (
                         <select value={editRole} onChange={e=>setEditRole(e.target.value)} style={{background:"rgba(5,10,16,0.8)",border:"1px solid rgba(94,234,212,0.25)",borderRadius:6,color:"#e6f1f0",fontSize:12,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace"}}>
@@ -6022,18 +6044,23 @@ function UserManagementTab({ token, t, lang }) {
                     <td style={{padding:"12px 0",textAlign:"right"}}>
                       {customAttrs.role === "owner" ? null : isEditing ? (
                         <span style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-                          <button onClick={()=>handleSaveRole(u.localId)} disabled={savingRole} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(94,234,212,0.3)",background:"rgba(94,234,212,0.1)",color:"#5eead4"}}>
+                          <button onClick={()=>handleSave(u.localId, u.displayName)} disabled={savingRole} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(94,234,212,0.3)",background:"rgba(94,234,212,0.1)",color:"#5eead4"}}>
                             {savingRole?"…":"✓"}
                           </button>
-                          <button onClick={()=>setEditingUid(null)} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>✕</button>
+                          <button onClick={()=>{setEditingUid(null);setSaveError("");}} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>✕</button>
                         </span>
                       ) : (
-                        <button onClick={()=>{ setEditingUid(u.localId); setEditRole(customAttrs.role || "pastor"); }} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>
+                        <button onClick={()=>{ setEditingUid(u.localId); setEditRole(customAttrs.role || "pastor"); setEditName(u.displayName || ""); setSaveError(""); }} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>
                           {lang==="PT"?"Editar":lang==="ES"?"Editar":"Edit"}
                         </button>
                       )}
                     </td>
                   </tr>
+                  {isEditing && saveError && (
+                    <tr>
+                      <td colSpan={5} style={{padding:"0 0 8px",color:"#f87171",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{saveError}</td>
+                    </tr>
+                  )}
                   {isEditing && customAttrs.role !== "owner" && (
                     <tr style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
                       <td colSpan={5} style={{padding:"0 0 16px"}}>

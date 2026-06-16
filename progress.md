@@ -5,6 +5,54 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Grants UI (ministry_leader / group_leader) in Users tab
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: c2e465d (pushed to main)
+
+STAGE: Foundational access-model stage. This is the admin surface for ASSIGNING grants only.
+The Ministry Leader View itself (Pool tab, etc.) is STILL NOT BUILT. Grants are now stackable on
+top of a user's base role; the views that consume those grants come in a later session.
+
+CONTEXT: Base role per user lives in Firebase customAttributes.role (owner/senior_pastor/pastor/
+group_leader) and was the only access lever. The Worker now exposes grant endpoints to layer
+ministry_leader / group_leader grants on top of any user, with multiple grants per person.
+
+ENDPOINTS (verified live — all return 401 unauthenticated, i.e. routes exist & are auth-gated):
+- GET    /user/:uid/grants                 → list of grants for a user
+- POST   /user/:uid/grants  { grant_type, scope_name }  → 409 on exact duplicate (same type+scope)
+- DELETE /user/:uid/grants/:grantId
+NOTE: no worker session report documented the exact JSON shapes, so the frontend parses GET
+defensively — accepts id/grant_id/grantId, grant_type/grantType/type, scope_name/scopeName/scope,
+and a list at either the top level or under .grants. If the deployed shapes differ, only the field
+accessors (gId/gType/gScope) in UserGrantsSection need adjusting.
+
+WHAT WAS BUILT (all in src/App.jsx):
+- New component UserGrantsSection (above UserManagementTab). Fetches GET /user/:uid/grants on open;
+  shows current grants as removable teal chips labeled "Ministry Leader: <scope>" / "Group Leader:
+  <scope>" (bilingual), grouped by type. Each chip ✕ calls DELETE and removes locally on success;
+  delete failures surface an inline error (not swallowed).
+- "Add Grant" control: Type selector (Ministry Leader / Lider de Ministerio · Group Leader / Lider
+  de Grupo) + Scope dropdown. Scope reuses EXISTING constants — MH_MINISTRIES for ministries,
+  GL_GROUPS for groups (same source the Group Leader View dropdown uses). No new lists.
+  POST on Add; 409 → inline "Already assigned" / "Ja atribuido"; other errors shown verbatim;
+  refetches so the new chip appears immediately. Multiple grants of the same type allowed (only
+  exact dupes blocked, by the backend 409).
+- Rendered INSIDE the existing per-user inline-edit state of the Users tab (table at the role-edit
+  spot) as a full-width colSpan sub-row that appears when Edit is clicked — no new tab/page. Owner
+  rows excluded. Wrapped in RefErrorBoundary so a grants failure can't crash the Users tab.
+- Null guards: every fetch in try/catch, arrays default to [] before .map().
+
+VISUAL: dark theme + teal accent (#5eead4), chip/pill styling consistent with the rest of the app.
+
+BUILD: `npm run build` clean (827 modules; only the pre-existing >500kB chunk-size warning).
+
+NOT VERIFIED IN BROWSER: Users tab is behind Firebase owner login and grant endpoints are
+auth-gated, so a local preview only shows the login wall without Nicole's credentials. Verified via
+clean build + defensive coding instead.
+
+---
+
+DATE: 2026-06-16
 SESSION: Owner-only alert banner for custom position submissions
 STATUS: Complete (frontend, src/App.jsx only) — built, built clean, pushed
 COMMIT: 19dd5d5 (pushed to main)

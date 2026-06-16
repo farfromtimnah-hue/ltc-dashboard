@@ -5,6 +5,37 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Inline name editing in Users tab
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: 2511b9d (pushed to main)
+
+CONTEXT: Users created before the displayName field was set (or before POST /admin/user was
+fixed to persist it) showed "—" in the Name column with no way to backfill. The Worker-side
+PUT /admin/user/:uid/name endpoint was added in the ltc-api session immediately prior to this one.
+
+WHAT WAS BUILT (all in src/App.jsx, UserManagementTab):
+- New state: editName (string), saveError (string) added alongside existing editingUid/editRole.
+- handleSaveRole renamed to handleSave(uid, originalName). Now calls both endpoints in one save:
+  1. Always PUT /admin/user/:uid/role (matching prior behavior — saves even if role unchanged)
+  2. PUT /admin/user/:uid/name only if editName.trim() is non-empty
+  Validation: if user had a name (originalName non-empty) and clears the field → blocks save with
+  inline error "Name cannot be blank." / "Nome não pode ficar vazio." — never allows blanking a name
+  silently. If user was already blank and leaves it blank → name endpoint skipped, role still saves.
+- Name cell: plain text {u.displayName || "—"} in view mode; <input> pre-filled with
+  u.displayName || "" in edit mode. Same border/font style as the existing role <select>.
+- Edit button onClick: now also seeds setEditName(u.displayName || "") and clears setSaveError("").
+- Cancel button onClick: now also calls setSaveError("") on close.
+- saveError displays as a full-width <tr colSpan=5> sub-row immediately below the edit row, above
+  the grants sub-row. Inline to the user's row — not the global fetchError above the table.
+- Owner rows remain non-editable (existing owner check preserved unchanged).
+- On success: setEditingUid(null) + loadUsers() so new name replaces "—" immediately.
+
+BUILD: npm run build clean (827 modules; only pre-existing >500kB chunk-size warning).
+NOT VERIFIED IN BROWSER: auth-gated behind Firebase owner login.
+
+---
+
+DATE: 2026-06-16
 SESSION: Grants UI (ministry_leader / group_leader) in Users tab
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: c2e465d (pushed to main)

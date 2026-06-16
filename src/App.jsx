@@ -6314,11 +6314,296 @@ function GroupHealthBox({ attending, serving, lang, groupName }) {
   );
 }
 
+// ─── LEADER PERSON MODAL (Mode 1) ─────────────────────────────────────────────
+// Standalone component — intentionally separate from PersonPanel. Do NOT merge or share props.
+// Shows: photo+name, current ministries, groups attended, top giftings, position checkboxes.
+function LeaderPersonModal({ person, ministryName, ministryPositions, token, lang, onClose, onChanged }) {
+  // Local state tracks which positions are assigned: { position_name -> volunteer_positions id }
+  const [localAssigned, setLocalAssigned] = React.useState(function() {
+    var map = {};
+    ((person && person.volunteer_positions) || [])
+      .filter(function(vp) { return vp.ministry_name === ministryName; })
+      .forEach(function(vp) { map[vp.position_name] = vp.id; });
+    return map;
+  });
+  const [toggling, setToggling] = React.useState({}); // position_name -> bool
+
+  const displayName = (person && (person.preferred_name || person.name)) || "?";
+  const ministries = parseJSON((person && person.current_ministries));
+  const groups = parseJSON((person && person.group_attendance));
+  const topGiftings = [
+    person && person.gifting_1,
+    person && person.gifting_2,
+    person && person.gifting_3
+  ].filter(Boolean);
+
+  async function togglePosition(positionName) {
+    var existingId = localAssigned[positionName];
+    setToggling(function(prev) { return Object.assign({}, prev, {[positionName]: true}); });
+    try {
+      if (existingId) {
+        await fetch(MH_API + '/volunteer-positions/' + existingId, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        setLocalAssigned(function(prev) {
+          var n = Object.assign({}, prev);
+          delete n[positionName];
+          return n;
+        });
+      } else {
+        var res = await fetch(MH_API + '/volunteer-positions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ person_id: person.id, ministry_name: ministryName, position_name: positionName })
+        });
+        var data = await res.json().catch(function() { return {}; });
+        var newId = (data && data.id) || ('_' + Date.now());
+        setLocalAssigned(function(prev) { return Object.assign({}, prev, {[positionName]: newId}); });
+      }
+      onChanged();
+    } catch(e) { /* silent — UI stays optimistic */ }
+    setToggling(function(prev) { return Object.assign({}, prev, {[positionName]: false}); });
+  }
+
+  var tx = {
+    close:       lang === 'PT' ? 'Fechar' : 'Close',
+    ministries:  lang === 'PT' ? 'Ministerios que serve' : 'Ministries serving in',
+    groups:      lang === 'PT' ? 'Grupos que frequenta' : 'Groups attended',
+    giftings:    lang === 'PT' ? 'Dons principais' : 'Top giftings',
+    positions:   lang === 'PT' ? 'Posicoes nesta ministerio' : 'Positions in this ministry',
+    none:        lang === 'PT' ? 'Nenhum' : 'None',
+    saving:      lang === 'PT' ? 'Salvando...' : 'Saving...',
+  };
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:5000,display:'flex',alignItems:'flex-start',justifyContent:'flex-end',paddingTop:0}}>
+      <div onClick={function(e){e.stopPropagation();}} style={{width:380,maxWidth:'95vw',height:'100vh',overflowY:'auto',background:'#08121a',borderLeft:'1px solid rgba(94,234,212,0.18)',boxShadow:'-8px 0 40px rgba(0,0,0,0.5)',display:'flex',flexDirection:'column'}}>
+        {/* Header */}
+        <div style={{padding:'20px 20px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',gap:14,background:'linear-gradient(180deg,rgba(94,234,212,0.06),transparent)',flexShrink:0}}>
+          {(person && person.photo_url) ? (
+            <img src={person.photo_url} alt={displayName} style={{width:48,height:48,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(94,234,212,0.4)',flexShrink:0}} />
+          ) : (
+            <div style={{width:48,height:48,borderRadius:'50%',background:'linear-gradient(135deg,rgba(94,234,212,0.18),rgba(94,234,212,0.04))',border:'2px solid rgba(94,234,212,0.22)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,color:'#5eead4'}}>
+              {displayName[0].toUpperCase()}
+            </div>
+          )}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,color:'#e6f1f0',lineHeight:1.2,wordBreak:'break-word'}}>{displayName}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7a82',fontSize:18,cursor:'pointer',padding:'4px 8px',flexShrink:0}}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{flex:1,padding:'20px',overflowY:'auto',display:'flex',flexDirection:'column',gap:20}}>
+
+          {/* Section 2 — Current ministries */}
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:'#475a64',marginBottom:8}}>{tx.ministries}</div>
+            {ministries.length > 0 ? (
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {ministries.map(function(m) {
+                  return (
+                    <span key={m} style={{fontSize:11,padding:'3px 10px',background:'rgba(94,234,212,0.07)',color:'#5eead4',borderRadius:999,border:'1px solid rgba(94,234,212,0.18)'}}>
+                      {lang === 'PT' ? (MINISTRY_PT[m] || m) : m}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span style={{fontSize:12,color:'#475a64'}}>{tx.none}</span>
+            )}
+          </div>
+
+          {/* Section 3 — Groups attended */}
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:'#475a64',marginBottom:8}}>{tx.groups}</div>
+            {groups.length > 0 ? (
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {groups.map(function(g) {
+                  return (
+                    <span key={g} style={{fontSize:11,padding:'3px 10px',background:'rgba(255,255,255,0.04)',color:'#aebac0',borderRadius:999,border:'1px solid rgba(255,255,255,0.08)'}}>
+                      {g}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span style={{fontSize:12,color:'#475a64'}}>{tx.none}</span>
+            )}
+          </div>
+
+          {/* Section 4 — Top giftings */}
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:'#475a64',marginBottom:8}}>{tx.giftings}</div>
+            {topGiftings.length > 0 ? (
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {topGiftings.map(function(g, i) {
+                  return (
+                    <span key={g} style={{fontSize:11,padding:'3px 10px',background:i===0?'rgba(94,234,212,0.1)':'rgba(255,255,255,0.04)',color:i===0?'#5eead4':'#aebac0',borderRadius:999,border:i===0?'1px solid rgba(94,234,212,0.22)':'1px solid rgba(255,255,255,0.08)',fontWeight:i===0?600:400}}>
+                      {'#'+(i+1)+' '+(lang==='PT'?(GIFTING_PT[g]||g):g)}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span style={{fontSize:12,color:'#475a64'}}>{tx.none}</span>
+            )}
+          </div>
+
+          {/* Section 5 — Position checkboxes */}
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:'#475a64',marginBottom:8}}>{tx.positions}</div>
+            {(ministryPositions || []).length === 0 ? (
+              <span style={{fontSize:12,color:'#475a64'}}>{tx.none}</span>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {(ministryPositions || []).map(function(pos) {
+                  var posName = pos.position_name || pos.name || '';
+                  var isChecked = !!localAssigned[posName];
+                  var isSaving = !!toggling[posName];
+                  return (
+                    <label key={posName} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',padding:'8px 10px',borderRadius:8,background:isChecked?'rgba(94,234,212,0.06)':'rgba(255,255,255,0.02)',border:isChecked?'1px solid rgba(94,234,212,0.18)':'1px solid rgba(255,255,255,0.05)',transition:'all 0.15s'}}>
+                      <input type="checkbox" checked={isChecked} disabled={isSaving}
+                        onChange={function() { togglePosition(posName); }}
+                        style={{accentColor:'#5eead4',width:15,height:15,flexShrink:0,cursor:'pointer'}} />
+                      <span style={{flex:1,fontSize:13,color:isChecked?'#e6f1f0':'#aebac0',fontFamily:"'Space Grotesk',sans-serif"}}>{posName}</span>
+                      {isSaving && (
+                        <span style={{fontSize:10,color:'#5eead4',fontFamily:"'JetBrains Mono',monospace"}}>{tx.saving}</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── POSITION ASSIGN MODAL (Mode 2) ────────────────────────────────────────────
+// Opened when user clicks a position row in the positions list.
+// Shows: position name header, searchable roster multi-select, toggle calls POST/DELETE.
+function PositionAssignModal({ position, roster, ministryName, token, lang, onClose, onChanged }) {
+  var posName = (position && (position.position_name || position.name)) || '';
+
+  // Local state: { person_id -> volunteer_positions id }
+  const [localAssigned, setLocalAssigned] = React.useState(function() {
+    var map = {};
+    (roster || []).forEach(function(person) {
+      ((person && person.volunteer_positions) || [])
+        .filter(function(vp) { return vp.ministry_name === ministryName && vp.position_name === posName; })
+        .forEach(function(vp) { map[person.id] = vp.id; });
+    });
+    return map;
+  });
+  const [toggling, setToggling] = React.useState({});
+  const [search, setSearch] = React.useState('');
+
+  var filteredRoster = (roster || []).filter(function(p) {
+    if (!search.trim()) return true;
+    var name = (p.preferred_name || p.name || '').toLowerCase();
+    return name.includes(search.toLowerCase());
+  });
+
+  async function togglePerson(person) {
+    var existingId = localAssigned[person.id];
+    setToggling(function(prev) { return Object.assign({}, prev, {[person.id]: true}); });
+    try {
+      if (existingId) {
+        await fetch(MH_API + '/volunteer-positions/' + existingId, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        setLocalAssigned(function(prev) { var n = Object.assign({}, prev); delete n[person.id]; return n; });
+      } else {
+        var res = await fetch(MH_API + '/volunteer-positions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ person_id: person.id, ministry_name: ministryName, position_name: posName })
+        });
+        var data = await res.json().catch(function() { return {}; });
+        var newId = (data && data.id) || ('_' + Date.now());
+        setLocalAssigned(function(prev) { return Object.assign({}, prev, {[person.id]: newId}); });
+      }
+      onChanged();
+    } catch(e) { /* silent */ }
+    setToggling(function(prev) { return Object.assign({}, prev, {[person.id]: false}); });
+  }
+
+  var tx = {
+    close:      lang === 'PT' ? 'Fechar' : 'Close',
+    position:   lang === 'PT' ? 'Posicao' : 'Position',
+    search:     lang === 'PT' ? 'Buscar por nome...' : 'Search by name...',
+    noResults:  lang === 'PT' ? 'Nenhum resultado' : 'No results',
+    saving:     lang === 'PT' ? 'Salvando...' : 'Saving...',
+    team:       lang === 'PT' ? 'Equipe' : 'Team',
+  };
+
+  var showSearch = (roster || []).length > 15;
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:5000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div onClick={function(e){e.stopPropagation();}} style={{width:440,maxWidth:'95vw',maxHeight:'85vh',overflowY:'auto',background:'#08121a',border:'1px solid rgba(94,234,212,0.18)',borderRadius:16,boxShadow:'0 8px 40px rgba(0,0,0,0.6)',display:'flex',flexDirection:'column'}}>
+        {/* Header */}
+        <div style={{padding:'18px 20px 14px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'linear-gradient(180deg,rgba(94,234,212,0.06),transparent)'}}>
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:'#475a64',marginBottom:4}}>{tx.position}</div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,color:'#e6f1f0'}}>{posName}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7a82',fontSize:18,cursor:'pointer',padding:'4px 8px'}}> × </button>
+        </div>
+
+        {/* Search — only if roster > 15 */}
+        {showSearch && (
+          <div style={{padding:'12px 20px 0',flexShrink:0}}>
+            <input value={search} onChange={function(e){setSearch(e.target.value);}}
+              placeholder={tx.search}
+              style={{width:'100%',boxSizing:'border-box',padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(94,234,212,0.18)',borderRadius:8,color:'#e6f1f0',fontSize:13,fontFamily:"'Space Grotesk',sans-serif",outline:'none'}} />
+          </div>
+        )}
+
+        {/* Roster list */}
+        <div style={{flex:1,overflowY:'auto',padding:'12px 20px 20px',display:'flex',flexDirection:'column',gap:6}}>
+          {filteredRoster.length === 0 ? (
+            <div style={{color:'#475a64',fontSize:13,textAlign:'center',padding:20}}>{tx.noResults}</div>
+          ) : filteredRoster.map(function(person) {
+            var pName = person.preferred_name || person.name || '?';
+            var isChecked = !!localAssigned[person.id];
+            var isSaving = !!toggling[person.id];
+            return (
+              <label key={person.id} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',padding:'8px 10px',borderRadius:8,background:isChecked?'rgba(94,234,212,0.06)':'rgba(255,255,255,0.02)',border:isChecked?'1px solid rgba(94,234,212,0.18)':'1px solid rgba(255,255,255,0.05)',transition:'all 0.15s'}}>
+                <input type="checkbox" checked={isChecked} disabled={isSaving}
+                  onChange={function() { togglePerson(person); }}
+                  style={{accentColor:'#5eead4',width:15,height:15,flexShrink:0,cursor:'pointer'}} />
+                {person.photo_url ? (
+                  <img src={person.photo_url} alt={pName} style={{width:30,height:30,borderRadius:'50%',objectFit:'cover',border:'1px solid rgba(94,234,212,0.3)',flexShrink:0}} />
+                ) : (
+                  <div style={{width:30,height:30,borderRadius:'50%',background:'linear-gradient(135deg,rgba(94,234,212,0.15),rgba(94,234,212,0.04))',border:'1px solid rgba(94,234,212,0.18)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#5eead4',fontFamily:"'Space Grotesk',sans-serif"}}>
+                    {pName[0].toUpperCase()}
+                  </div>
+                )}
+                <span style={{flex:1,fontSize:13,color:isChecked?'#e6f1f0':'#aebac0',fontFamily:"'Space Grotesk',sans-serif"}}>{pName}</span>
+                {isSaving && (
+                  <span style={{fontSize:10,color:'#5eead4',fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{tx.saving}</span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MINISTRY LEADER VIEW ──────────────────────────────────────────────────────
 // Shell only. Pool/Roster (Mode 1/2/3 assignment UI) plugs into MinistryTeamTab below.
 // hasBlanketAccess: owner/senior_pastor/pastor — nav dropdown controls ministry (activeMinistryOverride).
 // Grant-only: pill or single-header selector inside this component; activeMinistryOverride sets initial value.
-function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOverride }) {
+function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOverride, token }) {
   const ministryGrants = (grants || []).filter(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
 
   // Access guard — should never be reachable without access, but guard anyway.
@@ -6340,6 +6625,36 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
   // Blanket-access: ministry is fully controlled by the nav dropdown (activeMinistryOverride).
   // Grant-only: ministry is controlled internally via pill/header.
   const currentMinistry = hasBlanketAccess ? (activeMinistryOverride || "") : activeMinistry;
+
+  // Equipe tab data
+  const [roster, setRoster] = React.useState([]);
+  const [ministryPositions, setMinistryPositions] = React.useState([]);
+  const [equipeLoading, setEquipeLoading] = React.useState(false);
+  const [selectedPerson, setSelectedPerson] = React.useState(null); // Mode 1
+  const [selectedPosition, setSelectedPosition] = React.useState(null); // Mode 2
+
+  const loadEquipe = React.useCallback(function() {
+    if (!currentMinistry || !token) return;
+    setEquipeLoading(true);
+    var rosterUrl = MH_API + '/ministry/' + encodeURIComponent(currentMinistry) + '/roster';
+    var healthUrl = MH_API + '/ministry-health';
+    Promise.all([
+      fetch(rosterUrl, { headers: { Authorization: 'Bearer ' + token } }).then(function(r) { return r.json(); }).catch(function() { return []; }),
+      fetch(healthUrl, { headers: { Authorization: 'Bearer ' + token } }).then(function(r) { return r.json(); }).catch(function() { return []; })
+    ]).then(function(results) {
+      var rosterData = Array.isArray(results[0]) ? results[0] : [];
+      var healthList = Array.isArray(results[1]) ? results[1] : [];
+      setRoster(rosterData);
+      // Find this ministry's positions from health data
+      var card = healthList.find(function(c) { return c && c.ministry === currentMinistry; });
+      setMinistryPositions(Array.isArray(card && card.positions) ? card.positions : []);
+      setEquipeLoading(false);
+    });
+  }, [currentMinistry, token]);
+
+  React.useEffect(function() {
+    if (mlTab === 'team') loadEquipe();
+  }, [mlTab, loadEquipe]);
 
   const tx = {
     team:      lang === "PT" ? "Equipe"   : "Team",
@@ -6420,12 +6735,152 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
 
       {/* Sub-tab content */}
       {mlTab === "team" && (
-        <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
-          {/* POOL/ROSTER UI GOES HERE — next session will build Mode 1/2/3 assignment
-              logic here: Pool tab (unassigned volunteers), Roster (confirmed for service),
-              mode switching, and date-based scheduling. Ministry context: currentMinistry. */}
-          {tx.soon}
-        </div>
+        <RefErrorBoundary onBack={function() { setMlTab("schedule"); }}>
+          <div>
+            {equipeLoading ? (
+              <div style={{color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:12,padding:"40px 0",textAlign:"center"}}>{lang==="PT"?"Carregando...":"Loading..."}</div>
+            ) : (
+              <div>
+
+                {/* ── TOP: Equipe / Roster grid ── */}
+                <div style={{marginBottom:40}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:16}}>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:"#475a64"}}>
+                      {lang==="PT"?"EQUIPE":"TEAM"}
+                    </span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64"}}>
+                      {"("+(roster||[]).length+")"}
+                    </span>
+                  </div>
+
+                  {(roster||[]).length === 0 ? (
+                    <div style={{color:"#475a64",fontSize:13,fontFamily:"'Space Grotesk',sans-serif",padding:"20px 0"}}>
+                      {lang==="PT"?"Nenhum membro encontrado neste ministerio.":"No members found for this ministry."}
+                    </div>
+                  ) : (
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
+                      {(roster||[]).map(function(person) {
+                        var pName = person.preferred_name || person.name || "?";
+                        var pMins = parseJSON(person.current_ministries);
+                        var topGift = person.gifting_1 ? (lang==="PT"?(GIFTING_PT[person.gifting_1]||person.gifting_1):person.gifting_1) : null;
+                        // Positions assigned in THIS ministry
+                        var myPos = ((person.volunteer_positions)||[]).filter(function(vp){ return vp.ministry_name===currentMinistry; });
+                        return (
+                          <div key={person.id} onClick={function(){ setSelectedPerson(person); }}
+                            className="glass glow-hover"
+                            style={{borderRadius:10,padding:"14px 14px 12px",cursor:"pointer",transition:"all 0.18s",borderTop:"1px solid rgba(94,234,212,0.12)"}}>
+                            {/* Photo + name row */}
+                            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                              {person.photo_url ? (
+                                <img src={person.photo_url} alt={pName} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(94,234,212,0.35)",flexShrink:0}} />
+                              ) : (
+                                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,rgba(94,234,212,0.18),rgba(94,234,212,0.04))",border:"1px solid rgba(94,234,212,0.2)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#5eead4",fontFamily:"'Space Grotesk',sans-serif"}}>
+                                  {pName[0].toUpperCase()}
+                                </div>
+                              )}
+                              <div style={{minWidth:0}}>
+                                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:700,color:"#e6f1f0",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pName}</div>
+                                {topGift && <div style={{fontSize:10,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",marginTop:2,opacity:0.8}}>{topGift}</div>}
+                              </div>
+                            </div>
+                            {/* Ministry chips (other ministries this person serves) */}
+                            {pMins.length > 0 && (
+                              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                                {pMins.slice(0,3).map(function(m){
+                                  return <span key={m} style={{fontSize:10,padding:"2px 7px",background:"rgba(255,255,255,0.04)",color:"#6b7a82",borderRadius:999,border:"1px solid rgba(255,255,255,0.07)"}}>
+                                    {lang==="PT"?(MINISTRY_PT[m]||m):m}
+                                  </span>;
+                                })}
+                              </div>
+                            )}
+                            {/* Position tags for THIS ministry */}
+                            <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                              {myPos.length > 0 ? myPos.map(function(vp){
+                                return <span key={vp.id||vp.position_name} style={{fontSize:10,padding:"2px 8px",background:"rgba(94,234,212,0.1)",color:"#5eead4",borderRadius:999,border:"1px solid rgba(94,234,212,0.22)",fontWeight:600}}>
+                                  {vp.position_name}
+                                </span>;
+                              }) : (
+                                <span style={{fontSize:10,color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontStyle:"italic"}}>
+                                  {lang==="PT"?"Sem posicao":"No position"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── BOTTOM: Posicoes / Positions list ── */}
+                <div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:"#475a64",marginBottom:14}}>
+                    {lang==="PT"?"POSICOES":"POSITIONS"}
+                  </div>
+                  {ministryPositions.length === 0 ? (
+                    <div style={{color:"#475a64",fontSize:13,fontFamily:"'Space Grotesk',sans-serif"}}>
+                      {lang==="PT"?"Nenhuma posicao cadastrada.":"No positions on file."}
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {ministryPositions.map(function(pos) {
+                        var posName = pos.position_name || pos.name || "";
+                        // Count how many in roster are assigned to this position
+                        var filledFromRoster = (roster||[]).filter(function(p){
+                          return ((p.volunteer_positions)||[]).some(function(vp){ return vp.ministry_name===currentMinistry && vp.position_name===posName; });
+                        }).length;
+                        // Use filled from roster if > 0, otherwise fall back to mhPosFilled (form+system counts)
+                        var filled = filledFromRoster > 0 ? filledFromRoster : mhPosFilled(pos);
+                        var minC = pos.min_count || 0;
+                        var idealC = pos.ideal_count || 0;
+                        var st = mhPosStatus(filled, minC, idealC);
+                        var dotColor = st==="healthy"?"#34d399":st==="needs_volunteers"?"#f59e0b":st==="critical"?"#f87171":"#475a64";
+                        return (
+                          <div key={posName} onClick={function(){ setSelectedPosition(pos); }}
+                            className="glow-hover"
+                            style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",cursor:"pointer",transition:"all 0.15s"}}>
+                            <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0,boxShadow:"0 0 6px "+dotColor+"99"}} />
+                            <span style={{flex:1,fontFamily:"'Space Grotesk',sans-serif",fontSize:13,color:"#e6f1f0"}}>{posName}</span>
+                            <span style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#6b7a82",flexShrink:0}}>
+                              {filled}{minC>0?" / "+minC:""}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* Mode 1 — person modal */}
+            {selectedPerson && (
+              <LeaderPersonModal
+                person={selectedPerson}
+                ministryName={currentMinistry}
+                ministryPositions={ministryPositions}
+                token={token}
+                lang={lang}
+                onClose={function(){ setSelectedPerson(null); }}
+                onChanged={function(){ loadEquipe(); }}
+              />
+            )}
+
+            {/* Mode 2 — position assign modal */}
+            {selectedPosition && (
+              <PositionAssignModal
+                position={selectedPosition}
+                roster={roster||[]}
+                ministryName={currentMinistry}
+                token={token}
+                lang={lang}
+                onClose={function(){ setSelectedPosition(null); }}
+                onChanged={function(){ loadEquipe(); }}
+              />
+            )}
+          </div>
+        </RefErrorBoundary>
       )}
       {mlTab === "schedule" && (
         <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
@@ -7075,7 +7530,7 @@ export default function App() {
           : null}
         {viewMode === 'ministry_leader_view' && (!hasBlanketMLAccess || glMinistry) && (
           <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>
-            <MinistryLeaderView lang={lang} grants={myGrants} hasBlanketAccess={hasBlanketMLAccess} activeMinistryOverride={glMinistry} />
+            <MinistryLeaderView lang={lang} grants={myGrants} hasBlanketAccess={hasBlanketMLAccess} activeMinistryOverride={glMinistry} token={token} />
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}

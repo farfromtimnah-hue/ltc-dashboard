@@ -6520,6 +6520,33 @@ function GroupLeaderView({ token, lang, groupName }) {
   );
 }
 
+const WELCOME_BLESSINGS = {
+  PT: [
+    "Que Deus te abençoe hoje enquanto serves.",
+    "Que Deus fale ao seu coração enquanto cuida das ovelhas Dele.",
+    "Que Deus abençoe você e sua família hoje.",
+  ],
+  EN: [
+    "May God bless you today as you serve.",
+    "May God speak to your heart as you care for His sheep.",
+    "May God bless you and your family today.",
+  ],
+};
+const WELCOME_VISIONS = {
+  PT: [
+    "Uma igreja grande para servir e pequena para se importar.",
+    "Levando cada pessoa a um relacionamento público e crescente com Jesus Cristo.",
+    "Obrigado por cuidar do Corpo de Cristo com excelência.",
+    "Cada pessoa que você ajuda a conectar é um passo na missão de alcançar 10% da nossa cidade para Cristo.",
+  ],
+  EN: [
+    "A church big enough to serve and small enough to care.",
+    "Leading each person to a public and growing relationship with Jesus Christ.",
+    "Thank you for caring for the Body of Christ with excellence.",
+    "Every person you help connect is a step toward reaching 10% of our city for Christ.",
+  ],
+};
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
@@ -6530,6 +6557,8 @@ export default function App() {
   const [lang, setLang] = useState("PT");
   const [viewMode, setViewMode] = useState("my_view");
   const [glGroup, setGlGroup] = useState("");
+  const [welcomeBlessing] = useState(() => Math.floor(Math.random() * 3));
+  const [welcomeVision] = useState(() => Math.floor(Math.random() * 4));
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   // Priority+ nav: measure the actual rendered width of the nav row and of every
@@ -6835,6 +6864,28 @@ export default function App() {
 
       {/* Content */}
       <div style={{maxWidth:1600,margin:"0 auto"}}>
+
+        {/* Welcome banner — rendered once per login, random lines stable for the session */}
+        {fbUser && (() => {
+          const h = new Date().getHours();
+          const greeting = h >= 5 && h < 12 ? "Bom dia" : h >= 12 && h < 18 ? "Boa tarde" : "Boa noite";
+          const name = (fbUser.displayName || fbUser.email || "").trim();
+          const langKey = lang === "EN" ? "EN" : "PT";
+          return (
+            <div style={{padding:"28px 32px 0",maxWidth:860}}>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:22,color:"#e6f1f0",marginBottom:6,lineHeight:1.25}}>
+                {greeting}{name ? `, ${name}` : ""}!
+              </div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,color:"#aebac0",marginBottom:5,lineHeight:1.5}}>
+                {WELCOME_BLESSINGS[langKey][welcomeBlessing]}
+              </div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"11px",letterSpacing:"0.06em",color:"#475a64",lineHeight:1.6}}>
+                {WELCOME_VISIONS[langKey][welcomeVision]}
+              </div>
+            </div>
+          );
+        })()}
+
         {viewMode === 'group_leader' && glGroup
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}

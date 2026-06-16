@@ -5,6 +5,56 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Blanket owner/pastor access to Ministry Leader View + Ministry Modal entry point
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: 7e896cd (pushed to main)
+
+WHAT WAS BUILT:
+
+Part 1 — Blanket access logic:
+- Added `hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor'`
+  (mirrors the existing `isPastorRole` pattern from MinistryModal/MinistryHealthTab).
+- Added `hasAnyMLAccess = hasBlanketMLAccess || hasMinistryLeaderGrant`.
+- VIEW_OPTS: ministry_leader_view option now shows for `hasAnyMLAccess` (was: only `hasMinistryLeaderGrant`).
+- hasSwitcher already covered blanket roles; no change needed there.
+
+Part 2 — Selector behavior by access type:
+- `glMinistry` state added (parallel to `glGroup`), cleared on switch to my_view.
+- `switcherNav()` and `switcherMore()`: when `viewMode === 'ministry_leader_view'` AND `hasBlanketMLAccess`,
+  a secondary ministry dropdown appears (same style as group_leader's glGroup dropdown), populated with
+  full `MH_MINISTRIES` list. Grant-only users see no secondary nav dropdown.
+- Content block guard: `(!hasBlanketMLAccess || glMinistry)` — blanket-access users must pick a ministry
+  from the nav dropdown before the view renders (same behavior as group_leader requiring glGroup).
+  Grant-only users go straight in (component handles selection internally).
+- `MinistryLeaderView` updated with new props: `hasBlanketAccess` (bool), `activeMinistryOverride` (string).
+  - Blanket access: `currentMinistry = activeMinistryOverride` (nav dropdown controls it); ministry shown
+    as plain 22px header in the component (no pills — the dropdown IS the selector).
+  - Grant-only, 1 ministry: plain header as before.
+  - Grant-only, multiple ministries: pill selector as before.
+  - Both+blanket: blanket wins — nav dropdown + plain header, no pills.
+  - `activeMinistryOverride` also seeds the internal `activeMinistry` state for grant-only users
+    navigating in from the Ministry Modal button.
+
+Part 3 — Ministry Modal entry point:
+- `MinistryModal` now accepts optional `onNavigateToML` prop (callback).
+- Button "↗ Ver Visao do Lider" / "↗ View Leader Dashboard" added in Section 3 (Contact Leader row),
+  alongside the WhatsApp button. Teal color scheme, same size/padding. Visible only when `onNavigateToML`
+  is defined (i.e. when the user has access to ML view for this ministry).
+- `MinistryHealthTab` now accepts `onNavigateToML` and `userGrants` props from App().
+- Per-modal access computed in MinistryHealthTab: `isPastorRole` (blanket) OR grant for that specific
+  ministry in `userGrants`. Passed to MinistryModal as `onNavigateToML` when true, `undefined` when false.
+- Clicking the button: closes the modal, calls `handleNavigateToML(ministryKey)` in App(), which sets
+  `viewMode = 'ministry_leader_view'` and `glMinistry = ministryKey` — pre-selected, no dropdown step.
+- `handleNavigateToML` added to App() (also dismisses the welcome banner).
+
+WHAT IS NOT YET BUILT:
+- Pool/Roster assignment functionality (Mode 1/2/3) — NEXT STAGE.
+  Find insertion point: "POOL/ROSTER UI GOES HERE" comment in MinistryLeaderView team sub-tab.
+- Agenda/Schedule and Recursos sub-tab content remain "Em breve" placeholders.
+
+---
+
+DATE: 2026-06-16
 SESSION: Welcome banner fix + Ministry Leader View shell
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: 3896649 (pushed to main)

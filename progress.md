@@ -5,6 +5,44 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Owner-only alert banner for custom position submissions
+STATUS: Complete (frontend, src/App.jsx only) — built, built clean, pushed
+COMMIT: 19dd5d5 (pushed to main)
+
+CONTEXT: When a ministry leader fills the Leader Form free-text "missed positions" field, the
+submission lands in leader_form_submissions with a non-empty custom_positions_notes. The Worker
+endpoint GET /ministry-positions-alert (owner-only — enforced server-side via isOwner) returns all
+such rows, newest first. Nothing surfaced this as a review queue in the dashboard.
+
+WHAT ALREADY EXISTED (did NOT match spec):
+- MinistryHealthTab already fetched GET /ministry-positions-alert (owner-gated) but only reduced it
+  to a posAlerts map {ministry -> custom_positions_notes}, discarding preferred_name + submitted_at,
+  and surfaced it only as a per-ministry alertNote INSIDE each MinistryModal. No top-of-tab banner.
+
+WHAT WAS BUILT (all in src/App.jsx, MinistryHealthTab):
+- New state: posAlertRows (full rows array) + showPosAlerts (expand toggle). Existing posAlerts map
+  kept intact so the MinistryModal alertNote keeps working.
+- Same fetch now also setPosAlertRows(list) with null guards; .catch resets to [].
+- New amber banner at top of tab, mirroring the existing "Other flags notice" pattern exactly
+  (owner-only via isOwnerRole, clickable to expand). Renders nothing if array empty.
+  - Collapsed: count message, e.g. "3 ministerios relataram posicoes nao listadas" /
+    "3 ministries reported unlisted positions" (singular/plural handled).
+  - Expanded: per submission — translated ministry name (MH_MINISTRY_PT in PT), leader preferred_name,
+    custom_positions_notes text (whiteSpace pre-wrap), and submitted_at via formatNoteDate(ts,lang).
+  - Review queue only — no "add position" action button (positions added manually to ministry_positions later).
+- Null guard on every field; falls back to "Ministerio/Lider desconhecido" / "Unknown ministry/leader".
+- Bilingual PT/EN throughout.
+
+ROLE CHECK: reused existing `var isOwnerRole = role === 'owner'`; no new auth mechanism.
+NOTE: GET /ministry-positions-alert was made owner-only server-side in worker.js earlier same day
+(Worker version 3cf95a8a) — the dashboard already only calls it for owner.
+
+BUILD: `npm run build` clean (827 modules; only pre-existing >500kB chunk-size warning).
+VERIFICATION: behind Firebase auth — no live browser verification possible this session.
+
+---
+
+DATE: 2026-06-16
 SESSION: BUG FIX — Ministry Modal notes not persisting after close/reopen
 STATUS: Complete (frontend, src/App.jsx only)
 

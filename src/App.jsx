@@ -4673,7 +4673,7 @@ function SurveyModal({ ministry, token, lang, onClose }) {
   );
 }
 
-function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose }) {
+function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, onSaved }) {
   var isOwnerRole = role === 'owner';
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
   var ministryKey = (card && card.ministry) || '';
@@ -4710,6 +4710,10 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose }) 
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ author_name: authorName, note_text: text }),
+    }).then(function(res) {
+      // On success, refresh the parent ministry-health data so the persisted note
+      // survives close/reopen (the modal re-seeds from mhList, not local state).
+      if (res && res.ok && typeof onSaved === 'function') onSaved();
     }).catch(function() {}).finally(function() { setSavingNote(false); });
     setNoteList(function(prev) { return [optimistic].concat(Array.isArray(prev) ? prev : []); });
     setNoteText('');
@@ -5156,6 +5160,7 @@ function MinistryHealthTab({ token, role, t, lang, fbUser }) {
           fbUser={fbUser}
           posAlerts={posAlerts}
           onClose={function(){setModalMinistry(null);}}
+          onSaved={loadMH}
         />
       )}
 

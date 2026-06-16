@@ -5,6 +5,37 @@
 ---
 
 DATE: 2026-06-16
+SESSION: BUG FIX — Ministry Modal notes not persisting after close/reopen
+STATUS: Complete (frontend, src/App.jsx only)
+
+ROOT CAUSE (state/refetch failure, NOT a POST failure):
+The POST that saves a ministry note (addMinistryNote in MinistryModal) fired correctly and
+DID persist to D1 — it was the in-memory state that went stale:
+- addMinistryNote did `.then`/`.catch` fire-and-forget: it never checked response.ok, never
+  read the created note, and never triggered any refresh of the parent `mhList`.
+- The optimistic note was pushed into the modal's LOCAL `noteList` state only.
+- `loadMH()` (the fresh GET /ministry-health, which now returns notes[] per card) only ran on
+  mount and after CSV import — NOT after saving a note.
+- The modal seeds its `noteList` once from `card.notes`, where `card = modalMinistry` = an item
+  out of `mhList`. Since `mhList` was never refreshed after the POST, that item kept its old
+  notes array. On close the local state was discarded; on reopen the card re-seeded from the
+  stale `mhList` entry -> the just-saved note was gone. (A full page reload showed it, because
+  loadMH runs on mount and the Worker GET returns the persisted notes.)
+
+FIX (root cause only):
+- Added an `onSaved` prop to MinistryModal; wired `onSaved={loadMH}` at the call site in
+  MinistryHealthTab.
+- addMinistryNote now inspects the POST response: on `res.ok` it calls `onSaved()` to refetch
+  ministry-health, so `mhList` (and therefore the card re-opened in the same session) reflects
+  the persisted note. Optimistic update kept for snappy UX; no longer blindly trusted.
+- No other changes.
+
+BUILD: `npm run build` clean (only the pre-existing >500kB chunk-size warning).
+VERIFICATION: behind Firebase auth — no live browser verification possible this session.
+
+---
+
+DATE: 2026-06-16
 SESSION: Ministry Health REGRESSION FIX — restore tap-to-open Ministry Modal
 STATUS: Complete (frontend, src/App.jsx only) — REQUIRES D1 table + Worker endpoints before notes persist (see below)
 

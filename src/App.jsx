@@ -6318,17 +6318,22 @@ function GroupHealthBox({ attending, serving, lang, groupName }) {
 // Standalone component — intentionally separate from PersonPanel. Do NOT merge or share props.
 // Shows: photo+name, current ministries, groups attended, top giftings, position checkboxes.
 function LeaderPersonModal({ person, ministryName, ministryPositions, token, lang, onClose, onChanged }) {
+  // volunteer_positions may arrive as a JSON string (D1 GROUP_ARRAY) or a parsed array — handle both.
+  var personVPs = parseJSON((person && person.volunteer_positions), []);
+  // Ensure it's actually an array (parseJSON with [] fallback handles null/undefined/malformed).
+
   // Local state tracks which positions are assigned: { position_name -> volunteer_positions id }
   const [localAssigned, setLocalAssigned] = React.useState(function() {
     var map = {};
-    ((person && person.volunteer_positions) || [])
+    personVPs
       .filter(function(vp) { return vp.ministry_name === ministryName; })
       .forEach(function(vp) { map[vp.position_name] = vp.id; });
     return map;
   });
   const [toggling, setToggling] = React.useState({}); // position_name -> bool
 
-  const displayName = (person && (person.preferred_name || person.name)) || "?";
+  var noName = lang === 'PT' ? 'Sem nome' : 'No name';
+  const displayName = (person && (person.preferred_name || person.full_name || person.name)) || noName;
   const ministries = parseJSON((person && person.current_ministries));
   const groups = parseJSON((person && person.group_attendance));
   const topGiftings = [
@@ -6336,6 +6341,10 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
     person && person.gifting_2,
     person && person.gifting_3
   ].filter(Boolean);
+
+  // WhatsApp — only rendered if the roster response includes a whatsapp field.
+  var waPhone = person && (person.whatsapp || person.phone || '');
+  var waHref = waPhone ? 'https://wa.me/' + String(waPhone).replace(/\D/g, '') : null;
 
   async function togglePosition(positionName) {
     var existingId = localAssigned[positionName];
@@ -6390,8 +6399,23 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
           )}
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,color:'#e6f1f0',lineHeight:1.2,wordBreak:'break-word'}}>{displayName}</div>
+            {/* Language flags — renders only when languages_spoken is in the roster response */}
+            {(person && person.languages_spoken) && (
+              <div style={{fontSize:11,color:'#6b7a82',marginTop:3}}>{renderLangFlags(person, lang)}</div>
+            )}
+            {/* WhatsApp button — renders only when whatsapp/phone is in the roster response */}
+            {waHref && (
+              <a href={waHref} target="_blank" rel="noopener noreferrer"
+                onClick={function(e){e.stopPropagation();}}
+                style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:6,fontSize:11,padding:'4px 10px',
+                  background:'linear-gradient(180deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08))',
+                  color:'#86efac',borderRadius:8,border:'1px solid rgba(34,197,94,0.3)',
+                  cursor:'pointer',textDecoration:'none',fontWeight:500}}>
+                {'💬 '}{lang==='PT'?'WhatsApp':'WhatsApp'}
+              </a>
+            )}
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7a82',fontSize:18,cursor:'pointer',padding:'4px 8px',flexShrink:0}}>×</button>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7a82',fontSize:18,cursor:'pointer',padding:'4px 8px',flexShrink:0,alignSelf:'flex-start'}}>×</button>
         </div>
 
         {/* Body */}
@@ -6494,7 +6518,8 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
   const [localAssigned, setLocalAssigned] = React.useState(function() {
     var map = {};
     (roster || []).forEach(function(person) {
-      ((person && person.volunteer_positions) || [])
+      // volunteer_positions may be a JSON string from D1 GROUP_ARRAY — parse defensively.
+      parseJSON((person && person.volunteer_positions), [])
         .filter(function(vp) { return vp.ministry_name === ministryName && vp.position_name === posName; })
         .forEach(function(vp) { map[person.id] = vp.id; });
     });
@@ -6505,7 +6530,7 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
 
   var filteredRoster = (roster || []).filter(function(p) {
     if (!search.trim()) return true;
-    var name = (p.preferred_name || p.name || '').toLowerCase();
+    var name = (p.preferred_name || p.full_name || p.name || '').toLowerCase();
     return name.includes(search.toLowerCase());
   });
 
@@ -6571,7 +6596,7 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
           {filteredRoster.length === 0 ? (
             <div style={{color:'#475a64',fontSize:13,textAlign:'center',padding:20}}>{tx.noResults}</div>
           ) : filteredRoster.map(function(person) {
-            var pName = person.preferred_name || person.name || '?';
+            var pName = person.preferred_name || person.full_name || person.name || (lang==='PT'?'Sem nome':'No name');
             var isChecked = !!localAssigned[person.id];
             var isSaving = !!toggling[person.id];
             return (
@@ -6760,11 +6785,13 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
                       {(roster||[]).map(function(person) {
-                        var pName = person.preferred_name || person.name || "?";
+                        var pName = person.preferred_name || person.full_name || person.name || (lang==="PT"?"Sem nome":"No name");
                         var pMins = parseJSON(person.current_ministries);
                         var topGift = person.gifting_1 ? (lang==="PT"?(GIFTING_PT[person.gifting_1]||person.gifting_1):person.gifting_1) : null;
+                        // volunteer_positions may be a JSON string from D1 — parse defensively.
+                        var personVPs = parseJSON(person.volunteer_positions, []);
                         // Positions assigned in THIS ministry
-                        var myPos = ((person.volunteer_positions)||[]).filter(function(vp){ return vp.ministry_name===currentMinistry; });
+                        var myPos = personVPs.filter(function(vp){ return vp.ministry_name===currentMinistry; });
                         return (
                           <div key={person.id} onClick={function(){ setSelectedPerson(person); }}
                             className="glass glow-hover"
@@ -6781,6 +6808,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                               <div style={{minWidth:0}}>
                                 <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:700,color:"#e6f1f0",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pName}</div>
                                 {topGift && <div style={{fontSize:10,color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",marginTop:2,opacity:0.8}}>{topGift}</div>}
+                                {person.languages_spoken && <div style={{fontSize:10,color:"#6b7a82",marginTop:2}}>{renderLangFlags(person, lang)}</div>}
                               </div>
                             </div>
                             {/* Ministry chips (other ministries this person serves) */}
@@ -6825,9 +6853,10 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {ministryPositions.map(function(pos) {
                         var posName = pos.position_name || pos.name || "";
-                        // Count how many in roster are assigned to this position
+                        // Count how many in roster are assigned to this position.
+                        // volunteer_positions may be a JSON string from D1 — parse each defensively.
                         var filledFromRoster = (roster||[]).filter(function(p){
-                          return ((p.volunteer_positions)||[]).some(function(vp){ return vp.ministry_name===currentMinistry && vp.position_name===posName; });
+                          return parseJSON(p.volunteer_positions, []).some(function(vp){ return vp.ministry_name===currentMinistry && vp.position_name===posName; });
                         }).length;
                         // Use filled from roster if > 0, otherwise fall back to mhPosFilled (form+system counts)
                         var filled = filledFromRoster > 0 ? filledFromRoster : mhPosFilled(pos);

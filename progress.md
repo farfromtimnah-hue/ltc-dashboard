@@ -5,6 +5,46 @@
 ---
 
 DATE: 2026-06-15
+SESSION: Stage 1 Dashboard Quick Wins — nav overflow fix, weekly bar chart, ministry health per-position cards
+STATUS: Complete (frontend, src/App.jsx only — no Worker, no D1 changes)
+
+PROGRESS CHECK (before starting): none of the three features were confirmed done.
+- Nav overflow: prior "Priority+" sessions used hardcoded width estimates (last live code estimated TAB_BTN_W=120px per tab) — the documented bug. NOT done -> implemented.
+- Weekly Submissions chart: was the SVG AreaChart with ISO-week labels. NOT done -> replaced.
+- Ministry Health per-position cards: cards showed only a worst-status badge + a "X/Y positions healthy" summary line; per-position breakdown lived only inside the modal. NOT done -> implemented inline. (Skipped nothing.)
+
+WHAT WAS DONE (all in src/App.jsx):
+
+FEATURE A — Nav tab overflow (dynamic measurement):
+- Removed the hardcoded TAB_BTN_W / MORE_BTN_W / floor-division estimate.
+- Added a hidden "mirror" nav row (navMeasRef, off-screen) rendering every nav item at natural size; a useLayoutEffect reads each item's getBoundingClientRect().width (logo, title, each tab, switcher, aux, lang toggle, More button) into navMeas. Re-measures on [token, lang, role, viewMode].
+- A ResizeObserver on the live row (navRowRef) tracks available width (navRowW); width is also seeded synchronously in the layout effect to avoid a first-frame flash.
+- Collapse decision in render compares measured widths against available room, following the required order: 1) title text, 2) gear+logout, 3) view switcher, 4) tabs right→left.
+- Logo and PT/EN toggle always visible. More button appears ONLY when something is collapsed into it (hiding the title alone does not summon More). View switcher + gear/logout are now visible inline at wide widths and collapse into More under pressure (restores the original Priority+ intent).
+- Shared renderers (tabBtn, switcherNav/switcherMore, auxNav, langToggle, moreBtn, titleEl) are used by BOTH the live nav and the mirror so measured widths match rendered widths.
+
+FEATURE B — Weekly Submissions chart (bar):
+- Replaced <AreaChart> with a recharts <BarChart> (vertical bars), teal #5eead4, radius top corners, count label on top of each bar (Bar label prop), Tooltip + axes styled to match the dark theme.
+- Added formatWeekLabel(week) helper: converts ISO week ("2026-W24") or a date ("2026-06-08") to "MMM D" (e.g. "Jun 8"). X-axis now uses these readable labels instead of ISO week numbers.
+- Empty data still shows the localized noData message.
+
+FEATURE C — Ministry Health per-position cards:
+- New helpers: mhPosFilled(pos) (null-guarded form+system headcount), mhPosStatus(filled,min,ideal) (green >= ideal, amber >= min, red < min, no_data when nothing defined), mhWorstStatus(positions) (card color = WORST position status, not an average — one critical position turns the whole card critical).
+- Each card now EXPANDS inline (chevron toggle, expanded state keyed by ministry) to a per-position breakdown: position name, "filled/min" (e.g. 1/4), colored status dot, mini progress bar. Expanded view also has a "Details & notes" button that opens the existing modal (coaching notes).
+- Card border/badge and the top KPI counts (healthy/needs/critical) now derive from mhWorstStatus(positions) so they stay consistent. Critical cards get an extra glow shadow.
+- MinistryModal header + per-position dots updated to the same threshold helpers.
+- Every property access and division is null-guarded (denominator falls back ideal->min->0; never divides by 0).
+- The Ministry Health tab render is wrapped in <RefErrorBoundary> at the call site to prevent a white screen.
+
+BUILD: `npm run build` clean (only the pre-existing >500kB chunk-size warning). 827 modules.
+
+VERIFICATION NOTE: all three features render only after Firebase auth, so live browser verification was not possible in this session (the preview tool also only served a static dir). Confidence rests on the clean production build + code review.
+
+NOT TOUCHED: no Worker changes, no D1 changes, no API endpoints, Carisma logo untouched.
+
+---
+
+DATE: 2026-06-15
 SESSION: Not Yet Serving tab + stage checkboxes + 4 stage views + display name
 STATUS: Complete (frontend) — Worker changes PENDING (see below)
 COMMIT: 57ae8aa (pushed to main — wait for GitHub Actions green check before testing live)

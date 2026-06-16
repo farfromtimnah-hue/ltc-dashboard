@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -1565,6 +1565,29 @@ function AreaChart({ data, height=160, noDataMsg="No data yet" }) {
   );
 }
 
+// Converts an ISO week string ("2026-W24" / "2026-24") or a date ("2026-06-08")
+// into a readable "MMM D" label (e.g. "Jun 8"). Falls back to the raw string.
+function formatWeekLabel(week) {
+  var s = String(week == null ? "" : week);
+  var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return MON[d.getUTCMonth()] + " " + d.getUTCDate();
+  }
+  m = s.match(/(\d{4})\D*W?(\d{1,2})$/i);
+  if (m) {
+    var year = +m[1], wk = +m[2];
+    var simple = new Date(Date.UTC(year, 0, 1 + (wk - 1) * 7));
+    var dow = simple.getUTCDay();
+    var monday = new Date(simple);
+    if (dow <= 4) monday.setUTCDate(simple.getUTCDate() - dow + 1);
+    else monday.setUTCDate(simple.getUTCDate() + 8 - dow);
+    return MON[monday.getUTCMonth()] + " " + monday.getUTCDate();
+  }
+  return s;
+}
+
 function RadialGauge({ value, max, color="#5eead4", size=84, thickness=6 }) {
   const r = (size-thickness)/2;
   const c = 2*Math.PI*r;
@@ -2065,7 +2088,25 @@ function AnalyticsTab({ token, t, lang }) {
             </p>
           </div>
         </div>
-        <AreaChart data={(data.byWeek||[]).slice(-10)} height={160} noDataMsg={t.noData}/>
+        {(function(){
+          var weekData = (data.byWeek||[]).slice(-10).map(function(d){
+            return { label: formatWeekLabel(d && d.week), count: (d && d.count) || 0 };
+          });
+          if (!weekData.length) return (
+            <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace",padding:"20px 0"}}>{t.noData}</div>
+          );
+          return (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={weekData} margin={{top:24,right:8,bottom:4,left:0}}>
+                <XAxis dataKey="label" interval={0} tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{fill:'#475a64',fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} width={28} />
+                <Tooltip cursor={{fill:'rgba(94,234,212,0.06)'}} contentStyle={{background:'#0c1a24',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:'#aebac0'}} itemStyle={{color:'#e6f1f0'}} />
+                <Bar dataKey="count" name={lang==='PT'?'Respostas':'Responses'} fill="#5eead4" radius={[4,4,0,0]} maxBarSize={48}
+                  label={{position:'top',fill:'#5eead4',fontSize:11,fontFamily:"'JetBrains Mono',monospace"}} />
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })()}
       </div>
 
       {/* ── DISC Profile Distribution ── */}
@@ -4538,6 +4579,39 @@ function mhStatusLabel(s, l) {
   return l === 'PT' ? 'SEM DADOS' : 'NO DATA';
 }
 
+// Filled headcount for a position, null-guarded (form + system reports).
+function mhPosFilled(pos) {
+  if (!pos) return 0;
+  return (pos.actual_count_form || 0) + (pos.actual_count_system || 0);
+}
+
+// Per-position status from raw counts. Thresholds (per spec):
+//   green  (healthy)          -> filled >= ideal
+//   amber  (needs_volunteers) -> filled >= min
+//   red    (critical)         -> filled < min
+// Returns 'no_data' only when a position has no min, no ideal and nobody filled.
+function mhPosStatus(filled, min, ideal) {
+  var f = filled || 0;
+  var hasMin = (min || 0) > 0;
+  var hasIdeal = (ideal || 0) > 0;
+  if (!hasMin && !hasIdeal && f === 0) return 'no_data';
+  if (hasIdeal && f >= ideal) return 'healthy';
+  if (hasMin && f >= min) return 'needs_volunteers';
+  return 'critical';
+}
+
+// Card-level status = the WORST position status on the card (NOT an average).
+// One critical position turns the whole card critical regardless of headcount.
+function mhWorstStatus(positions) {
+  var order = { critical: 0, needs_volunteers: 1, healthy: 2, no_data: 3 };
+  var worst = 'no_data';
+  (positions || []).forEach(function(p) {
+    var st = mhPosStatus(mhPosFilled(p), p && p.min_count, p && p.ideal_count);
+    if (order[st] < order[worst]) worst = st;
+  });
+  return worst;
+}
+
 function SurveyModal({ ministry, token, lang, onClose }) {
   var [rows, setRows] = useState([]);
   useEffect(function() {
@@ -4571,9 +4645,10 @@ function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes,
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
   var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
   var displayName = lang === 'PT' ? ptName : card.ministry;
-  var sc = mhStatusColor(card.card_status);
-  var sl = mhStatusLabel(card.card_status, lang);
   var positions = card.positions || [];
+  var worst = mhWorstStatus(positions);
+  var sc = mhStatusColor(worst);
+  var sl = mhStatusLabel(worst, lang);
   var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
   var alertNote = posAlerts[card.ministry] || null;
   var notes = localNotes[card.ministry] !== undefined ? localNotes[card.ministry] : (card.coaching_notes || '');
@@ -4632,11 +4707,11 @@ function MinistryModal({ card, lang, role, localNotes, setLocalNotes, saveNotes,
           </div>
           <div style={{display:'flex',flexDirection:'column'}}>
             {positions.map(function(pos) {
-              var actual = (pos.actual_count_form || 0) + (pos.actual_count_system || 0);
-              var pct = pos.ideal_count > 0 ? Math.min(actual / pos.ideal_count, 1) : 0;
-              var pc = mhStatusColor(pos.status);
+              var actual = mhPosFilled(pos);
+              var pct = (pos && pos.ideal_count > 0) ? Math.min(actual / pos.ideal_count, 1) : 0;
+              var pc = mhStatusColor(mhPosStatus(actual, pos && pos.min_count, pos && pos.ideal_count));
               var posName = lang === 'PT' ? pos.position_name_pt : pos.position_name;
-              var hasData = actual > 0 || pos.min_count > 0;
+              var hasData = actual > 0 || (pos && pos.min_count > 0);
               return (
                 <div key={pos.position_name}
                   style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
@@ -4708,6 +4783,7 @@ function MinistryHealthTab({ token, role, t, lang }) {
   var [csvHeaders, setCsvHeaders] = useState([]);
   var [csvImporting, setCsvImporting] = useState(false);
   var [csvMsg, setCsvMsg] = useState(null);
+  var [expanded, setExpanded] = useState({});
 
   var isOwnerRole = role === 'owner';
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
@@ -4808,9 +4884,10 @@ function MinistryHealthTab({ token, role, t, lang }) {
       .finally(function() { setCsvImporting(false); });
   }
 
-  var healthy = mhList.filter(function(c) { return c.card_status === 'healthy'; }).length;
-  var needs = mhList.filter(function(c) { return c.card_status === 'needs_volunteers'; }).length;
-  var critical = mhList.filter(function(c) { return c.card_status === 'critical'; }).length;
+  // Counts use the same worst-position logic as the cards so they stay in sync.
+  var healthy = mhList.filter(function(c) { return mhWorstStatus(c && c.positions) === 'healthy'; }).length;
+  var needs = mhList.filter(function(c) { return mhWorstStatus(c && c.positions) === 'needs_volunteers'; }).length;
+  var critical = mhList.filter(function(c) { return mhWorstStatus(c && c.positions) === 'critical'; }).length;
 
   var whatsappTemplatePT = 'Oi! Tudo bem? Preparei um formulario rapido sobre o seu ministerio e seria muito valioso ter a sua visao. Leva menos de 1 minuto. ' + FORM_LINK;
   var whatsappTemplateEN = 'Hi! How are you doing? I put together a quick form about your ministry and your input would mean a lot. It takes less than a minute. ' + FORM_LINK;
@@ -4939,19 +5016,24 @@ function MinistryHealthTab({ token, role, t, lang }) {
           {/* Ministry cards */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14,alignItems:"start"}}>
             {mhList.map(function(card) {
-              var sc = mhStatusColor(card.card_status);
-              var sl = mhStatusLabel(card.card_status, lang);
+              var positions = Array.isArray(card && card.positions) ? card.positions : [];
+              // Card status = the WORST position status (not card.card_status, not an average).
+              var worst = mhWorstStatus(positions);
+              var sc = mhStatusColor(worst);
+              var sl = mhStatusLabel(worst, lang);
               var ptName = MH_MINISTRY_PT[card.ministry] || card.ministry;
               var displayName = lang === 'PT' ? ptName : card.ministry;
-              var positions = card.positions || [];
-              var healthyPos = positions.filter(function(p) { return p.status === 'healthy'; }).length;
+              var healthyPos = positions.filter(function(p) {
+                return mhPosStatus(mhPosFilled(p), p && p.min_count, p && p.ideal_count) === 'healthy';
+              }).length;
               var leaderName = card.leader_name || MH_DEFAULT_LEADERS[card.ministry] || null;
+              var isOpen = !!expanded[card.ministry];
 
               return (
                 <div key={card.ministry} className="glass"
-                  onClick={function(){setModalMinistry(card);}}
                   style={{borderRadius:12,overflow:"hidden",borderTop:'2px solid '+sc,
-                    cursor:'pointer',padding:'18px 20px',display:'flex',flexDirection:'column',gap:10}}>
+                    boxShadow: worst === 'critical' ? '0 0 0 1px '+sc+'33, 0 8px 28px '+sc+'22' : 'none',
+                    padding:'18px 20px',display:'flex',flexDirection:'column',gap:10}}>
 
                   {/* Row 1: name + badge */}
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -4966,7 +5048,7 @@ function MinistryHealthTab({ token, role, t, lang }) {
                   </div>
 
                   {/* Row 2: leader + whatsapp */}
-                  <div style={{display:'flex',alignItems:'center',gap:8}} onClick={function(e){e.stopPropagation();}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <span style={{fontSize:12,color:'#6b7a82'}}>
                       {lang==='PT'?'Lider':'Leader'}{': '}
                       <span style={{color:leaderName?'#aebac0':'#475a64'}}>
@@ -4976,7 +5058,6 @@ function MinistryHealthTab({ token, role, t, lang }) {
                     {card.leader_whatsapp && (
                       <a href={'https://wa.me/'+card.leader_whatsapp.replace(/\D/g,'')}
                         target="_blank" rel="noopener noreferrer"
-                        onClick={function(e){e.stopPropagation();}}
                         style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,
                           background:'#25D366',color:'#fff',fontSize:11,fontWeight:600,textDecoration:'none',flexShrink:0}}>
                         WhatsApp
@@ -4984,12 +5065,59 @@ function MinistryHealthTab({ token, role, t, lang }) {
                     )}
                   </div>
 
-                  {/* Row 3: summary */}
-                  <div style={{fontSize:12,color:'#6b7a82'}}>
-                    <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
-                    {' / '}{positions.length}
-                    {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
-                  </div>
+                  {/* Row 3: summary + expand toggle */}
+                  <button
+                    onClick={function(){ setExpanded(function(prev){ var n=Object.assign({},prev); n[card.ministry]=!prev[card.ministry]; return n; }); }}
+                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',
+                      background:'transparent',border:'none',cursor:'pointer',padding:'2px 0',
+                      color:'#6b7a82',fontSize:12,fontFamily:'inherit',textAlign:'left'}}>
+                    <span>
+                      <span style={{color:'#27AE60',fontWeight:700}}>{healthyPos}</span>
+                      {' / '}{positions.length}
+                      {'  '}{lang==='PT'?'posicoes saudaveis':'positions healthy'}
+                    </span>
+                    <span style={{fontSize:9,transform:isOpen?'rotate(180deg)':'none',transition:'transform 0.2s',marginLeft:8,flexShrink:0}}>&#9660;</span>
+                  </button>
+
+                  {/* Per-position breakdown (inline expand) */}
+                  {isOpen && (
+                    <div style={{display:'flex',flexDirection:'column',gap:10,paddingTop:2}}>
+                      {positions.length === 0 && (
+                        <div style={{fontSize:12,color:'#475a64'}}>{lang==='PT'?'Sem funcoes cadastradas':'No positions on file'}</div>
+                      )}
+                      {positions.map(function(pos, pi) {
+                        var filled = mhPosFilled(pos);
+                        var minC = (pos && pos.min_count) || 0;
+                        var idealC = (pos && pos.ideal_count) || 0;
+                        var pst = mhPosStatus(filled, minC, idealC);
+                        var pc = mhStatusColor(pst);
+                        var denom = idealC > 0 ? idealC : (minC > 0 ? minC : 0);
+                        var pct = denom > 0 ? Math.min(filled / denom, 1) : 0;
+                        var posName = (lang === 'PT' ? (pos && pos.position_name_pt) : (pos && pos.position_name))
+                          || (pos && pos.position_name) || (lang==='PT'?'Funcao':'Position');
+                        return (
+                          <div key={(pos && pos.position_name) || pi}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,gap:8}}>
+                              <span style={{fontSize:12,color:'#e6f1f0',fontWeight:500,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{posName}</span>
+                              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                                <span style={{fontSize:11,color:'#aebac0',fontFamily:"'JetBrains Mono',monospace",whiteSpace:'nowrap'}}>{filled}/{minC}</span>
+                                <span style={{width:8,height:8,borderRadius:'50%',background:pc,display:'inline-block',flexShrink:0}}/>
+                              </div>
+                            </div>
+                            <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:4,overflow:'hidden'}}>
+                              <div style={{height:'100%',width:(pct*100)+'%',background:pc,borderRadius:4,transition:'width 0.3s'}}/>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <button onClick={function(){setModalMinistry(card);}}
+                        style={{alignSelf:'flex-start',marginTop:2,background:'rgba(94,234,212,0.1)',
+                          border:'1px solid rgba(94,234,212,0.25)',color:'#5eead4',borderRadius:7,
+                          padding:'5px 12px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                        {lang==='PT'?'Detalhes e notas':'Details & notes'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -6130,18 +6258,38 @@ export default function App() {
   const [glGroup, setGlGroup] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const tabStripRef = useRef(null);
-  const [tabStripW, setTabStripW] = useState(600);
+  // Priority+ nav: measure the actual rendered width of the nav row and of every
+  // collapsible item (via getBoundingClientRect on a hidden mirror row), then decide
+  // what to collapse into the More dropdown. No hardcoded per-item pixel estimates.
+  const navRowRef = useRef(null);   // live nav inner row (gives available width)
+  const navMeasRef = useRef(null);  // hidden mirror row (gives intrinsic item widths)
+  const [navRowW, setNavRowW] = useState(0);
+  const [navMeas, setNavMeas] = useState(null);
   useEffect(() => {
-    if (!tabStripRef.current) return;
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setTabStripW(entry.contentRect.width);
-      }
+    const el = navRowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) setNavRowW(entry.contentRect.width);
     });
-    observer.observe(tabStripRef.current);
-    return () => observer.disconnect();
-  }, []);
+    ro.observe(el);
+    setNavRowW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, [token]);
+  useLayoutEffect(() => {
+    if (navRowRef.current) setNavRowW(navRowRef.current.getBoundingClientRect().width);
+    const root = navMeasRef.current;
+    if (!root) return;
+    const widthOf = sel => { const n = root.querySelector(sel); return n ? n.getBoundingClientRect().width : 0; };
+    setNavMeas({
+      logo: widthOf('[data-meas="logo"]'),
+      title: widthOf('[data-meas="title"]'),
+      langtoggle: widthOf('[data-meas="langtoggle"]'),
+      more: widthOf('[data-meas="more"]'),
+      switcher: widthOf('[data-meas="switcher"]'),
+      aux: widthOf('[data-meas="aux"]'),
+      tabs: Array.from(root.querySelectorAll('[data-meas="tab"]')).map(n => n.getBoundingClientRect().width),
+    });
+  }, [token, lang, role, viewMode]);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
@@ -6224,119 +6372,190 @@ export default function App() {
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
-  // Priority+ breakpoints: 0=all visible, 1=aux(title+gear+logout) in More,
-  // 2=also switcher in More, 3=also tabs in More
-  // Per-tab overflow: measure only the tab strip container width.
-  // TAB_BTN_W: estimated px per tab button (font 12px, 0.08em tracking, padding 6/10,
-  // "Ministry Health" is the longest label ~130px; use 120px average + gap).
-  const TAB_BTN_W = 120;
-  const TAB_GAP   = 4;
-  const MORE_BTN_W = 88; // "More ▾" button reserved width
-  // How many tabs fit in the strip? If not all fit, reserve MORE_BTN_W.
-  const allFit = tabs.length * (TAB_BTN_W + TAB_GAP) <= tabStripW;
-  const availForTabs = allFit ? tabStripW : tabStripW - MORE_BTN_W;
-  const maxVisible = allFit ? tabs.length : Math.max(0, Math.floor(availForTabs / (TAB_BTN_W + TAB_GAP)));
-  const visibleTabs  = tabs.slice(0, maxVisible);
-  const overflowTabs = tabs.slice(maxVisible);
-  const hasOverflow  = overflowTabs.length > 0;
+  // ── Priority+ collapse: measured, not hardcoded ──────────────────
+  // Always visible: logo + PT/EN toggle. Collapse order as space shrinks:
+  //   1) title text  2) gear + logout  3) view switcher  4) tabs (right→left).
+  // The More button appears only once something has collapsed into it.
+  const TAB_GAP = 4;
+  const REGION_GAP = 10;
+  const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor');
 
-  // Aux items (gear, logout, view switcher) always go in More — keeps fixed regions lean.
-  // They appear in the More dropdown alongside any overflow tabs.
-  const showMore = true; // More button always present (contains aux + possibly overflow tabs)
+  let showTitle = true, showSwitcher = hasSwitcher, showAux = true, visibleTabCount = tabs.length, showMore = false;
+  if (navMeas && navRowW > 0) {
+    const m = navMeas;
+    const PAD = 48, SAFETY = 16;
+    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + REGION_GAP * 2);
+    const need = (s) => {
+      let w = 0;
+      if (s.title) w += m.title + REGION_GAP;
+      for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;
+      if (s.switcher && hasSwitcher && m.switcher > 0) w += m.switcher + REGION_GAP;
+      if (s.aux) w += m.aux + REGION_GAP;
+      if (s.more) w += m.more + REGION_GAP;
+      return w;
+    };
+    const s = { title: true, switcher: hasSwitcher, aux: true, tabCount: tabs.length, more: false };
+    if (need(s) > room) {
+      s.title = false;                                       // 1) title text first (just hidden)
+      if (need(s) > room) {
+        s.more = true;                                       // beyond here, items go INTO More
+        if (need(s) > room) s.aux = false;                   // 2) gear + logout
+        if (need(s) > room) s.switcher = false;              // 3) view switcher
+        while (s.tabCount > 0 && need(s) > room) s.tabCount--; // 4) tabs, right → left
+      }
+    }
+    showTitle = s.title; showSwitcher = s.switcher && hasSwitcher; showAux = s.aux;
+    visibleTabCount = s.tabCount; showMore = s.more;
+  }
+  const visibleTabs = tabs.slice(0, visibleTabCount);
+  const overflowTabs = tabs.slice(visibleTabCount);
+
+  // ── Shared renderers (live nav + hidden measurement mirror use the same markup) ──
+  const tabBtn = (t2) => (
+    <button key={t2.id} onClick={() => setTab(t2.id)}
+      style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
+      onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
+      onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
+      {t2.label}
+      {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
+    </button>
+  );
+  const onViewChange = (e) => { const v=e.target.value; setViewMode(v); if(v==='my_view') setGlGroup(""); if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
+  const VIEW_OPTS = [
+    ['my_view', lang==="PT"?"Minha visao":"My View"],
+    ['senior_pastor_view', lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"],
+    ['pastor_view', lang==="PT"?"Visao do Pastor":"Pastor View"],
+    ['new_believer_view', lang==="PT"?"Vista Novos Crentes":"New Believer View"],
+    ['start_class_view', lang==="PT"?"Vista Start":"Start Class View"],
+    ['baptism_view', lang==="PT"?"Vista Batismo":"Baptism View"],
+    ['cafe_view', lang==="PT"?"Vista Cafe":"Cafe View"],
+    ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
+  ];
+  const selStyle = {background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",borderRadius:8,padding:"6px 8px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",maxWidth:170};
+  const switcherNav = () => (
+    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+      <select value={viewMode} onChange={onViewChange} style={selStyle}>
+        {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
+      </select>
+      {viewMode==='group_leader' && (
+        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)} style={{...selStyle,maxWidth:150}}>
+          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+      )}
+    </div>
+  );
+  const switcherMore = () => (
+    <div className="pp-sub">
+      <select value={viewMode} onChange={onViewChange}>
+        {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
+      </select>
+      {viewMode==='group_leader' && (
+        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
+          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
+          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+      )}
+    </div>
+  );
+  const auxNav = () => (
+    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+      <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#9881;</button>
+      <button onClick={()=>signOut(auth)} title={t.logout} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#8618;</button>
+    </div>
+  );
+  const langToggle = () => (
+    <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
+      <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
+      <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
+    </div>
+  );
+  const moreBtn = () => (
+    <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
+      style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+      {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
+    </button>
+  );
+  const titleEl = () => (
+    <>
+      <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
+      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap",flexShrink:0}}>{t.dashboard}</span>
+    </>
+  );
 
   return (
     <div className="app" style={{minHeight:"100vh"}}>
       <style>{css}</style>
 
-      {/* Nav — four fixed regions: [Logo] [TabStrip→flex:1] [LangToggle] [More] */}
+      {/* Nav: logo + title | tabs | switcher | gear/logout | (spacer) | PT/EN | More */}
       <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
-        <div style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:0,height:52}}>
+        <div ref={navRowRef} style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:REGION_GAP,height:52}}>
 
-          {/* Region 1 — Logo/brand: never shrinks, never collapses */}
-          <div style={{display:"flex",alignItems:"center",gap:12,flex:"0 0 auto",paddingRight:16}}>
+          {/* Logo (always) + title (collapses 1st) */}
+          <div style={{display:"flex",alignItems:"center",gap:12,flex:"0 0 auto"}}>
             <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block",flexShrink:0}} />
-            <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
-            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap",flexShrink:0}}>{t.dashboard}</span>
+            {showTitle && titleEl()}
           </div>
 
-          {/* Region 2 — Collapsible tab strip: flex:1, min-width:0, observed by ResizeObserver */}
-          <div ref={tabStripRef} style={{flex:"1 1 0",minWidth:0,display:"flex",alignItems:"center",gap:TAB_GAP,overflow:"hidden",position:"relative"}}>
-            {visibleTabs.map(t2=>(
-              <button key={t2.id} onClick={()=>setTab(t2.id)}
-                style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
-                onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
-                onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
-                {t2.label}
-                {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
-              </button>
-            ))}
+          {/* Tabs (collapse last, right → left) */}
+          <div style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
+            {visibleTabs.map(t2=>tabBtn(t2))}
           </div>
 
-          {/* Region 3 — Lang toggle: pinned, always visible */}
-          <div style={{flex:"0 0 auto",paddingLeft:12}}>
-            <div style={{display:"flex",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:2,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>
-              <button onClick={()=>setLang("PT")} style={{padding:"5px 10px",background:lang==="PT"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="PT"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="PT"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="PT"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>PT</button>
-              <button onClick={()=>setLang("EN")} style={{padding:"5px 10px",background:lang==="EN"?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",border:lang==="EN"?"1px solid rgba(94,234,212,0.3)":"none",color:lang==="EN"?"#5eead4":"#6b7a82",cursor:"pointer",borderRadius:6,fontWeight:lang==="EN"?600:400,fontFamily:"inherit",transition:"all 0.18s"}}>EN</button>
+          {/* View switcher (collapses 3rd) */}
+          {showSwitcher && switcherNav()}
+
+          {/* Gear + logout (collapse 2nd) */}
+          {showAux && auxNav()}
+
+          {/* Spacer pushes lang toggle + More to the right */}
+          <div style={{flex:"1 1 0",minWidth:0}} />
+
+          {/* PT/EN toggle — always visible */}
+          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
+
+          {/* More — only when something is collapsed into it */}
+          {showMore && (
+            <div style={{flex:"0 0 auto",position:"relative"}}>
+              {moreBtn()}
+              {moreOpen && (
+                <>
+                  <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                  <div className="pp-dropdown">
+                    {overflowTabs.map(t2=>(
+                      <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
+                        onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
+                        {t2.label}
+                      </button>
+                    ))}
+                    {overflowTabs.length>0 && ((!showSwitcher && hasSwitcher) || !showAux) && <div className="pp-divider"/>}
+                    {!showSwitcher && hasSwitcher && switcherMore()}
+                    {!showAux && (
+                      <>
+                        <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>&#9881; {t.settings}</button>
+                        <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>&#8618; {t.logout}</button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* Region 4 — More button: pinned, contains overflow tabs + aux (gear, logout, switcher) */}
-          <div style={{flex:"0 0 auto",paddingLeft:8,position:"relative"}}>
-            <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
-              style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
-              {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
-            </button>
-            {moreOpen && (
-              <>
-                <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
-                <div className="pp-dropdown">
+        </div>
 
-                  {/* Overflow tabs */}
-                  {overflowTabs.map(t2=>(
-                    <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
-                      onClick={()=>{setTab(t2.id);setMoreOpen(false);}}>
-                      {t2.label}
-                    </button>
-                  ))}
-
-                  {/* Divider between overflow tabs and aux, only when both present */}
-                  {overflowTabs.length > 0 && <div className="pp-divider"/>}
-
-                  {/* View switcher (owner / senior_pastor / pastor — all get the same options) */}
-                  {(role==='owner'||role==='senior_pastor'||role==='pastor') && (
-                    <div className="pp-sub">
-                      <select value={viewMode} onChange={e=>{const v=e.target.value;setViewMode(v);if(v==='my_view')setGlGroup("");if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v))setTab("people");}}>
-                        <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
-                        <option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>
-                        <option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>
-                        <option value="new_believer_view">{lang==="PT"?"Vista Novos Crentes":"New Believer View"}</option>
-                        <option value="start_class_view">{lang==="PT"?"Vista Start":"Start Class View"}</option>
-                        <option value="baptism_view">{lang==="PT"?"Vista Batismo":"Baptism View"}</option>
-                        <option value="cafe_view">{lang==="PT"?"Vista Cafe":"Cafe View"}</option>
-                        <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
-                      </select>
-                      {viewMode==='group_leader'&&(
-                        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
-                          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-                          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-                        </select>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Gear + Logout */}
-                  <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>
-                    &#9881; {t.settings}
-                  </button>
-                  <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>
-                    &#8618; {t.logout}
-                  </button>
-
-                </div>
-              </>
-            )}
-          </div>
-
+        {/* Hidden mirror row — used ONLY to measure intrinsic widths via getBoundingClientRect */}
+        <div ref={navMeasRef} aria-hidden="true"
+          style={{position:"absolute",top:-9999,left:0,visibility:"hidden",pointerEvents:"none",display:"flex",alignItems:"center",whiteSpace:"nowrap"}}>
+          <span data-meas="logo" style={{display:"inline-flex"}}>
+            <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="" style={{height:32,width:"auto"}} />
+          </span>
+          <span data-meas="title" style={{display:"inline-flex",alignItems:"center",gap:12}}>{titleEl()}</span>
+          {tabs.map(t2=><span key={t2.id} data-meas="tab" style={{display:"inline-flex"}}>{tabBtn(t2)}</span>)}
+          {hasSwitcher && <span data-meas="switcher" style={{display:"inline-flex"}}>{switcherNav()}</span>}
+          <span data-meas="aux" style={{display:"inline-flex"}}>{auxNav()}</span>
+          <span data-meas="langtoggle" style={{display:"inline-flex"}}>{langToggle()}</span>
+          <span data-meas="more" style={{display:"inline-flex"}}>{moreBtn()}</span>
         </div>
       </div>
 
@@ -6349,7 +6568,11 @@ export default function App() {
         {!(viewMode === 'group_leader' && glGroup) && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "health" && (
+          <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
+            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />
+          </RefErrorBoundary>
+        )}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />

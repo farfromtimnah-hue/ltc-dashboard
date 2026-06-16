@@ -5,6 +5,87 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Equipe tab field-mapping fix + WhatsApp + language display
+STATUS: Frontend complete — WORKER CHANGES REQUIRED before data displays (see below)
+COMMIT: f562e44 (pushed to main)
+
+WHAT WAS FIXED (frontend, src/App.jsx only):
+
+Bug: volunteer_positions JSON-string parsing
+  Previously: `person.volunteer_positions` read as a raw array everywhere.
+  D1 GROUP_ARRAY returns a JSON STRING, not a parsed array.
+  Fixed: all four read sites now use `parseJSON(person.volunteer_positions, [])`:
+    - LeaderPersonModal localAssigned initialization
+    - PositionAssignModal localAssigned initialization
+    - Roster card myPos filter
+    - Positions list filledFromRoster count
+
+Bug: name null guard
+  Previously: fallback was literal "?" on both roster card and PositionAssignModal.
+  Fixed: fallback is now "Sem nome" (PT) / "No name" (EN).
+  Also added `person.full_name` as an intermediate fallback before `person.name`
+  in all three name-reading sites (roster card, LeaderPersonModal, PositionAssignModal),
+  since the Worker may return `full_name` instead of `name` in some JOIN implementations.
+
+Added: WhatsApp button in LeaderPersonModal header
+  Reads `person.whatsapp || person.phone`. Only renders if the value is truthy.
+  Style matches the existing WhatsApp button used in PersonCard/PersonPanel (green gradient,
+  💬 prefix). Will remain invisible until the Worker returns the field.
+
+Added: Language flags in LeaderPersonModal header
+  Reads `person.languages_spoken` via `renderLangFlags(person, lang)`.
+  Only renders if `person.languages_spoken` is truthy. Will remain invisible until
+  the Worker returns the field.
+
+Added: Language flags on roster cards
+  Same `person.languages_spoken` guard. Only renders if field present.
+
+⚠️ WORKER CHANGES REQUIRED — GET /ministry/:name/roster endpoint
+The Equipe tab STILL SHOWS WRONG DATA (names "?", ministries "None", giftings "None")
+because GET /ministry/:name/roster does not return the necessary connection fields.
+The Worker endpoint (ltc-api) must be updated to return ALL of the following fields
+per person in the roster array:
+
+  id              — person's connections row id
+  name            — person's name
+  preferred_name  — preferred display name (may differ from name)
+  full_name       — legal full name (if stored separately)
+  photo_url       — profile photo URL
+  current_ministries   — JSON string, e.g. '["Worship Team","Photography"]'
+  group_attendance     — JSON string, e.g. '["Legacy"]'
+  gifting_1       — primary gifting name (e.g. "Worship & Music")
+  gifting_2       — secondary gifting name
+  gifting_3       — tertiary gifting name
+  whatsapp        — WhatsApp phone number (digits only preferred)
+  languages_spoken     — JSON string, e.g. '["Português"]'
+  volunteer_positions  — JSON string (GROUP_ARRAY of {id, ministry_name, position_name} objects)
+                         OR a pre-parsed array — frontend handles both via parseJSON()
+
+The roster should include ALL people whose current_ministries contains the ministry name,
+NOT just people who already have a volunteer_positions row (i.e., don't use an INNER JOIN
+on volunteer_positions — use a LEFT JOIN or separate query so unassigned members also appear).
+
+Suggested Worker SQL (example):
+  SELECT c.id, c.name, c.preferred_name, c.full_name, c.photo_url,
+         c.current_ministries, c.group_attendance,
+         c.gifting_1, c.gifting_2, c.gifting_3,
+         c.whatsapp, c.languages_spoken,
+         JSON_GROUP_ARRAY(
+           JSON_OBJECT('id', vp.id, 'ministry_name', vp.ministry_name, 'position_name', vp.position_name)
+         ) FILTER (WHERE vp.id IS NOT NULL) as volunteer_positions
+  FROM connections c
+  LEFT JOIN volunteer_positions vp ON vp.person_id = c.id
+  WHERE JSON_EACH_VALUE(c.current_ministries) = ?   -- or using LIKE / JSON_EACH
+  GROUP BY c.id
+
+WHAT IS NOT YET BUILT:
+- Drag-and-drop (Mode 3) — next session
+- Agenda/Schedule sub-tab content remains "Em breve" placeholder
+- Recursos sub-tab content remains "Em breve" placeholder
+
+---
+
+DATE: 2026-06-16
 SESSION: Equipe tab Pool/Roster UI — Modes 1 and 2 (standalone components)
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: 177cc93 (pushed to main)

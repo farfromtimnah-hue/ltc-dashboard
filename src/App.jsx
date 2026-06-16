@@ -4673,7 +4673,7 @@ function SurveyModal({ ministry, token, lang, onClose }) {
   );
 }
 
-function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, onSaved }) {
+function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, onSaved, onNavigateToML }) {
   var isOwnerRole = role === 'owner';
   var isPastorRole = role === 'pastor' || role === 'senior_pastor' || role === 'owner';
   var ministryKey = (card && card.ministry) || '';
@@ -4810,6 +4810,15 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, on
                 💬 {lang==='PT'?'Contatar lider':'Contact leader'}
               </a>
             )}
+            {typeof onNavigateToML === 'function' && (
+              <button onClick={onNavigateToML}
+                style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,padding:"7px 14px",
+                  background:"linear-gradient(180deg,rgba(94,234,212,0.14),rgba(94,234,212,0.06))",color:"#5eead4",
+                  borderRadius:8,border:"1px solid rgba(94,234,212,0.28)",cursor:"pointer",fontWeight:500,
+                  fontFamily:"inherit"}}>
+                ↗ {lang==='PT'?'Ver Visao do Lider':'View Leader Dashboard'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -4862,7 +4871,7 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, on
   );
 }
 
-function MinistryHealthTab({ token, role, t, lang, fbUser }) {
+function MinistryHealthTab({ token, role, t, lang, fbUser, onNavigateToML, userGrants }) {
   var [mhList, setMhList] = useState([]);
   var [loading, setLoading] = useState(true);
   var [modalMinistry, setModalMinistry] = useState(null);
@@ -5189,18 +5198,27 @@ function MinistryHealthTab({ token, role, t, lang, fbUser }) {
       )}
 
       {/* Ministry modal */}
-      {modalMinistry && (
-        <MinistryModal
-          card={modalMinistry}
-          lang={lang}
-          role={role}
-          token={token}
-          fbUser={fbUser}
-          posAlerts={posAlerts}
-          onClose={function(){setModalMinistry(null);}}
-          onSaved={loadMH}
-        />
-      )}
+      {modalMinistry && (function() {
+        var modalMinKey = (modalMinistry && modalMinistry.ministry) || '';
+        // Show ML entry-point button to pastors (blanket access) or grant-holders for this specific ministry.
+        var canAccessMLForThis = isPastorRole || (userGrants || []).some(function(g) {
+          return (g.grant_type || g.grantType || g.type) === 'ministry_leader' &&
+                 (g.scope_name || g.scopeName || g.scope) === modalMinKey;
+        });
+        return (
+          <MinistryModal
+            card={modalMinistry}
+            lang={lang}
+            role={role}
+            token={token}
+            fbUser={fbUser}
+            posAlerts={posAlerts}
+            onClose={function(){setModalMinistry(null);}}
+            onSaved={loadMH}
+            onNavigateToML={canAccessMLForThis && typeof onNavigateToML === 'function' ? function() { setModalMinistry(null); onNavigateToML(modalMinKey); } : undefined}
+          />
+        );
+      })()}
 
       {/* Survey modal */}
       {surveyModal && (
@@ -6298,11 +6316,13 @@ function GroupHealthBox({ attending, serving, lang, groupName }) {
 
 // ─── MINISTRY LEADER VIEW ──────────────────────────────────────────────────────
 // Shell only. Pool/Roster (Mode 1/2/3 assignment UI) plugs into MinistryTeamTab below.
-function MinistryLeaderView({ lang, grants }) {
+// hasBlanketAccess: owner/senior_pastor/pastor — nav dropdown controls ministry (activeMinistryOverride).
+// Grant-only: pill or single-header selector inside this component; activeMinistryOverride sets initial value.
+function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOverride }) {
   const ministryGrants = (grants || []).filter(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
 
-  // Access guard — should never be reachable without a grant, but guard anyway.
-  if (!ministryGrants.length) {
+  // Access guard — should never be reachable without access, but guard anyway.
+  if (!hasBlanketAccess && !ministryGrants.length) {
     return (
       <div style={{padding:"60px 32px",textAlign:"center",color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>
         {lang === "PT" ? "Voce nao tem acesso a esta visao." : "You don't have access to this view."}
@@ -6313,9 +6333,13 @@ function MinistryLeaderView({ lang, grants }) {
   const getScope = (g) => g.scope_name || g.scopeName || g.scope || "";
   const ministries = ministryGrants.map(getScope).filter(Boolean);
 
-  // If multi-grant, track which ministry is selected; default to first.
-  const [activeMinistry, setActiveMinistry] = React.useState(ministries[0] || "");
+  // Grant-only: internal selection state, seeded from activeMinistryOverride (e.g. modal entry-point).
+  const [activeMinistry, setActiveMinistry] = React.useState(activeMinistryOverride || ministries[0] || "");
   const [mlTab, setMlTab] = React.useState("team");
+
+  // Blanket-access: ministry is fully controlled by the nav dropdown (activeMinistryOverride).
+  // Grant-only: ministry is controlled internally via pill/header.
+  const currentMinistry = hasBlanketAccess ? (activeMinistryOverride || "") : activeMinistry;
 
   const tx = {
     team:      lang === "PT" ? "Equipe"   : "Team",
@@ -6362,8 +6386,15 @@ function MinistryLeaderView({ lang, grants }) {
         {tx.viewLabel}
       </div>
 
-      {/* Ministry selector — pills when multiple grants, plain header when one */}
-      {ministries.length === 1 ? (
+      {/* Ministry header / selector:
+          - Blanket access: nav dropdown is the selector; show chosen ministry as plain header here.
+          - Grant-only, 1 ministry: plain header.
+          - Grant-only, multiple ministries: pill selector. */}
+      {hasBlanketAccess ? (
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:22,color:"#e6f1f0",marginBottom:24,lineHeight:1.25}}>
+          {currentMinistry}
+        </div>
+      ) : ministries.length === 1 ? (
         <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:22,color:"#e6f1f0",marginBottom:24,lineHeight:1.25}}>
           {activeMinistry}
         </div>
@@ -6392,7 +6423,7 @@ function MinistryLeaderView({ lang, grants }) {
         <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
           {/* POOL/ROSTER UI GOES HERE — next session will build Mode 1/2/3 assignment
               logic here: Pool tab (unassigned volunteers), Roster (confirmed for service),
-              mode switching, and date-based scheduling. Ministry context: activeMinistry. */}
+              mode switching, and date-based scheduling. Ministry context: currentMinistry. */}
           {tx.soon}
         </div>
       )}
@@ -6671,6 +6702,7 @@ export default function App() {
   const [lang, setLang] = useState("PT");
   const [viewMode, setViewMode] = useState("my_view");
   const [glGroup, setGlGroup] = useState("");
+  const [glMinistry, setGlMinistry] = useState("");
   const [welcomeBlessing] = useState(() => Math.floor(Math.random() * 3));
   const [welcomeVision] = useState(() => Math.floor(Math.random() * 4));
   // Banner shows only on the initial post-login screen; dismissed on first navigation.
@@ -6750,6 +6782,12 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  function handleNavigateToML(ministryName) {
+    setBannerDismissed(true);
+    setViewMode('ministry_leader_view');
+    setGlMinistry(ministryName || "");
+  }
 
   function handleNavigate(tabId, anchor) {
     setBannerDismissed(true);
@@ -6853,8 +6891,10 @@ export default function App() {
       {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
     </button>
   );
-  const onViewChange = (e) => { const v=e.target.value; setBannerDismissed(true); setViewMode(v); if(v==='my_view') setGlGroup(""); if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
+  const onViewChange = (e) => { const v=e.target.value; setBannerDismissed(true); setViewMode(v); if(v==='my_view'){ setGlGroup(""); setGlMinistry(""); } if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
+  const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
+  const hasAnyMLAccess = hasBlanketMLAccess || hasMinistryLeaderGrant;
   const VIEW_OPTS = [
     ['my_view', lang==="PT"?"Minha visao":"My View"],
     ['senior_pastor_view', lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"],
@@ -6864,7 +6904,7 @@ export default function App() {
     ['baptism_view', lang==="PT"?"Vista Batismo":"Baptism View"],
     ['cafe_view', lang==="PT"?"Vista Cafe":"Cafe View"],
     ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
-    ...(hasMinistryLeaderGrant ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
+    ...(hasAnyMLAccess ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
   ];
   const selStyle = {background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",borderRadius:8,padding:"6px 8px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",maxWidth:170};
   const switcherNav = () => (
@@ -6878,6 +6918,12 @@ export default function App() {
           {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
         </select>
       )}
+      {viewMode==='ministry_leader_view' && hasBlanketMLAccess && (
+        <select value={glMinistry} onChange={e=>setGlMinistry(e.target.value)} style={{...selStyle,maxWidth:170}}>
+          <option value="">{lang==="PT"?"Escolher ministerio...":"Select ministry..."}</option>
+          {MH_MINISTRIES.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+      )}
     </div>
   );
   const switcherMore = () => (
@@ -6889,6 +6935,12 @@ export default function App() {
         <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
           <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
           {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+      )}
+      {viewMode==='ministry_leader_view' && hasBlanketMLAccess && (
+        <select value={glMinistry} onChange={e=>setGlMinistry(e.target.value)}>
+          <option value="">{lang==="PT"?"Escolher ministerio...":"Select ministry..."}</option>
+          {MH_MINISTRIES.map(m=><option key={m} value={m}>{m}</option>)}
         </select>
       )}
     </div>
@@ -7021,9 +7073,9 @@ export default function App() {
         {viewMode === 'group_leader' && glGroup
           ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
           : null}
-        {viewMode === 'ministry_leader_view' && (
+        {viewMode === 'ministry_leader_view' && (!hasBlanketMLAccess || glMinistry) && (
           <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>
-            <MinistryLeaderView lang={lang} grants={myGrants} />
+            <MinistryLeaderView lang={lang} grants={myGrants} hasBlanketAccess={hasBlanketMLAccess} activeMinistryOverride={glMinistry} />
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
@@ -7032,7 +7084,7 @@ export default function App() {
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "health" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
-            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} />
+            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} onNavigateToML={handleNavigateToML} userGrants={myGrants} />
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "reference" && (

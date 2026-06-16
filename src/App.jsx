@@ -4705,11 +4705,11 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose }) 
     // Auto-stamp the author from Firebase — never ask the pastor to type their name.
     var authorName = (fbUser && fbUser.displayName) ? fbUser.displayName
       : (fbUser && fbUser.email) ? fbUser.email : 'Pastor';
-    var optimistic = { id: 'tmp-' + Date.now(), pastor_name: authorName, note_text: text, created_at: new Date().toISOString() };
+    var optimistic = { id: 'tmp-' + Date.now(), author_name: authorName, note_text: text, created_at: new Date().toISOString() };
     fetch(MH_API + '/ministry-health/' + encodeURIComponent(ministryKey) + '/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ pastor_name: authorName, note_text: text }),
+      body: JSON.stringify({ author_name: authorName, note_text: text }),
     }).catch(function() {}).finally(function() { setSavingNote(false); });
     setNoteList(function(prev) { return [optimistic].concat(Array.isArray(prev) ? prev : []); });
     setNoteText('');
@@ -4833,7 +4833,7 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose }) 
             return (
               <div key={(note && note.id) || ni} style={{borderLeft:'2px solid rgba(94,234,212,0.2)',paddingLeft:14,marginBottom:16}}>
                 <div style={{display:'flex',gap:8,marginBottom:4,alignItems:'center',flexWrap:'wrap'}}>
-                  <span style={{fontSize:12,fontWeight:700,color:'#5eead4'}}>{(note && note.pastor_name) || 'Pastor'}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:'#5eead4'}}>{(note && note.author_name) || 'Pastor'}</span>
                   <span style={{fontSize:11,color:'#475a64'}}>{formatNoteDate(note && note.created_at, lang)}</span>
                 </div>
                 <div style={{fontSize:13,color:'#e6f1f0',lineHeight:1.6}}>{(note && note.note_text) || ''}</div>

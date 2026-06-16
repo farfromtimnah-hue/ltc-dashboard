@@ -5,6 +5,67 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Equipe tab Pool/Roster UI — Modes 1 and 2 (standalone components)
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: 177cc93 (pushed to main)
+
+WHAT WAS BUILT:
+
+Two new standalone modal components (intentionally NOT extending PersonPanel):
+
+LeaderPersonModal (Mode 1 — click a person):
+- Slide-in panel from right (fixed position, zIndex 5000, 380px wide, full height)
+- Section 1: photo (48px) + preferred_name or name header
+- Section 2: current ministries chips (from parseJSON(person.current_ministries), translated via MINISTRY_PT)
+- Section 3: groups attended chips (from parseJSON(person.group_attendance))
+- Section 4: top giftings (#1/#2/#3, translated via GIFTING_PT, first teal/bold)
+- Section 5: "Posicoes nesta ministerio" / "Positions in this ministry" — checkbox list of all
+  ministry_positions for this ministry; pre-checked from person.volunteer_positions filtered
+  to this ministry. Toggle: POST /volunteer-positions or DELETE /volunteer-positions/:id.
+  Optimistic local state update on each toggle; "Salvando..." indicator while in flight.
+  Calls onChanged() (re-fetches roster) after each API call.
+
+PositionAssignModal (Mode 2 — click a position):
+- Centered popup modal (zIndex 5000, 440px wide, max 85vh, scrollable)
+- Header: "Posicao" / "Position" micro-label + position name
+- Search input (only rendered if roster.length > 15) filters by name
+- Scrollable roster multi-select: checkbox + photo/avatar + name, pre-checked for anyone
+  already assigned to this position. Toggle: same POST/DELETE endpoints as Mode 1.
+  Optimistic local state; calls onChanged() to re-fetch roster.
+
+EquipeSection (inline in MinistryLeaderView team sub-tab, replacing {tx.soon}):
+- Wrapped in RefErrorBoundary
+- Fetches GET /ministry/:name/roster (roster with volunteer_positions per person) and
+  GET /ministry-health (to find this ministry's positions with min/ideal counts for status dots)
+  in parallel on mount and after any Mode 1/2 change (loadEquipe callback).
+- Top section "EQUIPE / TEAM": roster grid (auto-fill 220px min columns), each card shows:
+  photo/avatar (36px), name (Space Grotesk 14px bold), top gifting label (JetBrains Mono 10px),
+  ministry chips (up to 3, other ministries this person serves), position tags for THIS ministry
+  (teal chips) or "Sem posicao"/"No position" if none.
+- Bottom section "POSICOES / POSITIONS": list of all ministry_positions, each row has:
+  status dot (green/amber/red/grey via mhPosStatus, with glow shadow), position name,
+  filled/min count. Filled count = roster count assigned to this position (from volunteer_positions)
+  with fallback to mhPosFilled (form+system counts). Clicking a row opens PositionAssignModal.
+- null guards: roster defaults to [], ministryPositions defaults to [], "Sem posicao" never blank.
+
+MinistryLeaderView changes:
+- Added token prop (threaded from App.jsx call site)
+- Added state: roster[], ministryPositions[], equipeLoading bool, selectedPerson, selectedPosition
+- loadEquipe() useCallback fires when mlTab==="team" or currentMinistry changes
+
+ENDPOINTS USED (must exist in Worker):
+- GET  /ministry/:name/roster       → array of persons with volunteer_positions[]
+- POST /volunteer-positions          body: { person_id, ministry_name, position_name }
+- DELETE /volunteer-positions/:id    removes a volunteer_positions row
+
+WHAT IS NOT YET BUILT:
+- Drag-and-drop (Mode 3) — next session
+- Agenda/Schedule sub-tab content remains "Em breve" placeholder
+- Recursos sub-tab content remains "Em breve" placeholder
+
+---
+
+DATE: 2026-06-16
 SESSION: Blanket owner/pastor access to Ministry Leader View + Ministry Modal entry point
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: 7e896cd (pushed to main)

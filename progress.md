@@ -5,6 +5,33 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Welcome banner — time-of-day greeting + blessing + vision lines
+STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
+COMMIT: 8fadee3 (pushed to main)
+
+WHAT WAS BUILT (all in src/App.jsx):
+- Two module-level constants above App(): WELCOME_BLESSINGS {PT:[], EN:[]} (3 items each) and
+  WELCOME_VISIONS {PT:[], EN:[]} (4 items each). Phrases are verbatim from Lagoinha confirmed
+  material and standard Brazilian evangelical pastoral language — do not alter.
+- Two lazy-initialized state values in App(): welcomeBlessing (0-2) and welcomeVision (0-3).
+  Lazy initializer (()=>Math.floor(Math.random()*N)) runs once on mount — stable across tab
+  switches, re-randomizes only on next login/full reload.
+- Welcome banner rendered at top of content <div>, before all tab conditionals, only when fbUser
+  is set (post-login). Three lines:
+    1. "{Bom dia|Boa tarde|Boa noite}, {displayName || email}!" — Space Grotesk 22px bold #e6f1f0
+       Time ranges: 05:00-11:59 Bom dia, 12:00-17:59 Boa tarde, 18:00-04:59 Boa noite.
+       Greeting always PT (church context); name is fbUser.displayName || fbUser.email || "".
+    2. Blessing line — Space Grotesk 15px #aebac0. PT or EN based on lang state.
+    3. Vision line — JetBrains Mono 11px #475a64 (most muted). PT or EN based on lang state.
+  Padding: 28px 32px 0, maxWidth 860. Not a modal, not dismissable, feels part of the page.
+- Null guard: never shows "undefined" — falls back to email, then empty string (greeting still
+  shows without a name rather than crashing). Rendered only when fbUser exists.
+
+NOT VERIFIED IN BROWSER: auth-gated behind Firebase login.
+
+---
+
+DATE: 2026-06-16
 SESSION: Inline name editing in Users tab
 STATUS: Complete (frontend, src/App.jsx only) — built clean, pushed
 COMMIT: 2511b9d (pushed to main)

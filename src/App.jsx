@@ -60,7 +60,7 @@ const STAGE_LABEL = {
 };
 
 // Discipleship journey axis — separate from the volunteer placement `stage` field above.
-const DISCIPLESHIP_STAGES = ["New Believer", "Start Class", "Baptism", "New Members Cafe", "Active", "Placed"];
+const DISCIPLESHIP_STAGES = ["New Believer", "Start Class", "Baptism", "New Members Cafe", "Not Yet Serving", "Active", "Placed"];
 
 const DISCIPLESHIP_STAGE_LABEL = {
   PT: {
@@ -68,6 +68,7 @@ const DISCIPLESHIP_STAGE_LABEL = {
     "Start Class": "Start",
     "Baptism": "Batismo",
     "New Members Cafe": "Cafe de Membros",
+    "Not Yet Serving": "Ainda Nao Serve",
     "Active": "Voluntarios",
     "Placed": "Colocados"
   },
@@ -76,6 +77,7 @@ const DISCIPLESHIP_STAGE_LABEL = {
     "Start Class": "Start Class",
     "Baptism": "Baptism",
     "New Members Cafe": "New Members Cafe",
+    "Not Yet Serving": "Not Yet Serving",
     "Active": "Volunteers",
     "Placed": "Placed"
   }
@@ -2449,6 +2451,7 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
   const [nameEditFull, setNameEditFull] = useState("");
   const [nameEditPreferred, setNameEditPreferred] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
+  const [stageAdvanceMsg, setStageAdvanceMsg] = useState(false); // teal "moved to Not Yet Serving" confirmation
 
   const load = useCallback(() => {
     fetch(`${API}/person/${personId}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -2546,6 +2549,32 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
     if (!m || ministries.includes(m)) return;
     updateConnection({ current_ministries: [...ministries, m] });
     setNewMinistry(""); setShowMinistryInput(false);
+  }
+
+  // Completed discipleship stages (checkbox section). NULL-GUARDED: completed_stages may
+  // be null/undefined/string — always coerce to an array before any operation.
+  function toggleCompletedStage(stageName) {
+    try {
+      var raw = person.completed_stages;
+      var arr = Array.isArray(raw) ? raw.slice() : JSON.parse(raw || "[]");
+      if (!Array.isArray(arr)) arr = [];
+      var idx = arr.indexOf(stageName);
+      if (idx > -1) arr.splice(idx, 1);
+      else arr.push(stageName);
+      var patch = { completed_stages: JSON.stringify(arr) };
+      // Auto-advance: when all 4 core stages are complete, move to Not Yet Serving —
+      // but never move someone already at/past that stage backwards.
+      var core = ["New Believer", "Start Class", "Baptism", "New Members Cafe"];
+      var allDone = core.every(function(s){ return arr.indexOf(s) > -1; });
+      var cur = person.discipleship_stage || "Active";
+      if (allDone && cur !== "Active" && cur !== "Placed" && cur !== "Not Yet Serving") {
+        patch.discipleship_stage = "Not Yet Serving";
+        patch.not_yet_serving_date = new Date().toISOString();
+        setStageAdvanceMsg(true);
+        setTimeout(function(){ setStageAdvanceMsg(false); }, 3000);
+      }
+      updateConnection(patch);
+    } catch(e) { /* graceful fallback — leave checkboxes untouched on parse failure */ }
   }
 
   function removeMinistry(m) {
@@ -2750,6 +2779,52 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
         </div>
 
         <div style={{padding:"24px 28px",display:"flex",flexDirection:"column",gap:0}}>
+
+          {/* Completed Stages — interactive checkboxes (NULL-GUARDED, wrapped in try/catch) */}
+          {(function(){
+            try {
+              var rawCompleted = person.completed_stages;
+              var completedStages = Array.isArray(rawCompleted)
+                ? rawCompleted
+                : JSON.parse(rawCompleted || "[]");
+              if (!Array.isArray(completedStages)) completedStages = [];
+              var canEditStages = role !== "group_leader";
+              var stageBoxes = [
+                { key:"New Believer",     labelPT:"Novo Crente",    labelEN:"New Believer" },
+                { key:"Start Class",      labelPT:"Start",          labelEN:"Start Class" },
+                { key:"Baptism",          labelPT:"Batismo",        labelEN:"Baptism" },
+                { key:"New Members Cafe", labelPT:"Cafe de Membros",labelEN:"New Members Cafe" }
+              ];
+              return (
+                <div style={{paddingBottom:22,marginBottom:0}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{lang==="PT"?"Etapas Concluidas":"Completed Stages"}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+                    {stageBoxes.map(function(sb){
+                      var checked = completedStages.indexOf(sb.key) > -1;
+                      return (
+                        <label key={sb.key}
+                          style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:8,
+                            border:checked?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.06)",
+                            background:checked?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                            color:checked?"#5eead4":"#aebac0",fontSize:12,fontWeight:500,
+                            cursor:(canEditStages&&!saving)?"pointer":"default",opacity:canEditStages?1:0.55,transition:"all 0.18s"}}>
+                          <input type="checkbox" checked={checked} disabled={!canEditStages||saving}
+                            onChange={function(){ if(canEditStages) toggleCompletedStage(sb.key); }}
+                            style={{width:15,height:15,accentColor:"#5eead4",cursor:(canEditStages&&!saving)?"pointer":"default"}} />
+                          {lang==="PT"?sb.labelPT:sb.labelEN}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {stageAdvanceMsg && (
+                    <div style={{marginTop:12,display:"inline-flex",alignItems:"center",gap:7,padding:"7px 14px",borderRadius:8,border:"1px solid rgba(94,234,212,0.3)",background:"rgba(94,234,212,0.1)",color:"#5eead4",fontSize:12,fontWeight:500}}>
+                      {"✓ "}{lang==="PT"?"Movido para Ainda Nao Serve":"Moved to Not Yet Serving"}
+                    </div>
+                  )}
+                </div>
+              );
+            } catch(e) { return null; }
+          })()}
 
           {/* Discipleship Stage — read-only display (separate axis from volunteer pipeline Stage below) */}
           <div style={{paddingBottom:22,marginBottom:0}}>
@@ -3558,7 +3633,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
-function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser }) {
+function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser, viewMode }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("All");
@@ -3608,11 +3683,34 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
 
   useEffect(() => { load(); }, [load]);
 
+  // Stage-view roles (set via the top-nav view switcher) drive which discipleship
+  // tab opens by default and which pills are visible. Maps view role -> default tab view key.
+  const STAGE_VIEW_TAB_DEFAULT = {
+    new_believer_view: "new_believer",
+    start_class_view: "start_class",
+    baptism_view: "baptism",
+    cafe_view: "cafe"
+  };
+  const isStageView = !!STAGE_VIEW_TAB_DEFAULT[viewMode];
+
+  // When the active view role changes, jump to that view's default discipleship tab.
+  useEffect(() => {
+    if (STAGE_VIEW_TAB_DEFAULT[viewMode]) {
+      setView(STAGE_VIEW_TAB_DEFAULT[viewMode]);
+    } else if (viewMode === "my_view" || viewMode === "senior_pastor_view" || viewMode === "pastor_view") {
+      setView("active");
+    }
+    setFilterStage("All");
+    setLangFilter(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
   const STAGE_TO_VIEW = {
     "New Believer": "new_believer",
     "Start Class": "start_class",
     "Baptism": "baptism",
     "New Members Cafe": "cafe",
+    "Not Yet Serving": "not_yet_serving",
     "Active": "active",
     "Placed": "placed"
   };
@@ -3660,7 +3758,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
       {/* Discipleship-stage sub-view toggle — 6 mutually exclusive tabs */}
       <style>{`.disc-pill-row::-webkit-scrollbar{display:none;}`}</style>
       <div className="disc-pill-row" style={{display:"flex",flexWrap:"nowrap",gap:8,marginBottom:20,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",paddingBottom:2}}>
-        {DISCIPLESHIP_STAGES.map(ds => {
+        {(isStageView ? DISCIPLESHIP_STAGES.slice(0, 5) : DISCIPLESHIP_STAGES).map(ds => {
           const vk = STAGE_TO_VIEW[ds];
           const isActive = view === vk;
           const count = peopleByView(vk).length;
@@ -3840,6 +3938,83 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
             </button>
             <button
               onClick={function(){ openQrModal(BAPTISM_URL, lang==="PT"?"QR Code - Formulario de Batismo":lang==="ES"?"QR Code - Formulario de Bautismo":"QR Code - Baptism Form", "lagoinha-batismo-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/baptism-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Tudo bem? Gostaria de te convidar para fazer uma avaliacao rapida de dons ministeriais aqui na Lagoinha Tampa. Leva poucos minutos e vai te ajudar a descobrir como voce pode servir. Acesse aqui: " + ASSESSMENT_URL;
+                var msgEN = "Hi! How are you doing? I would love to invite you to take a quick ministry gifting assessment here at Lagoinha Tampa. It only takes a few minutes and will help you discover how you can serve. Access it here: " + ASSESSMENT_URL;
+                var msgES = "Hola! Me gustaria invitarte a hacer una evaluacion rapida de dones ministeriales aqui en Lagoinha Tampa. Solo toma unos minutos. Accede aqui: " + ASSESSMENT_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Avaliacao":lang==="ES"?"Compartir Evaluacion":"Share Assessment"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(ASSESSMENT_URL, lang==="PT"?"QR Code da Avaliacao":lang==="ES"?"QR Code de la Evaluacion":"Assessment QR Code", "lagoinha-tampa-avaliacao-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+          </div>
+          <input placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{padding:"9px 14px",width:"100%",marginBottom:10}}/>
+          {/* Language tally chips */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+            {[{key:"Portugues",flag:"🇧🇷",label:"Portugues"},{key:"English",flag:"🇺🇸",label:"English"},{key:"Espanol",flag:"🌐",label:"Espanol"}].map(function(lo){
+              var count = currentPool.filter(function(p){ return parseJSON(p.languages_spoken).includes(lo.key); }).length;
+              var active = langFilter === lo.key;
+              return (
+                <button key={lo.key}
+                  onClick={function(){ setLangFilter(active ? null : lo.key); }}
+                  style={{fontSize:12,padding:"5px 14px",borderRadius:999,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
+                    background:active?"#2ABFBF":"transparent",color:active?"#0a1a1a":"#6b7a82",
+                    border:active?"1px solid #2ABFBF":"1px solid rgba(255,255,255,0.12)"}}>
+                  {lo.flag} {lo.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB — Not Yet Serving (Baptism + Cafe + Assessment share, search, language chips) */}
+      {view === "not_yet_serving" && (
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario de Batismo da Lagoinha Tampa: " + BAPTISM_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the Baptism form at Lagoinha Tampa: " + BAPTISM_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario de Bautismo de Lagoinha Tampa: " + BAPTISM_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario de Batismo":lang==="ES"?"Compartir Formulario de Bautismo":"Share Baptism Form"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(BAPTISM_URL, lang==="PT"?"QR Code - Formulario de Batismo":lang==="ES"?"QR Code - Formulario de Bautismo":"QR Code - Baptism Form", "lagoinha-batismo-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/baptism-form.html"); }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
+              {lang==="PT"?"Baixar QR Code":"Download QR Code"}
+            </button>
+            <button
+              onClick={function(){
+                var msgPT = "Oi! Gostaria de te convidar para preencher o formulario do Cafe de Novos Membros da Lagoinha Tampa: " + CAFE_URL;
+                var msgEN = "Hi! I would like to invite you to fill out the New Members Cafe form at Lagoinha Tampa: " + CAFE_URL;
+                var msgES = "Hola! Me gustaria invitarte a completar el formulario del Cafe de Nuevos Miembros de Lagoinha Tampa: " + CAFE_URL;
+                var msg = lang==="PT"?msgPT:lang==="ES"?msgES:msgEN;
+                window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+              }}
+              style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
+              {"↗ "}{lang==="PT"?"Compartilhar Formulario do Cafe":lang==="ES"?"Compartir Formulario del Cafe":"Share Cafe Form"}
+            </button>
+            <button
+              onClick={function(){ openQrModal(CAFE_URL, lang==="PT"?"QR Code - Formulario do Cafe":lang==="ES"?"QR Code - Formulario del Cafe":"QR Code - Cafe Form", "lagoinha-cafe-qr.png", "farfromtimnah-hue.github.io/ministry-gifting/cafe-form.html"); }}
               style={{display:"inline-flex",alignItems:"center",gap:7,fontSize:12,padding:"8px 16px",background:"transparent",border:"1px solid #2ABFBF",borderRadius:8,color:"#2ABFBF",cursor:"pointer",fontWeight:500,transition:"all 0.18s"}}>
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#2ABFBF" strokeWidth="1.8"><rect x="1" y="1" width="7" height="7" rx="1"/><rect x="12" y="1" width="7" height="7" rx="1"/><rect x="1" y="12" width="7" height="7" rx="1"/><rect x="3" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="14" y="3" width="3" height="3" fill="#2ABFBF" stroke="none"/><rect x="3" y="14" width="3" height="3" fill="#2ABFBF" stroke="none"/><line x1="12" y1="12" x2="12" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="12" x2="16" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="12" x2="19" y2="12" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="16" x2="12" y2="16" strokeWidth="3" strokeLinecap="round"/><line x1="16" y1="16" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="19" y1="16" x2="19" y2="19" strokeWidth="3" strokeLinecap="round"/><line x1="12" y1="19" x2="16" y2="19" strokeWidth="3" strokeLinecap="round"/></svg>
               {lang==="PT"?"Baixar QR Code":"Download QR Code"}
@@ -5327,6 +5502,7 @@ function UserManagementTab({ token, t, lang }) {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [pw, setPw] = useState("");
   const [newRole, setNewRole] = useState("pastor");
   const [adding, setAdding] = useState(false);
@@ -5383,12 +5559,12 @@ function UserManagementTab({ token, t, lang }) {
       const r = await fetch(`${API}/admin/user`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email, password: pw, role: newRole })
+        body: JSON.stringify({ email, password: pw, role: newRole, displayName })
       });
       const d = await r.json();
       if (d.success) {
         setCreatedUser({ email, password: pw });
-        setEmail(""); setPw(""); setNewRole("pastor");
+        setEmail(""); setDisplayName(""); setPw(""); setNewRole("pastor");
         loadUsers();
       } else {
         setAddError(d.error || (lang === "PT" ? "Erro ao criar usuário." : "Error creating user."));
@@ -5410,6 +5586,10 @@ function UserManagementTab({ token, t, lang }) {
           <div>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>{t.loginEmail}</div>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@lagoinha.com" style={{height:42}} />
+          </div>
+          <div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>{lang==="PT"?"Nome de exibicao":lang==="ES"?"Nombre para mostrar":"Display Name"}</div>
+            <input type="text" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder={lang==="PT"?"Nome completo":lang==="ES"?"Nombre completo":"Full name"} style={{height:42}} />
           </div>
           <div>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#6b7a82",marginBottom:6}}>{lang==="PT"?"Senha Temporária":"Temporary Password"}</div>
@@ -6122,13 +6302,17 @@ export default function App() {
                   {/* Divider between overflow tabs and aux, only when both present */}
                   {overflowTabs.length > 0 && <div className="pp-divider"/>}
 
-                  {/* View switcher (owner/pastor only) */}
-                  {(role==='owner'||role==='pastor') && (
+                  {/* View switcher (owner / senior_pastor / pastor — all get the same options) */}
+                  {(role==='owner'||role==='senior_pastor'||role==='pastor') && (
                     <div className="pp-sub">
-                      <select value={viewMode} onChange={e=>{setViewMode(e.target.value);if(e.target.value==='my_view')setGlGroup("");}}>
+                      <select value={viewMode} onChange={e=>{const v=e.target.value;setViewMode(v);if(v==='my_view')setGlGroup("");if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v))setTab("people");}}>
                         <option value="my_view">{lang==="PT"?"Minha visao":"My View"}</option>
-                        {role==='owner'&&<option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>}
-                        {role==='owner'&&<option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>}
+                        <option value="senior_pastor_view">{lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"}</option>
+                        <option value="pastor_view">{lang==="PT"?"Visao do Pastor":"Pastor View"}</option>
+                        <option value="new_believer_view">{lang==="PT"?"Vista Novos Crentes":"New Believer View"}</option>
+                        <option value="start_class_view">{lang==="PT"?"Vista Start":"Start Class View"}</option>
+                        <option value="baptism_view">{lang==="PT"?"Vista Batismo":"Baptism View"}</option>
+                        <option value="cafe_view">{lang==="PT"?"Vista Cafe":"Cafe View"}</option>
                         <option value="group_leader">{lang==="PT"?"Visao do Lider":"Group Leader View"}</option>
                       </select>
                       {viewMode==='group_leader'&&(
@@ -6163,7 +6347,7 @@ export default function App() {
           : null}
         {!(viewMode === 'group_leader' && glGroup) && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
+        {!(viewMode === 'group_leader' && glGroup) && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "health" && <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && tab === "reference" && (

@@ -4,6 +4,35 @@
 
 ---
 
+DATE: 2026-06-15
+SESSION: Not Yet Serving tab + stage checkboxes + 4 stage views + display name
+STATUS: Complete (frontend) — Worker changes PENDING (see below)
+COMMIT: 57ae8aa (pushed to main — wait for GitHub Actions green check before testing live)
+
+WHAT WAS DONE (all in src/App.jsx):
+- TASK 1: Added "Not Yet Serving" to DISCIPLESHIP_STAGES (between New Members Cafe and Active) + PT/EN labels ("Ainda Nao Serve" / "Not Yet Serving") + STAGE_TO_VIEW mapping ("not_yet_serving").
+- TASK 2: 7th discipleship pill renders automatically (pill row maps over DISCIPLESHIP_STAGES); peopleByView handles "not_yet_serving" via STAGE_TO_VIEW.
+- TASK 3: Added Not Yet Serving toolbar (view==="not_yet_serving"): Share Baptism + Cafe + Assessment buttons w/ QR, search bar, language tally chips. No dropdowns, no Type chips.
+- TASK 4: PersonPanel — added "Etapas Concluidas / Completed Stages" checkbox section above the read-only discipleship display. 4 checkboxes (New Believer, Start Class, Baptism, New Members Cafe). Null-guarded + try/catch. Read-only for group_leader. Auto-advance: when all 4 checked AND not already Active/Placed/Not Yet Serving, sets discipleship_stage="Not Yet Serving" + not_yet_serving_date (single combined PUT) and shows a 3s teal confirmation.
+- TASK 6: View switcher now shown to owner/senior_pastor/pastor (all three get identical options). Added New Believer / Start Class / Baptism / Cafe views. Selecting a stage view jumps to the People tab, shows only tabs 1-5, and defaults to the matching tab. Switching back to my/senior/pastor view resets to Volunteers (active) and shows all 7 tabs. PeopleTab now receives a viewMode prop.
+- TASK 7: Add User form — added optional Display Name field (PT "Nome de exibicao" / EN "Display Name" / ES "Nombre para mostrar") between Email and Temporary Password; included as displayName in POST /admin/user payload.
+- TASK 8 (nav rebalance): 7-pill row uses flexWrap:nowrap + overflowX:auto + each pill flex:0 0 auto / whiteSpace:nowrap, scrollbar hidden. Confirmed it scrolls horizontally on a 375px viewport with no layout break.
+
+BUILD: `npm run build` clean (only the pre-existing >500kB chunk-size warning).
+
+PENDING WORKER CHANGES (worker.js is outside the dashboard dir — run a separate Worker prompt):
+- TASK 5: PUT /person/:id/connection uses a STATIC SET clause, NOT dynamic. It does NOT currently persist discipleship_stage, completed_stages, or not_yet_serving_date. Add these three columns to BOTH the authorized (pastor) and the relevant path UPDATE statements, e.g.:
+    discipleship_stage = COALESCE(?, discipleship_stage),
+    completed_stages   = COALESCE(?, completed_stages),
+    not_yet_serving_date = COALESCE(?, not_yet_serving_date)
+  and bind: str(pb.discipleship_stage), (pb.completed_stages != null ? str(pb.completed_stages) : null), str(pb.not_yet_serving_date).
+  NOTE: frontend sends completed_stages already JSON.stringify'd (a string), so bind it as-is (do NOT double-stringify). Without this, the stage checkboxes and auto-advance will not persist.
+- TASK 7: POST /admin/user does NOT set displayName. The Firebase accounts:update call (customAttributes) should also include `displayName: body.displayName` so the name is stored. GET /admin/users already returns u.displayName natively, so the Users list will show it once POST sets it.
+
+NOTE: The canonical tracker at /Users/nicolel/ministry-gifting/Progress.md was NOT updated — it is outside the permitted working directory (/Users/nicolel/ltc-dashboard/). Copy this checkpoint there manually if desired.
+
+---
+
 DATE: 2026-06-05
 SESSION: Scheduling + Training Library Prototype
 STATUS: Complete

@@ -6351,10 +6351,11 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
     setToggling(function(prev) { return Object.assign({}, prev, {[positionName]: true}); });
     try {
       if (existingId) {
-        await fetch(MH_API + '/volunteer-positions/' + existingId, {
+        var delRes = await fetch(MH_API + '/volunteer-positions/' + existingId, {
           method: 'DELETE',
           headers: { Authorization: 'Bearer ' + token }
         });
+        if (!delRes.ok) throw new Error('DELETE failed');
         setLocalAssigned(function(prev) {
           var n = Object.assign({}, prev);
           delete n[positionName];
@@ -6366,12 +6367,13 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
           body: JSON.stringify({ person_id: person.id, ministry_name: ministryName, position_name: positionName })
         });
+        if (!res.ok) throw new Error('POST failed');
         var data = await res.json().catch(function() { return {}; });
         var newId = (data && data.id) || ('_' + Date.now());
         setLocalAssigned(function(prev) { return Object.assign({}, prev, {[positionName]: newId}); });
       }
       onChanged();
-    } catch(e) { /* silent — UI stays optimistic */ }
+    } catch(e) { /* revert optimistic state on failure by triggering reload */ onChanged(); }
     setToggling(function(prev) { return Object.assign({}, prev, {[positionName]: false}); });
   }
 
@@ -6539,10 +6541,11 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
     setToggling(function(prev) { return Object.assign({}, prev, {[person.id]: true}); });
     try {
       if (existingId) {
-        await fetch(MH_API + '/volunteer-positions/' + existingId, {
+        var delRes = await fetch(MH_API + '/volunteer-positions/' + existingId, {
           method: 'DELETE',
           headers: { Authorization: 'Bearer ' + token }
         });
+        if (!delRes.ok) throw new Error('DELETE failed');
         setLocalAssigned(function(prev) { var n = Object.assign({}, prev); delete n[person.id]; return n; });
       } else {
         var res = await fetch(MH_API + '/volunteer-positions', {
@@ -6550,12 +6553,13 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
           body: JSON.stringify({ person_id: person.id, ministry_name: ministryName, position_name: posName })
         });
+        if (!res.ok) throw new Error('POST failed');
         var data = await res.json().catch(function() { return {}; });
         var newId = (data && data.id) || ('_' + Date.now());
         setLocalAssigned(function(prev) { return Object.assign({}, prev, {[person.id]: newId}); });
       }
       onChanged();
-    } catch(e) { /* silent */ }
+    } catch(e) { /* revert optimistic state on failure by triggering reload */ onChanged(); }
     setToggling(function(prev) { return Object.assign({}, prev, {[person.id]: false}); });
   }
 

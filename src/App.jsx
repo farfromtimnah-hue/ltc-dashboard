@@ -5325,12 +5325,16 @@ function ReferenceTab({ t, lang, anchor, onAnchorConsumed, onBack }) {
 function UserManagementTab({ token, t, lang }) {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [newRole, setNewRole] = useState("pastor");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [createdUser, setCreatedUser] = useState(null);
+  const [editingUid, setEditingUid] = useState(null);
+  const [editRole, setEditRole] = useState("");
+  const [savingRole, setSavingRole] = useState(false);
 
   const roleNames = {
     senior_pastor: t.userRoleSenior,
@@ -5338,14 +5342,39 @@ function UserManagementTab({ token, t, lang }) {
     group_leader: t.userRoleGroupLeader,
   };
 
+  const fetchErrMsg = lang === "PT" ? "Erro ao carregar usuários." : lang === "ES" ? "Error al cargar usuarios." : "Error loading users.";
+
   function loadUsers() {
+    setFetchError("");
     fetch(`${API}/admin/users`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(d => { if (d.users) setUsers(d.users); setLoadingUsers(false); })
-      .catch(() => setLoadingUsers(false));
+      .then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || r.status); });
+        return r.json();
+      })
+      .then(d => {
+        if (d.users) setUsers(d.users);
+        else setFetchError(fetchErrMsg);
+        setLoadingUsers(false);
+      })
+      .catch(e => { setFetchError(fetchErrMsg + (e.message ? " (" + e.message + ")" : "")); setLoadingUsers(false); });
   }
 
   useEffect(() => { loadUsers(); }, [token]);
+
+  async function handleSaveRole(uid) {
+    setSavingRole(true);
+    try {
+      const r = await fetch(`${API}/admin/user/${uid}/role`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role: editRole })
+      });
+      const d = await r.json();
+      if (d.success) { setEditingUid(null); loadUsers(); }
+      else setFetchError(d.error || fetchErrMsg);
+    } catch { setFetchError(fetchErrMsg); }
+    setSavingRole(false);
+  }
 
   async function handleAddUser() {
     if (!email || !pw) return;
@@ -5406,29 +5435,59 @@ function UserManagementTab({ token, t, lang }) {
       {/* User list */}
       <div className="glass" style={{padding:28,borderRadius:16,position:"relative"}}>
         <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",opacity:0.4}} />
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:16}}>{lang==="PT"?"Usuários Ativos":"Active Users"}</div>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:16}}>{lang==="PT"?"Usuários Ativos":lang==="ES"?"Usuarios Activos":"Active Users"}</div>
+        {fetchError && <div style={{color:"#f87171",fontSize:13,marginBottom:12}}>{fetchError}</div>}
         {loadingUsers ? (
           <div style={{color:"#6b7a82",fontSize:13}}>{t.loading}</div>
-        ) : users.length === 0 ? (
-          <div style={{color:"#6b7a82",fontSize:13}}>{lang==="PT"?"Nenhum usuário encontrado.":"No users found."}</div>
+        ) : users.length === 0 && !fetchError ? (
+          <div style={{color:"#6b7a82",fontSize:13}}>{lang==="PT"?"Nenhum usuário encontrado.":lang==="ES"?"No se encontraron usuarios.":"No users found."}</div>
         ) : (
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead>
               <tr style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.12em",textTransform:"uppercase",color:"#6b7a82",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                 <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>Email</th>
-                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Função":"Role"}</th>
-                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Último acesso":"Last sign in"}</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Nome":"Name"}</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Função":lang==="ES"?"Función":"Role"}</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}>{lang==="PT"?"Último acesso":lang==="ES"?"Último acceso":"Last sign in"}</th>
+                <th style={{textAlign:"left",padding:"8px 0 12px",fontWeight:500}}></th>
               </tr>
             </thead>
             <tbody>
               {users.map((u,i)=>{
                 var customAttrs = {};
                 try { customAttrs = u.customAttributes ? JSON.parse(u.customAttributes) : {}; } catch(e) {}
+                var lastSignIn = u.lastLoginAt || u.lastSignedInAt;
+                var isEditing = editingUid === u.localId;
                 return (
                   <tr key={u.localId||i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                    <td style={{padding:"12px 0",color:"#e6f1f0"}}>{u.email}</td>
-                    <td style={{padding:"12px 0",color:"#aebac0"}}>{roleNames[customAttrs.role] || t.userRolePastor}</td>
-                    <td style={{padding:"12px 0",color:"#6b7a82"}}>{u.lastSignedInAt ? new Date(parseInt(u.lastSignedInAt)).toLocaleDateString() : "—"}</td>
+                    <td style={{padding:"12px 8px 12px 0",color:"#e6f1f0"}}>{u.email}</td>
+                    <td style={{padding:"12px 8px 12px 0",color:"#aebac0"}}>{u.displayName || "—"}</td>
+                    <td style={{padding:"12px 8px 12px 0"}}>
+                      {isEditing ? (
+                        <select value={editRole} onChange={e=>setEditRole(e.target.value)} style={{background:"rgba(5,10,16,0.8)",border:"1px solid rgba(94,234,212,0.25)",borderRadius:6,color:"#e6f1f0",fontSize:12,padding:"4px 8px",fontFamily:"'JetBrains Mono',monospace"}}>
+                          <option value="senior_pastor">{t.userRoleSenior}</option>
+                          <option value="pastor">{t.userRolePastor}</option>
+                          <option value="group_leader">{t.userRoleGroupLeader}</option>
+                        </select>
+                      ) : (
+                        <span style={{color:"#aebac0"}}>{roleNames[customAttrs.role] || t.userRolePastor}</span>
+                      )}
+                    </td>
+                    <td style={{padding:"12px 8px 12px 0",color:"#6b7a82"}}>{lastSignIn ? new Date(parseInt(lastSignIn)).toLocaleDateString() : "—"}</td>
+                    <td style={{padding:"12px 0",textAlign:"right"}}>
+                      {customAttrs.role === "owner" ? null : isEditing ? (
+                        <span style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                          <button onClick={()=>handleSaveRole(u.localId)} disabled={savingRole} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(94,234,212,0.3)",background:"rgba(94,234,212,0.1)",color:"#5eead4"}}>
+                            {savingRole?"…":"✓"}
+                          </button>
+                          <button onClick={()=>setEditingUid(null)} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>✕</button>
+                        </span>
+                      ) : (
+                        <button onClick={()=>{ setEditingUid(u.localId); setEditRole(customAttrs.role || "pastor"); }} style={{padding:"4px 12px",borderRadius:6,fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)",background:"transparent",color:"#6b7a82"}}>
+                          {lang==="PT"?"Editar":lang==="ES"?"Editar":"Edit"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

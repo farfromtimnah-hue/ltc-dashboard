@@ -6674,10 +6674,32 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
       var rosterData = Array.isArray(results[0]) ? results[0] : [];
       var healthList = Array.isArray(results[1]) ? results[1] : [];
       setRoster(rosterData);
-      // Find this ministry's positions from health data
       var card = healthList.find(function(c) { return c && c.ministry === currentMinistry; });
       setMinistryPositions(Array.isArray(card && card.positions) ? card.positions : []);
       setEquipeLoading(false);
+    });
+  }, [currentMinistry, token]);
+
+  // Silent background refetch used by modals after each toggle — does NOT set equipeLoading so
+  // the modal is never affected by the loading-state re-render while its own state is still updating.
+  const silentRefetch = React.useCallback(function() {
+    if (!currentMinistry || !token) return;
+    var rosterUrl = MH_API + '/ministry/' + encodeURIComponent(currentMinistry) + '/roster';
+    var healthUrl = MH_API + '/ministry-health';
+    Promise.all([
+      fetch(rosterUrl, { headers: { Authorization: 'Bearer ' + token } }).then(function(r) { return r.json(); }).catch(function() { return []; }),
+      fetch(healthUrl, { headers: { Authorization: 'Bearer ' + token } }).then(function(r) { return r.json(); }).catch(function() { return []; })
+    ]).then(function(results) {
+      var rosterData = Array.isArray(results[0]) ? results[0] : [];
+      var healthList = Array.isArray(results[1]) ? results[1] : [];
+      setRoster(rosterData);
+      var card = healthList.find(function(c) { return c && c.ministry === currentMinistry; });
+      setMinistryPositions(Array.isArray(card && card.positions) ? card.positions : []);
+      // Sync selectedPerson with fresh data so re-opens show current assignments.
+      setSelectedPerson(function(prev) {
+        if (!prev) return prev;
+        return rosterData.find(function(p) { return p.id === prev.id; }) || prev;
+      });
     });
   }, [currentMinistry, token]);
 
@@ -6896,7 +6918,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                 token={token}
                 lang={lang}
                 onClose={function(){ setSelectedPerson(null); }}
-                onChanged={function(){ loadEquipe(); }}
+                onChanged={silentRefetch}
               />
             )}
 
@@ -6909,7 +6931,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                 token={token}
                 lang={lang}
                 onClose={function(){ setSelectedPosition(null); }}
-                onChanged={function(){ loadEquipe(); }}
+                onChanged={silentRefetch}
               />
             )}
           </div>

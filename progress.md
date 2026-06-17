@@ -5,6 +5,42 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Fix checkbox not persisting visually (real root cause) + modal scroll
+COMMIT: fddf120 (pushed to main)
+
+--- BUG 1: checkbox flashes then reverts to unchecked ---
+DEFINITIVE DIAGNOSIS (the two prior fixes this day targeted the WRONG cause):
+  The checkbox is a CONTROLLED input (checked={!!localAssigned[posName]}). `localAssigned` uses a
+  lazy useState initializer that runs ONCE at mount; a re-render (incl. silentRefetch passing a new
+  `person` prop) never re-runs it and the modal never remounts (no key, same tree position). So a
+  SUCCESSFUL toggle (setLocalAssigned) would stay checked permanently — refetch cannot downgrade it.
+  Therefore a revert can ONLY mean the POST/DELETE hit the catch (!res.ok). The "flash" is the native
+  browser paint of a controlled checkbox snapping back to its false controlled value. => POST failing.
+
+  ROOT CAUSE of the POST failure: brittle `vp.ministry_name === currentMinistry` filters at 4 roster-
+  derived sites. The roster endpoint is ALREADY single-ministry-scoped (worker queries
+  volunteer_positions WHERE ministry = ?), so every VP item it returns belongs to the current ministry.
+  But when the item's `ministry_name` field is absent or doesn't exactly string-match currentMinistry,
+  the filter silently drops ALL of a person's assignments. Effects:
+    - localAssigned init → {} → an already-assigned position renders UNCHECKED → toggling it POSTs a row
+      that already exists → server 409 duplicate → !res.ok → checkbox reverts.
+    - roster card tags hidden ("Sem posicao"); bottom position counts stuck at 0.
+
+FIX (src/App.jsx) — removed the redundant ministry_name equality check at all 4 sites, keeping the
+  position_name match where relevant (LeaderPersonModal localAssigned init, PositionAssignModal
+  localAssigned init, roster card myPos, bottom-counts filledFromRoster). Also: POST/DELETE catch now
+  logs the real status/body via console.error instead of failing fully silently.
+
+--- BUG 2: LeaderPersonView modal didn't scroll on long position lists ---
+ROOT CAUSE: modal had TWO nested scroll containers — outer panel (height:100vh, overflowY:auto,
+  display:flex column) AND an inner body (flex:1, overflowY:auto). A flex:1 child has min-height:auto
+  (content size), so it expands to fit content instead of constraining/scrolling → long lists clipped.
+FIX: matched PersonPanel's working single-scroll-container pattern — removed flex:1 + overflowY:auto
+  from the body so the outer panel scrolls everything as one.
+
+---
+
+DATE: 2026-06-16
 SESSION: Fix checkbox reverting after position assignment save
 COMMIT: 6a40b0c (pushed to main)
 

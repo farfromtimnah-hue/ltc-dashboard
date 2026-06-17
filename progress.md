@@ -4,8 +4,56 @@
 
 ---
 
+DATE: 2026-06-17 (later)
+SESSION: ACTUAL page-level scroll root cause (app-shell) + Positions list photo chips
+COMMIT: 022bf5a (pushed to main)
+
+=== PAGE-LEVEL SCROLL — real root cause (the cb16949 attempt did NOT fix this) ===
+The whole app relied on DOCUMENT-BODY scroll: `.app` was `minHeight:100vh` (grows with content),
+nav was `position:sticky`, and the content div had no scroll handling — content taller than the
+viewport was supposed to scroll the body/viewport. But `body { overflow-x: hidden }` (src/App.jsx
+~608) is a well-known trigger for breaking vertical-overflow propagation to the viewport: once a
+non-visible overflow is set on <body>, the body becomes its own (x-axis) scroll container and the
+viewport no longer reliably scrolls the body's vertical overflow. Result on tall tabs (Worship Team
+= long roster grid + 9 positions): no scrollbar, wheel does nothing, bottom positions unreachable.
+
+Why earlier sessions kept "finding no lock": there was no overflow:hidden/height cap on any single
+ancestor — the failure is the body-scroll *mechanism* itself, not one element. And the previous
+"fix" (cb16949) only touched the LeaderPersonModal panel, never the page shell, which is exactly
+why live behavior was unchanged.
+
+COMPARISON evidence: People, Analytics, and ServiceAttendance tabs have NO internal scroll
+containers either (grepped 1703-4509: zero overflowY/maxHeight/100vh) — they use the same fragile
+body-scroll path. They appear to "work" only when their content is short enough to fit; MLV is the
+first view tall enough to expose the broken body scroll.
+
+FIX (src/App.jsx, App() root ~7491): converted to the canonical sticky-header app-shell pattern,
+applied once at the shell so every tab scrolls reliably:
+  - .app: `height:100vh, display:flex, flexDirection:column` (was minHeight:100vh)
+  - nav:  `flexShrink:0, zIndex:50` (removed position:sticky — now permanently pinned outside the
+          scroll region, which is strictly better than sticky)
+  - NEW scroll region wrapping the content div: `flex:1, minHeight:0, overflowY:auto`
+    (minHeight:0 is the critical bit — without it a flex child refuses to shrink and won't scroll,
+    the same class of bug that hit the modal).
+This does not rely on body scroll at all, so the body overflow-x:hidden quirk is irrelevant.
+
+VERIFICATION NOTE: could not drive the live authenticated MLV page in-sandbox (preview MCP serves a
+static dir, app is Firebase-auth-gated). Fix is the standard app-shell scroll pattern applied at the
+shell; build passes. Nicole to confirm on the live deploy.
+
+=== POSITIONS LIST — photo+name chips (now actually built) ===
+Each position row in the Equipe tab Positions list (src/App.jsx ~6886) now renders, below the
+existing dot/name/count line, a wrapped row of chips for each assigned person: 20px circular
+photo_url (or initial-letter fallback in the same teal-gradient style as roster cards) + the
+person's name. Built a position→people lookup by reusing the existing count filter but collecting
+the matched roster people instead of only counting (assignedPeople; filled = assignedPeople.length).
+Null guards: name = preferred_name || full_name || "Sem nome"/"No name"; missing photo_url → initial
+avatar. Zero-assigned positions show no chips (count + red dot already convey empty).
+
+---
+
 DATE: 2026-06-17
-SESSION: ACTUAL root cause — parseJSON destroying already-parsed API arrays + page/modal scroll
+SESSION: ACTUAL root cause — parseJSON destroying already-parsed API arrays + modal scroll
 COMMIT: cb16949 (pushed to main)
 
 === THE REAL ROOT CAUSE (Equipe positions showing 0/X and "No position") ===

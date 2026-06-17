@@ -6324,10 +6324,12 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
 
   // Local state tracks which positions are assigned: { position_name -> volunteer_positions id }
   const [localAssigned, setLocalAssigned] = React.useState(function() {
+    // The roster endpoint is already scoped to a single ministry, so EVERY volunteer_position
+    // returned for this person belongs to the current ministry. Do NOT filter by ministry_name —
+    // if that field is absent/mismatched it wrongly drops all assignments, leaving assigned
+    // positions shown as unchecked (which then triggers a duplicate POST → 409 → checkbox reverts).
     var map = {};
-    personVPs
-      .filter(function(vp) { return vp.ministry_name === ministryName; })
-      .forEach(function(vp) { map[vp.position_name] = vp.id; });
+    personVPs.forEach(function(vp) { if (vp && vp.position_name) map[vp.position_name] = vp.id; });
     return map;
   });
   const [toggling, setToggling] = React.useState({}); // position_name -> bool
@@ -6355,7 +6357,7 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
           method: 'DELETE',
           headers: { Authorization: 'Bearer ' + token }
         });
-        if (!delRes.ok) throw new Error('DELETE failed');
+        if (!delRes.ok) throw new Error('DELETE failed: ' + delRes.status);
         setLocalAssigned(function(prev) {
           var n = Object.assign({}, prev);
           delete n[positionName];
@@ -6367,13 +6369,13 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
           body: JSON.stringify({ person_id: person.id, ministry_name: ministryName, position_name: positionName })
         });
-        if (!res.ok) throw new Error('POST failed');
         var data = await res.json().catch(function() { return {}; });
+        if (!res.ok) throw new Error('POST failed: ' + res.status + ' ' + JSON.stringify(data));
         var newId = (data && data.id) || ('_' + Date.now());
         setLocalAssigned(function(prev) { return Object.assign({}, prev, {[positionName]: newId}); });
       }
       onChanged();
-    } catch(e) { /* revert optimistic state on failure by triggering reload */ onChanged(); }
+    } catch(e) { console.error('[volunteer-positions] toggle failed:', e && e.message); /* revert optimistic state on failure by triggering reload */ onChanged(); }
     setToggling(function(prev) { return Object.assign({}, prev, {[positionName]: false}); });
   }
 
@@ -6420,8 +6422,10 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
           <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7a82',fontSize:18,cursor:'pointer',padding:'4px 8px',flexShrink:0,alignSelf:'flex-start'}}>×</button>
         </div>
 
-        {/* Body */}
-        <div style={{flex:1,padding:'20px',overflowY:'auto',display:'flex',flexDirection:'column',gap:20}}>
+        {/* Body — no nested scroll; the outer panel (height:100vh, overflowY:auto) scrolls
+            everything as one, matching PersonPanel's single-scroll-container pattern. A nested
+            flex:1 + overflowY:auto here clips long content because flex min-height defaults to auto. */}
+        <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:20}}>
 
           {/* Section 2 — Current ministries */}
           <div>
@@ -6522,7 +6526,7 @@ function PositionAssignModal({ position, roster, ministryName, token, lang, onCl
     (roster || []).forEach(function(person) {
       // volunteer_positions may be a JSON string from D1 GROUP_ARRAY — parse defensively.
       parseJSON((person && person.volunteer_positions), [])
-        .filter(function(vp) { return vp.ministry_name === ministryName && vp.position_name === posName; })
+        .filter(function(vp) { return vp && vp.position_name === posName; }) // roster is already ministry-scoped; match position only
         .forEach(function(vp) { map[person.id] = vp.id; });
     });
     return map;
@@ -6816,8 +6820,8 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                         var topGift = person.gifting_1 ? (lang==="PT"?(GIFTING_PT[person.gifting_1]||person.gifting_1):person.gifting_1) : null;
                         // volunteer_positions may be a JSON string from D1 — parse defensively.
                         var personVPs = parseJSON(person.volunteer_positions, []);
-                        // Positions assigned in THIS ministry
-                        var myPos = personVPs.filter(function(vp){ return vp.ministry_name===currentMinistry; });
+                        // Roster is already scoped to this ministry — every VP here belongs to it.
+                        var myPos = personVPs.filter(function(vp){ return vp && vp.position_name; });
                         return (
                           <div key={person.id} onClick={function(){ setSelectedPerson(person); }}
                             className="glass glow-hover"
@@ -6882,7 +6886,8 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                         // Count how many in roster are assigned to this position.
                         // volunteer_positions may be a JSON string from D1 — parse each defensively.
                         var filledFromRoster = (roster||[]).filter(function(p){
-                          return parseJSON(p.volunteer_positions, []).some(function(vp){ return vp.ministry_name===currentMinistry && vp.position_name===posName; });
+                          return parseJSON(p.volunteer_positions, []).some(function(vp){ return vp && vp.position_name===posName; }); // roster already ministry-scoped
+
                         }).length;
                         // Use filled from roster if > 0, otherwise fall back to mhPosFilled (form+system counts)
                         var filled = filledFromRoster > 0 ? filledFromRoster : mhPosFilled(pos);

@@ -5,6 +5,47 @@
 ---
 
 DATE: 2026-06-16
+SESSION: Fix checkbox reverting after position assignment save
+COMMIT: 6a40b0c (pushed to main)
+
+ROOT CAUSE: After a successful POST to /volunteer-positions, the modal called `onChanged()` which
+called `loadEquipe()`. `loadEquipe` immediately calls `setEquipeLoading(true)` before the async
+fetch. This triggers a parent re-render before React has flushed the modal's own `setLocalAssigned`
+state update (the two setState calls are in different components and the parent's update can land
+first). The result: modal briefly renders with its old `localAssigned = {}` — checkbox reverts —
+then `setLocalAssigned` fires and checks it again, but by then the user sees a flash/revert.
+
+FIX (src/App.jsx):
+- Added `silentRefetch` useCallback — identical fetch logic to `loadEquipe` but WITHOUT
+  `setEquipeLoading(true/false)` calls. No loading state is touched during background refreshes.
+- Also updates `selectedPerson` (via functional setState) with the matching fresh person object
+  from the refetched roster, so closing and reopening the modal shows current assignment state.
+- Both modal `onChanged` props now pass `silentRefetch` instead of `function(){ loadEquipe(); }`.
+- `loadEquipe` is unchanged and still used for initial tab load and tab-switch.
+
+---
+
+DATE: 2026-06-16
+SESSION: Fix position assignments not persisting in Equipe tab
+COMMIT: ca48a4e (pushed to main)
+
+ROOT CAUSE: Two-part failure.
+  1. POST /volunteer-positions was returning 400 "ministry is required" because the frontend sent
+     `ministry_name` but the Worker read only `vpBody.ministry`. Fixed in ltc-api (Worker version
+     3c85bf47 — now accepts `ministry_name` as alias for `ministry`).
+  2. Neither togglePosition (LeaderPersonModal) nor togglePerson (PositionAssignModal) checked
+     `res.ok` before proceeding. On a 400, the code still called `onChanged()` → `loadEquipe()`,
+     which refetched the roster and overrode the optimistic state — so the UI appeared to revert.
+
+FIX (src/App.jsx):
+  - Added `if (!res.ok) throw new Error(...)` after every POST and DELETE in both modal handlers.
+  - On throw, the catch block calls `onChanged()` to trigger a reload and revert optimistic state.
+  - The `onChanged` → `loadEquipe` wiring was already correct; no changes needed to refetch logic
+    or position count derivation (both derive from the same `roster` state from `loadEquipe`).
+
+---
+
+DATE: 2026-06-16
 SESSION: Equipe tab field-mapping fix + WhatsApp + language display
 STATUS: Frontend complete — WORKER CHANGES REQUIRED before data displays (see below)
 COMMIT: f562e44 (pushed to main)

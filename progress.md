@@ -4,6 +4,22 @@
 
 ---
 
+DATE: 2026-06-17 (latest+1)
+SESSION: Last position row sliced at scroll boundary — real fix
+COMMIT: 9620e54 (pushed to main)
+
+The 9a67ad4 padding fix did NOT move the cutoff at all — the decisive clue. Root cause: Blink/WebKit
+EXCLUDE a scroll container's own `padding-bottom` from its scrollable overflow region (honored at
+top, collapsed at bottom), so `paddingBottom:64` on the overflow:auto scroll div (7592) had zero
+effect on the max-scroll boundary; the last row stayed sliced at the edge. Ruled out: fixed height
+cap (none — pure flex:1/minHeight:0), async layout timing (scroll container is CSS flex:1, auto-
+reflows on content change; no JS-measured height), and the external bottom-right "contact us" widget
+(full-width slice at the bottom edge, not a corner overlay; widget is not in this codebase).
+FIX: removed paddingBottom from the scroll container and put `paddingBottom:80` on the INNER content
+child (src/App.jsx ~7593), where it counts as real content height and IS included in scrollHeight.
+
+---
+
 DATE: 2026-06-17 (latest)
 SESSION: Scroll region bottom padding — reveal last position rows
 COMMIT: 9a67ad4 (pushed to main)

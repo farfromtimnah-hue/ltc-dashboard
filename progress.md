@@ -4,6 +4,21 @@
 
 ---
 
+DATE: 2026-06-17 (latest)
+SESSION: Scroll region bottom padding — reveal last position rows
+COMMIT: 9a67ad4 (pushed to main)
+
+The app-shell scroll fix (022bf5a) worked; chips confirmed working in live screenshot. Remaining
+issue: last 1-2 position rows cut off at the very bottom. Cause = scroll region had NO bottom
+padding (only MLV root's 28px), so the final rows sat flush against the viewport bottom edge and
+were further obscured by an externally-injected "contact us" floating widget (bottom-right; NOT in
+this codebase — grepped, no such element exists here). Fix: added `paddingBottom:64` to the shell
+scroll region (src/App.jsx ~7592) so the last item has breathing room and clears the bottom
+edge/widget when scrolled fully. Height calc otherwise verified clean (nav flexShrink:0 + scroll
+region flex:1/minHeight:0, no stray margin/border/wrapper). One-line change.
+
+---
+
 DATE: 2026-06-17 (later)
 SESSION: ACTUAL page-level scroll root cause (app-shell) + Positions list photo chips
 COMMIT: 022bf5a (pushed to main)

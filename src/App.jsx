@@ -846,6 +846,8 @@ function renderLangFlags(person, lang) {
 }
 
 function parseJSON(str, fallback = []) {
+  if (Array.isArray(str)) return str;
+  if (str && typeof str === 'object') return str;
   try { return JSON.parse(str) || fallback; } catch { return fallback; }
 }
 
@@ -6391,7 +6393,7 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
 
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:5000,display:'flex',alignItems:'flex-start',justifyContent:'flex-end',paddingTop:0}}>
-      <div onClick={function(e){e.stopPropagation();}} style={{width:380,maxWidth:'95vw',height:'100vh',overflowY:'auto',background:'#08121a',borderLeft:'1px solid rgba(94,234,212,0.18)',boxShadow:'-8px 0 40px rgba(0,0,0,0.5)',display:'flex',flexDirection:'column'}}>
+      <div onClick={function(e){e.stopPropagation();}} style={{width:380,maxWidth:'95vw',height:'100vh',overflowY:'auto',background:'#08121a',borderLeft:'1px solid rgba(94,234,212,0.18)',boxShadow:'-8px 0 40px rgba(0,0,0,0.5)'}}>
         {/* Header */}
         <div style={{padding:'20px 20px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',gap:14,background:'linear-gradient(180deg,rgba(94,234,212,0.06),transparent)',flexShrink:0}}>
           {(person && person.photo_url) ? (

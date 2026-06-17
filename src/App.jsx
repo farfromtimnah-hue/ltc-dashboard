@@ -7589,8 +7589,12 @@ export default function App() {
           scrolls reliably regardless of document-body overflow quirks (body has overflow-x:hidden,
           which can break viewport scroll propagation). The nav above stays pinned as a flexShrink:0
           sibling. This is the canonical sticky-header app-shell scroll pattern. */}
-      <div style={{flex:1,minHeight:0,overflowY:"auto",paddingBottom:64}}>
-      <div style={{maxWidth:1600,margin:"0 auto"}}>
+      <div style={{flex:1,minHeight:0,overflowY:"auto"}}>
+      {/* paddingBottom lives on the INNER content child, not the scroll container above — Blink/WebKit
+          exclude a scroll container's own padding-bottom from the scrollable overflow region (honored
+          at top, collapsed at bottom), so padding on the overflow:auto div has no effect on the
+          max-scroll boundary. On the inner child it counts as real content height and is scrollable. */}
+      <div style={{maxWidth:1600,margin:"0 auto",paddingBottom:80}}>
 
         {/* Welcome banner — shown only on the initial post-login screen; dismissed on first tab/view navigation */}
         {fbUser && !bannerDismissed && (() => {

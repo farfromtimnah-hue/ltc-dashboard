@@ -6885,27 +6885,49 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {ministryPositions.map(function(pos) {
                         var posName = pos.position_name || pos.name || "";
-                        // Count how many in roster are assigned to this position.
-                        // volunteer_positions may be a JSON string from D1 — parse each defensively.
-                        var filledFromRoster = (roster||[]).filter(function(p){
-                          return parseJSON(p.volunteer_positions, []).some(function(vp){ return vp && vp.position_name===posName; }); // roster already ministry-scoped
-
-                        }).length;
+                        // Collect the people in the roster assigned to this position (roster is already
+                        // ministry-scoped, so a position_name match is sufficient). Used for both the
+                        // filled count AND the avatar+name chips below.
+                        var assignedPeople = (roster||[]).filter(function(p){
+                          return parseJSON(p.volunteer_positions, []).some(function(vp){ return vp && vp.position_name===posName; });
+                        });
+                        var filledFromRoster = assignedPeople.length;
                         // Use filled from roster if > 0, otherwise fall back to mhPosFilled (form+system counts)
                         var filled = filledFromRoster > 0 ? filledFromRoster : mhPosFilled(pos);
                         var minC = pos.min_count || 0;
                         var idealC = pos.ideal_count || 0;
                         var st = mhPosStatus(filled, minC, idealC);
                         var dotColor = st==="healthy"?"#34d399":st==="needs_volunteers"?"#f59e0b":st==="critical"?"#f87171":"#475a64";
+                        var posNoName = lang==="PT"?"Sem nome":"No name";
                         return (
                           <div key={posName} onClick={function(){ setSelectedPosition(pos); }}
                             className="glow-hover"
-                            style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",cursor:"pointer",transition:"all 0.15s"}}>
-                            <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0,boxShadow:"0 0 6px "+dotColor+"99"}} />
-                            <span style={{flex:1,fontFamily:"'Space Grotesk',sans-serif",fontSize:13,color:"#e6f1f0"}}>{posName}</span>
-                            <span style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#6b7a82",flexShrink:0}}>
-                              {filled}{minC>0?" / "+minC:""}
-                            </span>
+                            style={{display:"flex",flexDirection:"column",gap:8,padding:"10px 14px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",cursor:"pointer",transition:"all 0.15s"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:12}}>
+                              <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0,boxShadow:"0 0 6px "+dotColor+"99"}} />
+                              <span style={{flex:1,fontFamily:"'Space Grotesk',sans-serif",fontSize:13,color:"#e6f1f0"}}>{posName}</span>
+                              <span style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:"#6b7a82",flexShrink:0}}>
+                                {filled}{minC>0?" / "+minC:""}
+                              </span>
+                            </div>
+                            {/* Assigned-people chips — small avatar (or initial fallback) + preferred name. */}
+                            {assignedPeople.length > 0 && (
+                              <div style={{display:"flex",flexWrap:"wrap",gap:6,paddingLeft:20}}>
+                                {assignedPeople.map(function(p){
+                                  var pcName = p.preferred_name || p.full_name || posNoName;
+                                  return (
+                                    <span key={p.id} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 10px 3px 3px",background:"rgba(94,234,212,0.07)",borderRadius:999,border:"1px solid rgba(94,234,212,0.15)"}}>
+                                      {p.photo_url ? (
+                                        <img src={p.photo_url} alt={pcName} style={{width:20,height:20,borderRadius:"50%",objectFit:"cover",flexShrink:0}} />
+                                      ) : (
+                                        <span style={{width:20,height:20,borderRadius:"50%",background:"linear-gradient(135deg,rgba(94,234,212,0.25),rgba(94,234,212,0.08))",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#5eead4",fontFamily:"'Space Grotesk',sans-serif",flexShrink:0}}>{(pcName[0]||"?").toUpperCase()}</span>
+                                      )}
+                                      <span style={{fontSize:11,color:"#cfe9e5",fontFamily:"'Space Grotesk',sans-serif"}}>{pcName}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -7488,11 +7510,11 @@ export default function App() {
   );
 
   return (
-    <div className="app" style={{minHeight:"100vh"}}>
+    <div className="app" style={{height:"100vh",display:"flex",flexDirection:"column"}}>
       <style>{css}</style>
 
       {/* Nav: logo + title | tabs | switcher | gear/logout | (spacer) | PT/EN | More */}
-      <div className="nav" style={{position:"sticky",top:0,zIndex:50}}>
+      <div className="nav" style={{flexShrink:0,zIndex:50}}>
         <div ref={navRowRef} style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:REGION_GAP,height:52}}>
 
           {/* Logo (always) + title (collapses 1st) */}
@@ -7563,7 +7585,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — dedicated scroll region (flex:1 + minHeight:0 + overflowY:auto) so content
+          scrolls reliably regardless of document-body overflow quirks (body has overflow-x:hidden,
+          which can break viewport scroll propagation). The nav above stays pinned as a flexShrink:0
+          sibling. This is the canonical sticky-header app-shell scroll pattern. */}
+      <div style={{flex:1,minHeight:0,overflowY:"auto"}}>
       <div style={{maxWidth:1600,margin:"0 auto"}}>
 
         {/* Welcome banner — shown only on the initial post-login screen; dismissed on first tab/view navigation */}
@@ -7611,6 +7637,7 @@ export default function App() {
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && <SchedulingPrototype />}
         {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
+      </div>
       </div>
 
       {showSettings && (

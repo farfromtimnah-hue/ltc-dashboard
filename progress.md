@@ -4,9 +4,66 @@
 
 ---
 
-DATE: 2026-06-16
-SESSION: Fix checkbox not persisting visually (real root cause) + modal scroll
-COMMIT: fddf120 (pushed to main)
+DATE: 2026-06-17
+SESSION: ACTUAL root cause — parseJSON destroying already-parsed API arrays + page/modal scroll
+COMMIT: cb16949 (pushed to main)
+
+=== THE REAL ROOT CAUSE (Equipe positions showing 0/X and "No position") ===
+parseJSON (src/App.jsx:848) called JSON.parse() on its input UNCONDITIONALLY. But
+GET /ministry/:name/roster returns each person's `volunteer_positions` (and `assigned_positions`)
+as an ALREADY-PARSED JS array, not a JSON string (confirmed by direct Worker-side D1 audit:
+10 real Worship Team rows existed, exact string matches, and the roster query returns them
+correctly). JSON.parse coerces a non-string argument to a string first — String([{...}]) becomes
+"[object Object]" — which fails to parse and silently falls back to the empty-array default.
+Proven: parseJSON([{...}]) === [] and parseJSON([]) === [].
+
+This poisoned ALL FOUR Equipe read sites, because they all funnel through parseJSON:
+  1. LeaderPersonModal checkbox state   — src/App.jsx ~6324
+  2. PositionAssignModal state          — src/App.jsx ~6530
+  3. Roster card position tags (myPos)  — src/App.jsx ~6824
+  4. Position list counts (filledFromRoster) — src/App.jsx ~6891
+Every one received [] regardless of the real data → 0/X everywhere, "No position" on every card,
+and no pre-checked boxes (which also caused duplicate-POST 409s when toggling).
+
+FIX (Step 1): hardened parseJSON to return the value as-is when it is already an array or object,
+and only JSON.parse genuine strings:
+  function parseJSON(str, fallback = []) {
+    if (Array.isArray(str)) return str;
+    if (str && typeof str === 'object') return str;
+    try { return JSON.parse(str) || fallback; } catch { return fallback; }
+  }
+No call-site changes were needed — fixing the shared helper resolved all four sites at once.
+
+IMPORTANT CORRECTION TO PRIOR SESSIONS: the previous fix (commit df7fc3e — removing the
+`vp.ministry_name === currentMinistry` filters) addressed a REAL but SECONDARY issue (brittle
+ministry matching), NOT the actual root cause. The arrays were already emptied to [] by parseJSON
+*before* those filters ever ran, so df7fc3e changed nothing observable. The actual root cause was
+parseJSON double-parsing, fixed only now in cb16949.
+
+Step 3 — audited all 33 parseJSON call sites across App.jsx (current_ministries, languages_spoken,
+group_attendance, special_groups, scores, pairing_labels, ministry_fit, carisma_completed, etc.).
+The hardening is safe everywhere: string inputs parse byte-for-byte identically as before;
+null/undefined still fall through to the fallback; the only behavioral change is that pre-parsed
+array/object inputs are now preserved instead of being silently destroyed — strictly a fix, never
+a regression. No call site relies on the old destroy-the-array behavior.
+
+=== SCROLL (Step 4) ===
+PAGE-LEVEL: investigated the full MLV ancestor chain — body (only overflow-x:hidden), .app
+(position:relative only), content div (maxWidth:1600 only), MLV root (padding + maxWidth:1200),
+and all Equipe wrappers. NONE has a height cap or overflow:hidden. MLV uses document-body scroll
+exactly like the Analytics/People tabs. There is no page-level overflow lock in the code; nothing
+to change there.
+
+MODAL (the actual unreachable-content defect): the symptom "content below Backup Vocalist (Lead)
+unreachable" is the 9 POSITION CHECKBOXES inside LeaderPersonModal. The outer panel was
+`height:100vh, overflowY:auto, display:flex, flexDirection:column` with a flexShrink:0 header and a
+body with no flex props (defaulting to flex-shrink:1). In a fixed-height flex column the body gets
+compressed to fit 100vh−header and its overflow is clipped without the panel becoming scrollable —
+the classic flex-shrink scroll trap. FIX: removed `display:flex, flexDirection:column` from the
+outer panel so header + body stack in normal block flow and the panel's overflowY:auto scrolls the
+full content as one (src/App.jsx ~6396).
+
+---
 
 --- BUG 1: checkbox flashes then reverts to unchecked ---
 DEFINITIVE DIAGNOSIS (the two prior fixes this day targeted the WRONG cause):

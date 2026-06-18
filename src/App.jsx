@@ -353,7 +353,7 @@ function ministryLabel(name, lang, personLang) {
 const SPECIAL_GROUPS = ["Rocket","Link","Legacy","Shine","Hero","Culto Hope","Culto Fé","English Service","Other","CRIE","Gerações","Carisma Serve Team"];
 const LANGUAGES = ["Portugues","English","Espanol"];
 
-const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Esportes"];
+const ATTENDANCE_GROUPS_DASH = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fé","English Service","CRIE","Esportes"];
 const GROUP_ROLE_MAP_DASH = {
   "Legacy":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Kids","Translation"],
   "Rocket":          ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
@@ -361,14 +361,14 @@ const GROUP_ROLE_MAP_DASH = {
   "HERO":            ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "Link":            ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "Culto Hope":      ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
-  "Culto Fe":        ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
+  "Culto Fé":        ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "English Service": ["Welcome","Set Up","Worship","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Intercession","Translation"],
   "CRIE":            ["Welcome","Set Up","Sound","Projection","Streaming","Photo & Video","Social Media","Service Experience","Intercession"],
   "Esportes":        ["Welcome","Set Up","Photo & Video","Social Media","Intercession"],
   "Carisma Serve Team": ["Welcome","Set Up","Sound","Projection","Photo & Video","Social Media","Kids","Cafe/Food"]
 };
 
-const GL_GROUPS = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fe","English Service","CRIE","Esportes","Carisma Serve Team"];
+const GL_GROUPS = ["Legacy","Rocket","SHINE","HERO","Link","Culto Hope","Culto Fé","English Service","CRIE","Esportes","Carisma Serve Team"];
 
 const MINISTRY_TO_GL_ROLE = {
   "Worship Team":         "Worship",

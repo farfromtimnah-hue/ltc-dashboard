@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -6980,13 +6980,25 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
   );
 }
 
-function GroupLeaderView({ token, lang, groupName }) {
+function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [glTab, setGlTab] = useState("attending");
   const [sundayOpen, setSundayOpen] = useState(false);
   const [expandedMinistry, setExpandedMinistry] = useState(null);
   const [alsoServingOpen, setAlsoServingOpen] = useState(false);
+  const [schedDateIdx, setSchedDateIdx] = useState(0);
+  const [schedRefresh, setSchedRefresh] = useState(0);
+  const [schedData, setSchedData] = useState(null);
+  const [schedLoading, setSchedLoading] = useState(false);
+  const [schedError, setSchedError] = useState(false);
+  const [assignPickerArea, setAssignPickerArea] = useState(null);
+  const [assignPickerSearch, setAssignPickerSearch] = useState("");
+  const [conflictInfo, setConflictInfo] = useState(null);
+  const [savingArea, setSavingArea] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [statusSavingId, setStatusSavingId] = useState(null);
+  const [pnnSavingArea, setPnnSavingArea] = useState(null);
 
   const tx = {
     serving:       lang === "PT" ? "Servindo"        : "Serving",
@@ -6994,14 +7006,32 @@ function GroupLeaderView({ token, lang, groupName }) {
     ourTeam:       lang === "PT" ? "Nossa Equipe"    : "Our Team",
     sundayPool:    lang === "PT" ? "Voluntarios do Culto de Domingo" : "Sunday Ministry Volunteers",
     sundaySub:     lang === "PT" ? "Pessoas servindo no culto que podem ter interesse neste grupo" : "People serving on Sundays who may be a fit for this group",
-    noServing:     lang === "PT" ? "Nenhum voluntario neste grupo ainda." : "No volunteers in this group yet.",
-    noAttending:   lang === "PT" ? "Nenhum membro registrado neste grupo." : "No members recorded for this group.",
-    noSunday:      lang === "PT" ? "Nenhum voluntario do culto identificado para este grupo." : "No Sunday volunteers identified for this group yet.",
-    notYetServing: lang === "PT" ? "Nao serve ainda" : "Not yet serving",
-    leader:        lang === "PT" ? "Lider" : "Leader",
-    people:        lang === "PT" ? "pessoas" : "people",
-    person:        lang === "PT" ? "pessoa"  : "person",
-    glView:        lang === "PT" ? "VISAO DO LIDER" : "GROUP LEADER VIEW",
+    noServing:        lang === "PT" ? "Nenhum voluntario neste grupo ainda." : "No volunteers in this group yet.",
+    noAttending:      lang === "PT" ? "Nenhum membro registrado neste grupo." : "No members recorded for this group.",
+    noSunday:         lang === "PT" ? "Nenhum voluntario do culto identificado para este grupo." : "No Sunday volunteers identified for this group yet.",
+    notYetServing:    lang === "PT" ? "Nao serve ainda" : "Not yet serving",
+    leader:           lang === "PT" ? "Lider" : "Leader",
+    people:           lang === "PT" ? "pessoas" : "people",
+    person:           lang === "PT" ? "pessoa"  : "person",
+    glView:           lang === "PT" ? "VISAO DO LIDER" : "GROUP LEADER VIEW",
+    scheduling:       lang === "PT" ? "AGENDAMENTO DO SERVICO" : "SERVICE SCHEDULING",
+    openSlot:         lang === "PT" ? "Em aberto" : "Open",
+    notNeeded:        lang === "PT" ? "Nao necessario" : "Not Needed",
+    markNotNeeded:    lang === "PT" ? "Marcar como nao necessario" : "Mark as Not Needed",
+    unmarkNotNeeded:  lang === "PT" ? "Desfazer" : "Undo",
+    assign:           lang === "PT" ? "Atribuir" : "Assign",
+    reassign:         lang === "PT" ? "Reatribuir" : "Reassign",
+    remove:           lang === "PT" ? "Remover" : "Remove",
+    pcLocked:         lang === "PT" ? "Nao sincronizado com o Planning Center ainda" : "Not yet synced from Planning Center",
+    conflictTitle:    lang === "PT" ? "Conflito de Agendamento" : "Scheduling Conflict",
+    confirmOverride:  lang === "PT" ? "Confirmar mesmo assim" : "Confirm Anyway",
+    cancel:           lang === "PT" ? "Cancelar" : "Cancel",
+    searchPeople:     lang === "PT" ? "Buscar pessoa..." : "Search people...",
+    noResults:        lang === "PT" ? "Nenhum resultado" : "No results",
+    unfilled:         lang === "PT" ? "Areas em Aberto" : "Unfilled Areas",
+    noUnfilled:       lang === "PT" ? "Nenhuma area em aberto para este servico." : "No unfilled areas for this service.",
+    noScheduleData:   lang === "PT" ? "Nenhum dado de agendamento para esta data." : "No schedule data for this date.",
+    schedErr:         lang === "PT" ? "Erro ao carregar agendamento." : "Error loading schedule.",
   };
 
   useEffect(() => {
@@ -7023,6 +7053,143 @@ function GroupLeaderView({ token, lang, groupName }) {
       })
       .catch(() => setLoading(false));
   }, [token, groupName]);
+
+  const upcomingDates = useMemo(() => {
+    const dates = [];
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysToSun = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    const base = new Date(today);
+    base.setDate(today.getDate() + daysToSun);
+    for (let i = 0; i < 8; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i * 7);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+  }, []);
+
+  const schedDate = upcomingDates[schedDateIdx] || upcomingDates[0] || "";
+
+  useEffect(() => {
+    if (!token || !groupName || !schedDate) return;
+    setSchedLoading(true);
+    setSchedError(false);
+    fetch(`${API}/group-schedule?group_name=${encodeURIComponent(groupName)}&service_date=${encodeURIComponent(schedDate)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        setSchedData(Array.isArray(data) ? data : (Array.isArray(data?.areas) ? data.areas : []));
+        setSchedLoading(false);
+      })
+      .catch(() => { setSchedError(true); setSchedLoading(false); });
+  }, [token, groupName, schedDate, schedRefresh]);
+
+  function refreshSchedule() { setSchedRefresh(c => c + 1); }
+
+  const STATUS_OPTIONS = [
+    { value: "not_contacted",    label: lang === "PT" ? "Nao contatado"   : "Not Contacted" },
+    { value: "pending",          label: lang === "PT" ? "Pendente"         : "Pending" },
+    { value: "confirmed",        label: lang === "PT" ? "Confirmado"       : "Confirmed" },
+    { value: "wants_reschedule", label: lang === "PT" ? "Quer remarcar"    : "Wants Reschedule" },
+    { value: "declined",         label: lang === "PT" ? "Recusou"          : "Declined" },
+  ];
+
+  function doAssign(area, personId, overrideConflict) {
+    const areaKey = area?.area_name || area?.name || "";
+    const body = {
+      ministry: areaKey,
+      position_name: area?.position_name || areaKey,
+      person_id: personId,
+      service_date: schedDate,
+      service_name: groupName,
+      scheduled_by: scheduledBy || "group_leader",
+      ...(overrideConflict ? { override_conflict: true } : {}),
+    };
+    setSavingArea(areaKey);
+    fetch(`${API}/schedule/assignment`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(r => {
+        if (r.status === 409) return r.json().then(d => { throw { conflict: true, conflicting_ministry: d?.conflicting_ministry || "another service", area, personId }; });
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .then(() => {
+        setSavingArea(null);
+        setAssignPickerArea(null);
+        setAssignPickerSearch("");
+        setConflictInfo(null);
+        refreshSchedule();
+      })
+      .catch(err => {
+        setSavingArea(null);
+        if (err && err.conflict) {
+          setAssignPickerArea(null);
+          setAssignPickerSearch("");
+          setConflictInfo(err);
+        }
+      });
+  }
+
+  function doUpdateStatus(assignmentId, status) {
+    if (!assignmentId) return;
+    setStatusSavingId(assignmentId);
+    fetch(`${API}/schedule/assignment/${assignmentId}/status`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ status, updated_by: scheduledBy || "group_leader" }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setStatusSavingId(null); refreshSchedule(); })
+      .catch(() => setStatusSavingId(null));
+  }
+
+  function doDeleteAssignment(assignmentId) {
+    if (!assignmentId) return;
+    setDeletingId(assignmentId);
+    fetch(`${API}/schedule/assignment/${assignmentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setDeletingId(null); refreshSchedule(); })
+      .catch(() => setDeletingId(null));
+  }
+
+  function doMarkNotNeeded(area) {
+    const areaKey = area?.area_name || area?.name || "";
+    setPnnSavingArea(areaKey);
+    fetch(`${API}/schedule/position-not-needed`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ministry: areaKey,
+        position_name: area?.position_name || areaKey,
+        service_date: schedDate,
+        service_name: groupName,
+        marked_by: scheduledBy || "group_leader",
+      }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setPnnSavingArea(null); refreshSchedule(); })
+      .catch(() => setPnnSavingArea(null));
+  }
+
+  function doUnmarkNotNeeded(pnnId) {
+    if (!pnnId) return;
+    setPnnSavingArea("_unmark_");
+    fetch(`${API}/schedule/position-not-needed/${pnnId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setPnnSavingArea(null); refreshSchedule(); })
+      .catch(() => setPnnSavingArea(null));
+  }
 
   const groupRolesFor = (person) => {
     if (!person.group_roles) return [];
@@ -7167,7 +7334,201 @@ function GroupLeaderView({ token, lang, groupName }) {
       {/* Section B — Group Health Analytics (4C) */}
       <GroupHealthBox attending={attending} serving={serving} lang={lang} groupName={groupName} />
 
-      {/* Section C — Sunday Pool (collapsible, 4D) */}
+      {/* Section D — Service Scheduler */}
+      <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:16}}>{tx.scheduling}</div>
+
+        {/* Date selector */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:20,flexWrap:"wrap"}}>
+          <button onClick={()=>setSchedDateIdx(i=>Math.max(0,i-1))} disabled={schedDateIdx===0}
+            style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===0?"#475a64":"#aebac0",cursor:schedDateIdx===0?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
+            {"<"}
+          </button>
+          {upcomingDates.slice(Math.max(0,schedDateIdx-1), schedDateIdx+4).map((d) => {
+            const absIdx = upcomingDates.indexOf(d);
+            const isSelected = d === schedDate;
+            return (
+              <button key={d} onClick={()=>setSchedDateIdx(absIdx)}
+                style={{padding:"5px 12px",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",
+                  background:isSelected?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                  border:isSelected?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.05)",
+                  color:isSelected?"#5eead4":"#6b7a82",fontWeight:isSelected?600:400}}>
+                {d}
+              </button>
+            );
+          })}
+          <button onClick={()=>setSchedDateIdx(i=>Math.min(upcomingDates.length-1,i+1))} disabled={schedDateIdx===upcomingDates.length-1}
+            style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===upcomingDates.length-1?"#475a64":"#aebac0",cursor:schedDateIdx===upcomingDates.length-1?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
+            {">"}
+          </button>
+        </div>
+
+        {/* Area list */}
+        {schedLoading && (
+          <div style={{color:"#475a64",fontSize:12,padding:"12px 0",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.12em"}}>...</div>
+        )}
+        {schedError && (
+          <div style={{color:"#e07070",fontSize:13,padding:"12px 0"}}>{tx.schedErr}</div>
+        )}
+        {!schedLoading && !schedError && schedData !== null && (schedData || []).length === 0 && (
+          <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noScheduleData}</div>
+        )}
+        {!schedLoading && !schedError && (schedData || []).map((area) => {
+          const areaKey = area?.area_name || area?.name || "";
+          const isLocked = area?.is_locked_external === 1;
+          const assignments = area?.assignments || [];
+          const firstAssignment = assignments[0] || null;
+          const pnn = area?.position_not_needed || null;
+          const pnnId = pnn && typeof pnn === "object" ? (pnn?.id || null) : null;
+          const isNotNeeded = !!pnn;
+          const isSaving = savingArea === areaKey;
+          const isDeleting = !!(firstAssignment && deletingId === firstAssignment?.id);
+          const isStatusSaving = !!(firstAssignment && statusSavingId === firstAssignment?.id);
+          const isPnnSaving = pnnSavingArea === areaKey || (isNotNeeded && pnnSavingArea === "_unmark_");
+
+          const assignedPersonName = firstAssignment
+            ? (firstAssignment?.person_name || (() => { const p = allPersons.find(x => x && x.id === firstAssignment?.person_id); return p ? displayName(p) : String(firstAssignment?.person_id || ""); })())
+            : null;
+
+          return (
+            <div key={areaKey || String(area?.display_order)} style={{
+              display:"flex",alignItems:"flex-start",gap:10,padding:"12px 0",
+              borderBottom:"1px solid rgba(255,255,255,0.04)",
+              opacity:isNotNeeded ? 0.45 : 1,
+            }}>
+              {/* Area name */}
+              <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{areaKey}</div>
+              </div>
+
+              {/* Assignment content */}
+              <div style={{flex:1,minWidth:0}}>
+                {isLocked ? (
+                  <span style={{fontSize:12,color:"#475a64",fontStyle:"italic"}}>{tx.pcLocked}</span>
+                ) : isNotNeeded ? (
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <Chip label={tx.notNeeded} />
+                    <button onClick={()=>{ if (!isPnnSaving) doUnmarkNotNeeded(pnnId); }}
+                      style={{fontSize:11,color:"#5eead4",background:"none",border:"none",cursor:"pointer",padding:0,opacity:isPnnSaving?0.4:1}}>
+                      {tx.unmarkNotNeeded}
+                    </button>
+                  </div>
+                ) : firstAssignment ? (
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,color:"#e6f1f0",fontWeight:500}}>{assignedPersonName}</span>
+                    <select
+                      disabled={isStatusSaving}
+                      value={firstAssignment?.status || "not_contacted"}
+                      onChange={e => doUpdateStatus(firstAssignment?.id, e.target.value)}
+                      style={{fontSize:11,background:"#0f1e24",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#aebac0",padding:"2px 6px",cursor:"pointer",opacity:isStatusSaving?0.4:1}}>
+                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    <button onClick={()=>{ if (!isSaving) { setAssignPickerArea(area); setAssignPickerSearch(""); } }}
+                      style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isSaving?0.4:1}}>
+                      {tx.reassign}
+                    </button>
+                    <button onClick={()=>{ if (!isDeleting) doDeleteAssignment(firstAssignment?.id); }}
+                      style={{fontSize:11,color:"#e07070",background:"none",border:"1px solid rgba(220,100,100,0.2)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isDeleting?0.4:1}}>
+                      {tx.remove}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <Chip label={tx.openSlot} />
+                    <button onClick={()=>{ setAssignPickerArea(area); setAssignPickerSearch(""); }}
+                      style={{fontSize:12,color:"#5eead4",background:"rgba(94,234,212,0.06)",border:"1px solid rgba(94,234,212,0.2)",borderRadius:6,padding:"4px 12px",cursor:"pointer"}}>
+                      {tx.assign}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Not-needed toggle */}
+              {!isLocked && !isNotNeeded && (
+                <button onClick={()=>{ if (!isPnnSaving) doMarkNotNeeded(area); }}
+                  style={{fontSize:10,color:"#475a64",background:"none",border:"none",cursor:"pointer",padding:"4px 0",flexShrink:0,opacity:isPnnSaving?0.4:1,whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                  {tx.markNotNeeded}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Assign picker modal */}
+      {assignPickerArea !== null && (
+        <div onClick={()=>{ setAssignPickerArea(null); setAssignPickerSearch(""); }}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} className="glass modal-panel"
+            style={{width:"min(460px,92vw)",maxHeight:"80vh",borderRadius:16,padding:24,display:"flex",flexDirection:"column",boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7),0 0 0 1px rgba(94,234,212,0.08) inset"}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#5eead4",marginBottom:4}}>
+              {tx.assign}
+            </div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:16,color:"#e6f1f0",marginBottom:16}}>
+              {assignPickerArea?.area_name || assignPickerArea?.name || ""}
+            </div>
+            <input
+              autoFocus
+              placeholder={tx.searchPeople}
+              value={assignPickerSearch}
+              onChange={e=>setAssignPickerSearch(e.target.value || "")}
+              style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 12px",color:"#e6f1f0",fontSize:13,fontFamily:"'Space Grotesk',sans-serif",marginBottom:12,outline:"none"}}
+            />
+            <div style={{overflowY:"auto",flex:1}}>
+              {(() => {
+                const search = (assignPickerSearch || "").toLowerCase();
+                const filtered = (attending || []).filter(p => {
+                  const n = (p?.preferred_name || p?.name || "").toLowerCase();
+                  return !search || n.includes(search);
+                });
+                if (filtered.length === 0) return <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noResults}</div>;
+                return filtered.map(p => {
+                  const isSav = savingArea === (assignPickerArea?.area_name || assignPickerArea?.name || "");
+                  return (
+                    <button key={p?.id} onClick={()=>{ if (!isSav) doAssign(assignPickerArea, p?.id, false); }}
+                      disabled={isSav}
+                      style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:"10px 12px",cursor:isSav?"default":"pointer",marginBottom:4,opacity:isSav?0.5:1,textAlign:"left"}}>
+                      <GlAvatar person={p} />
+                      <span style={{fontSize:13,color:"#e6f1f0",fontFamily:"'Space Grotesk',sans-serif",fontWeight:500}}>{displayName(p)}</span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+            <button onClick={()=>{ setAssignPickerArea(null); setAssignPickerSearch(""); }}
+              style={{marginTop:16,padding:"8px 20px",borderRadius:8,background:"none",border:"1px solid rgba(255,255,255,0.08)",color:"#6b7a82",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em"}}>
+              {tx.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict confirmation modal */}
+      {conflictInfo !== null && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div className="glass modal-panel"
+            style={{width:"min(420px,92vw)",borderRadius:16,padding:28,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7),0 0 0 1px rgba(94,234,212,0.08) inset"}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#e07070",marginBottom:10}}>{tx.conflictTitle}</div>
+            <div style={{fontSize:14,color:"#e6f1f0",marginBottom:20,lineHeight:1.6}}>
+              {lang === "PT"
+                ? `Esta pessoa ja esta agendada em ${conflictInfo?.conflicting_ministry || ""} nesta data.`
+                : `This person is already scheduled in ${conflictInfo?.conflicting_ministry || ""} on this date.`}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>doAssign(conflictInfo?.area, conflictInfo?.personId, true)}
+                style={{flex:1,padding:"9px 0",borderRadius:8,background:"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))",border:"1px solid rgba(94,234,212,0.35)",color:"#5eead4",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em"}}>
+                {tx.confirmOverride}
+              </button>
+              <button onClick={()=>setConflictInfo(null)}
+                style={{flex:1,padding:"9px 0",borderRadius:8,background:"none",border:"1px solid rgba(255,255,255,0.08)",color:"#6b7a82",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em"}}>
+                {tx.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section C — Unfilled Areas (wired to schedule data from Section D) */}
       <div className="glass" style={{borderRadius:16,padding:24}}>
         <button onClick={()=>setSundayOpen(o=>!o)}
           style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",cursor:"pointer",padding:0,width:"100%",marginBottom:sundayOpen?16:0}}>
@@ -7176,29 +7537,31 @@ function GroupLeaderView({ token, lang, groupName }) {
           </div>
           <span style={{color:"#475a64",fontSize:11,marginLeft:"auto",flexShrink:0}}>{sundayOpen?"▼":"▶"}</span>
         </button>
-        {sundayOpen && (Object.keys(sundayByMinistry).length === 0
-          ? <div style={{color:"#475a64",fontSize:13}}>{tx.noSunday}</div>
-          : Object.entries(sundayByMinistry).map(([ministry, pool]) => (
-            <div key={ministry} style={{marginBottom:6}}>
-              <button onClick={()=>setExpandedMinistry(m=>m===ministry?null:ministry)}
-                style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.04)",borderRadius:8,padding:"10px 14px",cursor:"pointer",marginBottom:expandedMinistry===ministry?8:0}}>
-                <span style={{fontWeight:600,fontSize:13,color:"#aebac0",flex:1,textAlign:"left"}}>{ministry}</span>
-                <span style={{color:"#475a64",fontSize:11}}>{pool.length} {pool.length===1?tx.person:tx.people}</span>
-                <span style={{color:"#475a64",fontSize:11,marginLeft:4}}>{expandedMinistry===ministry?"▼":"▶"}</span>
-              </button>
-              {expandedMinistry===ministry && (
-                <div style={{paddingLeft:8}}>
-                  {pool.map(p => (
-                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                      <span style={{fontSize:13,color:"#e6f1f0",flex:1}}>{displayName(p)}</span>
-                      <Chip label={ministry} />
-                    </div>
-                  ))}
-                </div>
-              )}
+        {sundayOpen && (() => {
+          const unfilledAreas = (schedData || []).filter(area => {
+            if (area?.is_locked_external === 1) return false;
+            if (area?.position_not_needed) return false;
+            const assignments = area?.assignments || [];
+            return assignments.length === 0;
+          });
+          if (schedLoading) return <div style={{color:"#475a64",fontSize:12,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.12em"}}>...</div>;
+          if (schedError) return <div style={{color:"#e07070",fontSize:13}}>{tx.schedErr}</div>;
+          if (!schedData) return <div style={{color:"#475a64",fontSize:13}}>{tx.noScheduleData}</div>;
+          if (unfilledAreas.length === 0) return <div style={{color:"#475a64",fontSize:13}}>{tx.noUnfilled}</div>;
+          return (
+            <div>
+              {unfilledAreas.map(area => {
+                const areaKey = area?.area_name || area?.name || "";
+                return (
+                  <div key={areaKey} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <span style={{fontSize:13,color:"#e6f1f0",flex:1,fontFamily:"'Space Grotesk',sans-serif",fontWeight:500}}>{areaKey}</span>
+                    <Chip label={tx.openSlot} />
+                  </div>
+                );
+              })}
             </div>
-          ))
-        )}
+          );
+        })()}
       </div>
     </div>
   );
@@ -7618,7 +7981,7 @@ export default function App() {
         })()}
 
         {viewMode === 'group_leader' && glGroup
-          ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} />
+          ? <GroupLeaderView token={token} lang={lang} groupName={glGroup} scheduledBy={fbUser?.uid || fbUser?.email || "group_leader"} />
           : null}
         {viewMode === 'ministry_leader_view' && (!hasBlanketMLAccess || glMinistry) && (
           <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>

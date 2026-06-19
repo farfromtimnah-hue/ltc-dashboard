@@ -44,6 +44,16 @@ const CARISMA_LOGO = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNv
 
 const ROLES = { OWNER: 'owner', SENIOR_PASTOR: 'senior_pastor', PASTOR: 'pastor', GROUP_LEADER: 'group_leader' };
 
+// ─── Dock icons (inline SVG, no external dependency) ─────────────
+const IconUsers = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
+const IconBarChart = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>);
+const IconCalendar = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>);
+const IconHeart = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>);
+const IconGrid = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>);
+const IconStar = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>);
+const IconClock = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>);
+const IconUser = ({s=22,c="currentColor"}) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>);
+
 const GIFTINGS = [
   "Worship & Music","Gift of Helps","Visual Storytelling","Digital Communication",
   "Intercession","Hospitality","Evangelism","Encouragement","Faith","Teaching",
@@ -752,6 +762,12 @@ const css = `
   @keyframes shake {
     0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
   }
+
+  @keyframes dockSheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .dock-sheet { animation: dockSheetUp 0.2s ease; }
 
   /* ─── LTC Login Logo Animation ─────────────────────────────── */
   .ltc-logo-ring {
@@ -8072,6 +8088,83 @@ const WELCOME_VISIONS = {
   ],
 };
 
+// ─── Mobile bottom dock ───────────────────────────────────────────
+// items / moreItems: [{ id, label, Icon, action }]
+// activeId: which dock item is currently highlighted
+function MobileDock({ items, moreItems, moreOpen, onMoreToggle, onMoreClose, activeId }) {
+  const DOCK_H = 56;
+  return (
+    <>
+      <div style={{
+        position:'fixed', bottom:0, left:0, right:0, zIndex:60,
+        background:'rgba(10,24,32,0.97)',
+        borderTop:'1px solid rgba(255,255,255,0.07)',
+        backdropFilter:'blur(16px)',
+        WebkitBackdropFilter:'blur(16px)',
+        height:`calc(${DOCK_H}px + env(safe-area-inset-bottom, 16px))`,
+        paddingBottom:'env(safe-area-inset-bottom, 16px)',
+        display:'flex', alignItems:'flex-start',
+      }}>
+        {(items || []).map(item => {
+          const isActive = activeId === item.id;
+          const col = isActive ? '#5eead4' : '#475a64';
+          const Ic = item.Icon;
+          return (
+            <button key={item.id} onClick={item.action}
+              style={{
+                flex:1, display:'flex', flexDirection:'column', alignItems:'center',
+                justifyContent:'center', gap:3, background:'transparent', border:'none',
+                cursor:'pointer', color:col, transition:'color 0.15s',
+                fontFamily:"'JetBrains Mono',monospace", fontSize:9, fontWeight:600,
+                letterSpacing:'0.06em', textTransform:'uppercase',
+                padding:'10px 4px 0', height:`${DOCK_H}px`,
+                WebkitTapHighlightColor:'transparent',
+              }}>
+              <Ic s={21} c={col} />
+              <span style={{marginTop:3}}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {moreOpen && (
+        <>
+          <div onClick={onMoreClose}
+            style={{position:'fixed',inset:0,zIndex:61,background:'rgba(0,0,0,0.45)'}} />
+          <div className="dock-sheet" style={{
+            position:'fixed', bottom:0, left:0, right:0, zIndex:62,
+            background:'#0f1e24',
+            borderRadius:'16px 16px 0 0',
+            borderTop:'1px solid rgba(255,255,255,0.08)',
+            paddingBottom:'env(safe-area-inset-bottom, 16px)',
+          }}>
+            <div style={{display:'flex',justifyContent:'center',padding:'10px 0 6px'}}>
+              <div style={{width:36,height:4,borderRadius:2,background:'rgba(255,255,255,0.18)'}} />
+            </div>
+            {(moreItems || []).map(item => {
+              const Ic = item.Icon;
+              return (
+                <button key={item.id}
+                  onClick={() => { item.action(); onMoreClose(); }}
+                  style={{
+                    width:'100%', display:'flex', alignItems:'center', gap:14,
+                    background:'transparent', border:'none', cursor:'pointer',
+                    color:'#aebac0', fontFamily:"'JetBrains Mono',monospace",
+                    fontSize:12, fontWeight:500, letterSpacing:'0.04em',
+                    padding:'14px 24px', textAlign:'left', transition:'color 0.15s',
+                    WebkitTapHighlightColor:'transparent',
+                  }}>
+                  <Ic s={19} c="#6b7a82" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
@@ -8091,6 +8184,8 @@ export default function App() {
   const [myGrants, setMyGrants] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [dockMoreOpen, setDockMoreOpen] = useState(false);
   // Priority+ nav: measure the actual rendered width of the nav row and of every
   // collapsible item (via getBoundingClientRect on a hidden mirror row), then decide
   // what to collapse into the More dropdown. No hardcoded per-item pixel estimates.
@@ -8108,6 +8203,11 @@ export default function App() {
     setNavRowW(el.getBoundingClientRect().width);
     return () => ro.disconnect();
   }, [token]);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   useLayoutEffect(() => {
     if (navRowRef.current) setNavRowW(navRowRef.current.getBoundingClientRect().width);
     const root = navMeasRef.current;
@@ -8195,16 +8295,122 @@ export default function App() {
 
   if (!token) return <Login lang={lang} t={t} onLangChange={setLang} />;
 
-  if (role === 'group_leader') return (
-    <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#050a10"}}>
-      <style>{css}</style>
-      <div className="glass" style={{padding:40,borderRadius:20,textAlign:"center",maxWidth:400}}>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:16}}>LTC Ministry</div>
-        <p style={{color:"#e6f1f0",fontSize:16,margin:"0 0 24px"}}>{t.groupLeaderMsg}</p>
-        <button onClick={()=>signOut(auth)} className="btn-ghost" style={{padding:"8px 20px",fontSize:12}}>{t.logout}</button>
+  if (role === 'group_leader') {
+    if (!isMobile) return (
+      <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#050a10"}}>
+        <style>{css}</style>
+        <div className="glass" style={{padding:40,borderRadius:20,textAlign:"center",maxWidth:400}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:16}}>LTC Ministry</div>
+          <p style={{color:"#e6f1f0",fontSize:16,margin:"0 0 24px"}}>{t.groupLeaderMsg}</p>
+          <button onClick={()=>signOut(auth)} className="btn-ghost" style={{padding:"8px 20px",fontSize:12}}>{t.logout}</button>
+        </div>
       </div>
-    </div>
-  );
+    );
+    // Mobile GL experience
+    const glDockItems = [
+      { id:'my_group', label:lang==='PT'?'Meu Grupo':'My Group', Icon:IconUsers,
+        action:()=>{ setBannerDismissed(true); setTab('my_group'); setDockMoreOpen(false); } },
+      { id:'health', label:lang==='PT'?'Saude':'Health', Icon:IconHeart,
+        action:()=>{ setBannerDismissed(true); setTab('health'); setDockMoreOpen(false); } },
+      { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid,
+        action:()=>setDockMoreOpen(o=>!o) },
+    ];
+    const glMoreItems = [
+      { id:'settings', label:lang==='PT'?'Configuracoes':'Settings', Icon:IconUser,
+        action:()=>setShowSettings(true) },
+      { id:'logout', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser,
+        action:()=>signOut(auth) },
+    ];
+    const glActiveId = tab === 'health' ? 'health' : tab === 'my_group' ? 'my_group' : 'my_group';
+    return (
+      <div style={{minHeight:'100vh',background:'#050a10',overflowY:'auto',
+        paddingBottom:'calc(56px + env(safe-area-inset-bottom, 16px))'}}>
+        <style>{css}</style>
+        {/* GL group selector when no group chosen */}
+        {tab !== 'health' && !glGroup && (
+          <div style={{padding:'32px 20px'}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",marginBottom:16,textAlign:'center'}}>
+              {lang==='PT'?'Escolha seu grupo':'Select your group'}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8,maxWidth:320,margin:'0 auto'}}>
+              {(GL_GROUPS || []).map(g => (
+                <button key={g} onClick={()=>{ setGlGroup(g); setTab('my_group'); }}
+                  className="btn-ghost"
+                  style={{padding:'12px 16px',borderRadius:10,fontSize:13,textAlign:'left'}}>
+                  {g}
+                </button>
+              ))}
+            </div>
+            <div style={{textAlign:'center',marginTop:24}}>
+              <button onClick={()=>signOut(auth)} className="btn-ghost" style={{padding:"8px 20px",fontSize:12}}>
+                {t.logout}
+              </button>
+            </div>
+          </div>
+        )}
+        {tab !== 'health' && glGroup && (
+          <GroupLeaderView token={token} lang={lang} groupName={glGroup}
+            scheduledBy={fbUser?.uid || fbUser?.email || "group_leader"} />
+        )}
+        {tab === 'health' && (
+          <RefErrorBoundary lang={lang} onBack={()=>setTab('my_group')}>
+            <MinistryHealthTab token={token} role="group_leader" t={t} lang={lang}
+              fbUser={fbUser} onNavigateToML={()=>{}} userGrants={myGrants} />
+          </RefErrorBoundary>
+        )}
+        <MobileDock items={glDockItems} moreItems={glMoreItems}
+          moreOpen={dockMoreOpen} onMoreToggle={()=>setDockMoreOpen(o=>!o)}
+          onMoreClose={()=>setDockMoreOpen(false)} activeId={glActiveId} />
+        {showSettings && (
+          <SettingsModal token={token} t={t} lang={lang} onClose={()=>setShowSettings(false)}
+            onSaved={d=>{setTemplatePT(d.whatsapp_template_pt);setTemplateEN(d.whatsapp_template_en);}} />
+        )}
+      </div>
+    );
+  }
+
+  if (role === 'member_portal') {
+    const mpDockItems = [
+      { id:'my_schedule', label:lang==='PT'?'Agenda':'Schedule', Icon:IconCalendar,
+        action:()=>setTab('my_schedule') },
+      { id:'availability', label:lang==='PT'?'Disp.':'Avail.', Icon:IconClock,
+        action:()=>setTab('availability') },
+      { id:'my_profile', label:lang==='PT'?'Perfil':'Profile', Icon:IconUser,
+        action:()=>setTab('my_profile') },
+    ];
+    const mpMoreItems = [
+      { id:'logout', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser, action:()=>signOut(auth) },
+    ];
+    const mpActiveTab = ['my_schedule','availability','my_profile'].includes(tab) ? tab : 'my_schedule';
+    const placeholder = (title) => (
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+        minHeight:'60vh',padding:32}}>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
+          textTransform:"uppercase",color:"#5eead4",marginBottom:12}}>{title}</div>
+        <div className="glass" style={{padding:'32px 28px',borderRadius:16,maxWidth:320,width:'100%',textAlign:'center'}}>
+          <div style={{fontSize:28,marginBottom:12}}>🚧</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,color:"#e6f1f0",fontWeight:600,marginBottom:8}}>
+            Em breve
+          </div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#475a64",letterSpacing:'0.06em'}}>
+            {lang==='PT'?'Esta funcionalidade esta sendo desenvolvida.':'This feature is coming soon.'}
+          </div>
+        </div>
+      </div>
+    );
+    return (
+      <div style={{minHeight:'100vh',background:'#050a10',overflowY:'auto',
+        paddingBottom:'calc(56px + env(safe-area-inset-bottom, 16px))'}}>
+        <style>{css}</style>
+        {mpActiveTab === 'my_schedule' && placeholder(lang==='PT'?'Minha Agenda':'My Schedule')}
+        {mpActiveTab === 'availability' && placeholder(lang==='PT'?'Disponibilidade':'Availability')}
+        {mpActiveTab === 'my_profile' && placeholder(lang==='PT'?'Meu Perfil':'My Profile')}
+        <MobileDock items={mpDockItems} moreItems={mpMoreItems}
+          moreOpen={dockMoreOpen} onMoreToggle={()=>setDockMoreOpen(o=>!o)}
+          onMoreClose={()=>setDockMoreOpen(false)} activeId={mpActiveTab} />
+      </div>
+    );
+  }
 
   const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
 
@@ -8275,6 +8481,61 @@ export default function App() {
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
   const hasAnyMLAccess = hasBlanketMLAccess || hasMinistryLeaderGrant;
+
+  // ── Mobile dock item definitions (isMobile=true only) ────────────
+  // Blanket-access dock (owner / senior_pastor / pastor)
+  const blanketDockItems = [
+    { id:'people',     label:lang==='PT'?'Pessoas':'People',   Icon:IconUsers,    action:()=>{ setBannerDismissed(true); setTab('people');    setDockMoreOpen(false); } },
+    { id:'analytics',  label:lang==='PT'?'Anal.':'Analytics',  Icon:IconBarChart, action:()=>{ setBannerDismissed(true); setTab('analytics'); setDockMoreOpen(false); } },
+    { id:'scheduling', label:lang==='PT'?'Agenda':'Schedule',  Icon:IconCalendar, action:()=>{ setBannerDismissed(true); setTab('scheduling');setDockMoreOpen(false); } },
+    { id:'health',     label:lang==='PT'?'Saude':'Health',     Icon:IconHeart,    action:()=>{ setBannerDismissed(true); setTab('health');    setDockMoreOpen(false); } },
+    { id:'more',       label:lang==='PT'?'Mais':'More',        Icon:IconGrid,     action:()=>setDockMoreOpen(o=>!o) },
+  ];
+  const blanketMoreItems = [
+    ...(effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner'
+      ? [{ id:'attendance', label:lang==='PT'?'Cultos':'Attendance', Icon:IconCalendar,
+           action:()=>{ setBannerDismissed(true); setTab('attendance'); } }] : []),
+    { id:'gifting', label:lang==='PT'?'Dons':'Gifting', Icon:IconStar,
+      action:()=>{ setBannerDismissed(true); setTab('gifting'); } },
+    { id:'reference', label:lang==='PT'?'Referencia':'Reference', Icon:IconUser,
+      action:()=>{ setBannerDismissed(true); setTab('reference'); } },
+    ...(effectiveRole==='owner'
+      ? [{ id:'users', label:lang==='PT'?'Usuarios':'Users', Icon:IconUser,
+           action:()=>{ setBannerDismissed(true); setTab('users'); } }] : []),
+    { id:'settings_dock', label:lang==='PT'?'Config.':'Settings', Icon:IconUser,
+      action:()=>setShowSettings(true) },
+    { id:'logout_dock', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser,
+      action:()=>signOut(auth) },
+  ];
+  const blanketDockOverflowIds = new Set(['attendance','gifting','reference','users']);
+  const blanketDockActiveId = blanketDockOverflowIds.has(tab) ? 'more'
+    : ['people','analytics','scheduling','health'].includes(tab) ? tab : 'more';
+
+  // ML-grant dock (has ministry_leader grant but no blanket access)
+  const mlDockItems = [
+    { id:'ministry_leader_view', label:lang==='PT'?'Meu Min.':'Ministry', Icon:IconStar,
+      action:()=>{ setBannerDismissed(true); setViewMode('ministry_leader_view'); setDockMoreOpen(false); } },
+    { id:'people', label:lang==='PT'?'Pessoas':'People', Icon:IconUsers,
+      action:()=>{ setBannerDismissed(true); setTab('people'); setViewMode('my_view'); setDockMoreOpen(false); } },
+    { id:'scheduling', label:lang==='PT'?'Agenda':'Schedule', Icon:IconCalendar,
+      action:()=>{ setBannerDismissed(true); setTab('scheduling'); setViewMode('my_view'); setDockMoreOpen(false); } },
+    { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid, action:()=>setDockMoreOpen(o=>!o) },
+  ];
+  const mlMoreItems = [
+    { id:'health', label:lang==='PT'?'Saude':'Health', Icon:IconHeart,
+      action:()=>{ setBannerDismissed(true); setTab('health'); setViewMode('my_view'); } },
+    { id:'gifting', label:lang==='PT'?'Dons':'Gifting', Icon:IconStar,
+      action:()=>{ setBannerDismissed(true); setTab('gifting'); setViewMode('my_view'); } },
+    { id:'settings_ml', label:lang==='PT'?'Config.':'Settings', Icon:IconUser, action:()=>setShowSettings(true) },
+    { id:'logout_ml', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser, action:()=>signOut(auth) },
+  ];
+  const mlDockActiveId = viewMode === 'ministry_leader_view' ? 'ministry_leader_view'
+    : tab === 'people' ? 'people' : tab === 'scheduling' ? 'scheduling' : 'more';
+
+  // Which dock set applies
+  const activeDockItems = hasBlanketMLAccess ? blanketDockItems : mlDockItems;
+  const activeDockMoreItems = hasBlanketMLAccess ? blanketMoreItems : mlMoreItems;
+  const activeDockActiveId = hasBlanketMLAccess ? blanketDockActiveId : mlDockActiveId;
   const VIEW_OPTS = [
     ['my_view', lang==="PT"?"Minha visao":"My View"],
     ['senior_pastor_view', lang==="PT"?"Visao do Pastor Senior":"Senior Pastor View"],
@@ -8354,8 +8615,9 @@ export default function App() {
     <div className="app" style={{height:"100vh",display:"flex",flexDirection:"column"}}>
       <style>{css}</style>
 
-      {/* Nav: logo + title | tabs | switcher | gear/logout | (spacer) | PT/EN | More */}
-      <div className="nav" style={{flexShrink:0,zIndex:50}}>
+      {/* Nav: logo + title | tabs | switcher | gear/logout | (spacer) | PT/EN | More
+          Hidden on mobile — replaced by the fixed bottom dock below. */}
+      {!isMobile && <div className="nav" style={{flexShrink:0,zIndex:50}}>
         <div ref={navRowRef} style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:REGION_GAP,height:52}}>
 
           {/* Logo (always) + title (collapses 1st) */}
@@ -8424,7 +8686,7 @@ export default function App() {
           <span data-meas="langtoggle" style={{display:"inline-flex"}}>{langToggle()}</span>
           <span data-meas="more" style={{display:"inline-flex"}}>{moreBtn()}</span>
         </div>
-      </div>
+      </div>}
 
       {/* Content — dedicated scroll region (flex:1 + minHeight:0 + overflowY:auto) so content
           scrolls reliably regardless of document-body overflow quirks (body has overflow-x:hidden,
@@ -8435,7 +8697,8 @@ export default function App() {
           exclude a scroll container's own padding-bottom from the scrollable overflow region (honored
           at top, collapsed at bottom), so padding on the overflow:auto div has no effect on the
           max-scroll boundary. On the inner child it counts as real content height and is scrollable. */}
-      <div style={{maxWidth:1600,margin:"0 auto",paddingBottom:80}}>
+      <div style={{maxWidth:1600,margin:"0 auto",
+        paddingBottom: isMobile ? 'calc(80px + 56px + env(safe-area-inset-bottom, 16px))' : 80}}>
 
         {/* Welcome banner — shown only on the initial post-login screen; dismissed on first tab/view navigation */}
         {fbUser && !bannerDismissed && (() => {
@@ -8492,6 +8755,18 @@ export default function App() {
           lang={lang}
           onClose={() => setShowSettings(false)}
           onSaved={d => { setTemplatePT(d.whatsapp_template_pt); setTemplateEN(d.whatsapp_template_en); }}
+        />
+      )}
+
+      {/* Mobile bottom dock — renders only on narrow viewports */}
+      {isMobile && (
+        <MobileDock
+          items={activeDockItems}
+          moreItems={activeDockMoreItems}
+          moreOpen={dockMoreOpen}
+          onMoreToggle={() => setDockMoreOpen(o => !o)}
+          onMoreClose={() => setDockMoreOpen(false)}
+          activeId={activeDockActiveId}
         />
       )}
     </div>

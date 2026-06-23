@@ -7126,6 +7126,385 @@ function RecursosTab({ ministry, token, lang }) {
   );
 }
 
+// ─── AGENDA TAB ───────────────────────────────────────────────────────────────
+function AgendaTab({ ministry, token, lang }) {
+  // Sunday ministries have two services; group ministries use their own name as service.
+  var isSundayMinistry = !SPECIAL_GROUPS.includes(ministry);
+  var services = isSundayMinistry ? ['Culto Manha', 'Culto Tarde'] : [ministry];
+
+  function nextSundayDate() {
+    var d = new Date();
+    var day = d.getDay();
+    var diff = day === 0 ? 0 : 7 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function fmtDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function fmtDisplay(d) {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  var [selDate, setSelDate] = React.useState(function() { return nextSundayDate(); });
+  var [selService, setSelService] = React.useState(services[0]);
+
+  var [positions, setPositions] = React.useState([]);
+  var [assignments, setAssignments] = React.useState([]);
+  var [notNeededSet, setNotNeededSet] = React.useState(new Set());
+  var [schedLoading, setSchedLoading] = React.useState(false);
+
+  var [pickerPos, setPickerPos] = React.useState(null);
+  var [allPeople, setAllPeople] = React.useState([]);
+  var [peopleSearch, setPeopleSearch] = React.useState('');
+  var [peopleLoading, setPeopleLoading] = React.useState(false);
+  var [pickerOpen, setPickerOpen] = React.useState(false);
+  var [chipMenu, setChipMenu] = React.useState(null);
+  var [overflowMenu, setOverflowMenu] = React.useState(null);
+  var [conflictWarning, setConflictWarning] = React.useState(null);
+
+  var dateStr = fmtDate(selDate);
+
+  React.useEffect(function() {
+    if (!ministry || !token) return;
+    fetch(API + '/ministry-positions?ministry=' + encodeURIComponent(ministry), { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); }).catch(function() { return []; })
+      .then(function(data) {
+        setPositions(Array.isArray(data) ? data.slice().sort(function(a, b) { return (a.display_order || 0) - (b.display_order || 0); }) : []);
+      });
+  }, [ministry, token]);
+
+  function loadSchedule() {
+    if (!ministry || !token || !selService) return;
+    setSchedLoading(true);
+    fetch(API + '/schedule?ministry=' + encodeURIComponent(ministry) + '&service_date=' + dateStr + '&service_name=' + encodeURIComponent(selService), { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); }).catch(function() { return {}; })
+      .then(function(data) {
+        setAssignments(Array.isArray(data.assignments) ? data.assignments : []);
+        var nn = new Set(((data.not_needed) || []).map(function(x) { return x && x.position_name; }).filter(Boolean));
+        setNotNeededSet(nn);
+        setSchedLoading(false);
+      });
+  }
+
+  React.useEffect(function() { loadSchedule(); }, [ministry, token, dateStr, selService]);
+
+  function loadPeople() {
+    if (peopleLoading || allPeople.length > 0) return;
+    setPeopleLoading(true);
+    fetch(API + '/people', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); }).catch(function() { return []; })
+      .then(function(data) { setAllPeople(Array.isArray(data) ? data : []); setPeopleLoading(false); });
+  }
+
+  function openPicker(pos) { setPickerPos(pos); setPeopleSearch(''); setPickerOpen(true); loadPeople(); }
+  function closePicker() { setPickerOpen(false); setPickerPos(null); setPeopleSearch(''); }
+
+  function assignPerson(person) {
+    if (!pickerPos || !person) return;
+    var posName = (pickerPos.position_name || pickerPos.name || '');
+    fetch(API + '/schedule/assignment', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry: ministry, position_name: posName, person_id: person.id, service_date: dateStr, service_name: selService, status: 'pending' })
+    }).then(function(resp) {
+      if (resp.status === 409) {
+        resp.json().catch(function() { return {}; }).then(function(err) {
+          var pName = person.preferred_name || person.full_name || person.name || '';
+          setConflictWarning({ name: pName, ministry: (err && err.conflicting_ministry) || '' });
+        });
+      }
+      closePicker();
+      loadSchedule();
+    }).catch(function() { closePicker(); loadSchedule(); });
+  }
+
+  function removeAssignment(id) {
+    fetch(API + '/schedule/assignment/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } })
+      .then(function() { setChipMenu(null); loadSchedule(); });
+  }
+
+  function updateStatus(id, status) {
+    fetch(API + '/schedule/assignment/' + id, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status })
+    }).then(function() { setChipMenu(null); loadSchedule(); });
+  }
+
+  function markNotNeeded(positionName) {
+    fetch(API + '/schedule/position-not-needed', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry: ministry, position_name: positionName, service_date: dateStr, service_name: selService })
+    }).then(function() { setOverflowMenu(null); loadSchedule(); });
+  }
+
+  function unmarkNotNeeded(positionName) {
+    fetch(API + '/schedule/position-not-needed', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry: ministry, position_name: positionName, service_date: dateStr, service_name: selService })
+    }).then(function() { loadSchedule(); });
+  }
+
+  function prevWeek() { setSelDate(function(d) { var nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; }); }
+  function nextWeek() { setSelDate(function(d) { var nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; }); }
+
+  var STATUS_COLOR = { confirmed: '#34d399', pending: '#f59e0b', declined: '#f87171', wants_reschedule: '#fb923c', not_contacted: '#475a64' };
+
+  var tx2 = {
+    add:            lang === 'PT' ? '+ Adicionar'                    : '+ Add',
+    notNeeded:      lang === 'PT' ? 'Não necessário esta semana'      : 'Not needed this week',
+    undo:           lang === 'PT' ? 'desfazer'                       : 'undo',
+    conflict:       lang === 'PT' ? 'Conflito de escala'             : 'Scheduling conflict',
+    noVolunteers:   lang === 'PT' ? 'Nenhum voluntário encontrado'   : 'No volunteers found',
+    markNotNeeded:  lang === 'PT' ? 'Não necessário esta semana'     : 'Mark as not needed this week',
+    confirmStatus:  lang === 'PT' ? 'Confirmar'                      : 'Confirm',
+    pendingStatus:  lang === 'PT' ? 'Pendente'                       : 'Mark pending',
+    declinedStatus: lang === 'PT' ? 'Recusado'                       : 'Mark declined',
+    reschedStatus:  lang === 'PT' ? 'Reagendar'                      : 'Wants reschedule',
+    remove:         lang === 'PT' ? 'Remover'                        : 'Remove',
+    loading:        lang === 'PT' ? 'Carregando...'                  : 'Loading...',
+    search:         lang === 'PT' ? 'Buscar voluntário...'           : 'Search volunteer...',
+    addVolunteer:   lang === 'PT' ? 'Adicionar voluntário'           : 'Add volunteer',
+    noPositions:    lang === 'PT' ? 'Nenhuma posição cadastrada.'    : 'No positions on file.',
+    noVolsSlot:     lang === 'PT' ? 'Nenhum voluntário'              : 'No volunteers',
+    morning:        lang === 'PT' ? 'Culto Manhã (10:00)'            : 'Morning Service (10:00)',
+    evening:        lang === 'PT' ? 'Culto Tarde (18:30)'            : 'Evening Service (18:30)',
+  };
+
+  var filteredPeople = React.useMemo(function() {
+    var q = (peopleSearch || '').toLowerCase().trim();
+    if (!q) return allPeople || [];
+    return (allPeople || []).filter(function(p) {
+      return ((p.preferred_name || '') + ' ' + (p.full_name || '') + ' ' + (p.name || '')).toLowerCase().includes(q);
+    });
+  }, [allPeople, peopleSearch]);
+
+  var assignmentsByPos = React.useMemo(function() {
+    var map = {};
+    (assignments || []).forEach(function(a) {
+      var pn = (a && a.position_name) || '';
+      if (!map[pn]) map[pn] = [];
+      map[pn].push(a);
+    });
+    return map;
+  }, [assignments]);
+
+  function svcLabel(svc) {
+    if (svc === 'Culto Manha') return tx2.morning;
+    if (svc === 'Culto Tarde') return tx2.evening;
+    return svc;
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* ── 1. SERVICE SELECTOR ── */}
+      <div className="glass" style={{ borderRadius: 10, padding: '14px 18px', marginBottom: 18, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={prevWeek} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, width: 28, height: 28, color: '#5eead4', cursor: 'pointer', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#e6f1f0', minWidth: 120, textAlign: 'center' }}>{fmtDisplay(selDate)}</span>
+          <button onClick={nextWeek} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, width: 28, height: 28, color: '#5eead4', cursor: 'pointer', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        </div>
+        {services.length > 1 && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {services.map(function(svc) {
+              var active = selService === svc;
+              return (
+                <button key={svc} onClick={function() { setSelService(svc); }} style={{
+                  padding: '4px 12px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer',
+                  border: active ? '1px solid rgba(94,234,212,0.4)' : '1px solid rgba(255,255,255,0.07)',
+                  background: active ? 'rgba(94,234,212,0.12)' : 'rgba(255,255,255,0.02)',
+                  color: active ? '#5eead4' : '#6b7a82', fontWeight: active ? 600 : 400, transition: 'all 0.15s',
+                }}>{svcLabel(svc)}</button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Conflict warning */}
+      {conflictWarning && (
+        <div style={{ background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.35)', borderRadius: 8, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#fb923c' }}>
+            ⚠ {tx2.conflict}{conflictWarning.name ? ': ' + conflictWarning.name : ''}{conflictWarning.ministry ? ' — ' + conflictWarning.ministry : ''}
+          </span>
+          <button onClick={function() { setConflictWarning(null); }} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
+      {/* ── 2. POSITION SLOTS ── */}
+      {schedLoading ? (
+        <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '40px 0', textAlign: 'center' }}>{tx2.loading}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(positions || []).length === 0 && (
+            <div style={{ color: '#475a64', fontSize: 13, fontFamily: "'Space Grotesk',sans-serif", padding: '20px 0' }}>{tx2.noPositions}</div>
+          )}
+          {(positions || []).map(function(pos) {
+            var posName = (pos && (pos.position_name || pos.name)) || '';
+            var posAssignments = assignmentsByPos[posName] || [];
+            var isNotNeeded = notNeededSet.has(posName);
+            var minV = (pos && (pos.min_volunteers || pos.min_count)) || 0;
+            var idealV = (pos && (pos.ideal_volunteers || pos.ideal_count)) || 0;
+            return (
+              <div key={posName} className="glass" style={{ borderRadius: 10, padding: '14px 16px', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 14, fontWeight: 600, color: '#e6f1f0' }}>{posName}</div>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', marginTop: 2 }}>{'min ' + minV + ' / ideal ' + idealV}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    {!isNotNeeded && (
+                      <button onClick={function(e) { e.stopPropagation(); openPicker(pos); }} style={{
+                        padding: '4px 10px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
+                        border: '1px solid rgba(94,234,212,0.25)', background: 'rgba(94,234,212,0.07)',
+                        color: '#5eead4', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                      }}>{tx2.add}</button>
+                    )}
+                    <div style={{ position: 'relative' }}>
+                      <button onClick={function(e) { e.stopPropagation(); setOverflowMenu(overflowMenu === posName ? null : posName); }} style={{
+                        background: 'none', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
+                        width: 26, height: 26, color: '#6b7a82', cursor: 'pointer', fontSize: 14,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>⋯</button>
+                      {overflowMenu === posName && (
+                        <div style={{ position: 'absolute', right: 0, top: 30, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 100, minWidth: 210, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                          <button onClick={function() { markNotNeeded(posName); }} style={{
+                            display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none',
+                            color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+                          }}>{tx2.markNotNeeded}</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isNotNeeded ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx2.notNeeded}</span>
+                    <button onClick={function() { unmarkNotNeeded(posName); }} style={{ fontSize: 11, color: '#5eead4', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: "'JetBrains Mono',monospace", padding: 0 }}>{tx2.undo}</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {posAssignments.length === 0 && (
+                      <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic', padding: '2px 0' }}>{tx2.noVolsSlot}</span>
+                    )}
+                    {posAssignments.map(function(a) {
+                      if (!a) return null;
+                      var statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
+                      var personName = a.person_name || a.preferred_name || a.full_name || (lang === 'PT' ? 'Voluntário' : 'Volunteer');
+                      var isOpen = chipMenu && chipMenu.id === a.id;
+                      return (
+                        <div key={a.id} style={{ position: 'relative' }}>
+                          <button onClick={function(e) { e.stopPropagation(); setChipMenu(isOpen ? null : { id: a.id, assignment: a, posName: posName }); }} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 999, cursor: 'pointer', transition: 'all 0.15s',
+                          }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px ' + statusColor + '88' }} />
+                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
+                          </button>
+                          {isOpen && (
+                            <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 200, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                              {[['confirmed', tx2.confirmStatus, '#34d399'], ['pending', tx2.pendingStatus, '#f59e0b'], ['declined', tx2.declinedStatus, '#f87171'], ['wants_reschedule', tx2.reschedStatus, '#fb923c']].map(function(item) {
+                                return (
+                                  <button key={item[0]} onClick={function() { updateStatus(a.id, item[0]); }} style={{
+                                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px',
+                                    background: 'none', border: 'none', color: '#e6f1f0',
+                                    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left',
+                                  }}>
+                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: item[2], flexShrink: 0 }} />
+                                    {item[1]}
+                                  </button>
+                                );
+                              })}
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                              <button onClick={function() { removeAssignment(a.id); }} style={{
+                                display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none',
+                                color: '#f87171', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left',
+                              }}>{tx2.remove}</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── 3. VOLUNTEER PICKER MODAL ── */}
+      {pickerOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={function(e) { if (e.target === e.currentTarget) closePicker(); }}>
+          <div className="glass" style={{ borderRadius: '16px 16px 0 0', padding: '20px 0 0', width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{tx2.addVolunteer}</div>
+                {pickerPos && <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5eead4', marginTop: 2 }}>{pickerPos.position_name || pickerPos.name || ''}</div>}
+              </div>
+              <button onClick={closePicker} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <div style={{ padding: '12px 20px', flexShrink: 0 }}>
+              <input type="text" placeholder={tx2.search} value={peopleSearch}
+                onChange={function(e) { setPeopleSearch(e.target.value); }}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                autoFocus />
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 20px 20px' }}>
+              {peopleLoading ? (
+                <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx2.loading}</div>
+              ) : filteredPeople.length === 0 ? (
+                <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx2.noVolunteers}</div>
+              ) : (
+                filteredPeople.slice(0, 80).map(function(person) {
+                  if (!person) return null;
+                  var pName = person.preferred_name || person.full_name || person.name || '';
+                  var topGift = person.gifting_1 ? (lang === 'PT' ? (GIFTING_PT[person.gifting_1] || person.gifting_1) : person.gifting_1) : null;
+                  var pMins = parseJSON(person.current_ministries);
+                  return (
+                    <button key={person.id} onClick={function() { assignPerson(person); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0',
+                      background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      cursor: 'pointer', textAlign: 'left',
+                    }}>
+                      {person.photo_url ? (
+                        <img src={person.photo_url} alt={pName} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(94,234,212,0.2)' }} />
+                      ) : (
+                        <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,rgba(94,234,212,0.18),rgba(94,234,212,0.04))', border: '1px solid rgba(94,234,212,0.15)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#5eead4', fontFamily: "'Space Grotesk',sans-serif" }}>
+                          {(pName[0] || '?').toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pName}</div>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                          {topGift && <span style={{ fontSize: 10, color: '#5eead4', fontFamily: "'JetBrains Mono',monospace" }}>{topGift}</span>}
+                          {(pMins || []).slice(0, 2).map(function(m) { return <span key={m} style={{ fontSize: 10, color: '#6b7a82', fontFamily: "'JetBrains Mono',monospace" }}>{lang === 'PT' ? (MINISTRY_PT[m] || m) : m}</span>; })}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Click-away backdrop for dropdown menus */}
+      {(chipMenu || overflowMenu) && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }} onClick={function() { setChipMenu(null); setOverflowMenu(null); }} />
+      )}
+    </div>
+  );
+}
+
 // ─── MINISTRY LEADER VIEW ──────────────────────────────────────────────────────
 // Shell only. Pool/Roster (Mode 1/2/3 assignment UI) plugs into MinistryTeamTab below.
 // hasBlanketAccess: owner/senior_pastor/pastor — nav dropdown controls ministry (activeMinistryOverride).
@@ -7459,9 +7838,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
         </RefErrorBoundary>
       )}
       {mlTab === "schedule" && (
-        <div style={{color:"#6b7a82",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:"0.05em"}}>
-          {tx.soon}
-        </div>
+        <AgendaTab ministry={currentMinistry} token={token} lang={lang} />
       )}
       {mlTab === "resources" && (
         <RecursosTab

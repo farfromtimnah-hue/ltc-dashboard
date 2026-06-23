@@ -7194,7 +7194,7 @@ function AgendaTab({ ministry, token, lang }) {
   function loadPeople() {
     if (peopleLoading || allPeople.length > 0) return;
     setPeopleLoading(true);
-    fetch(API + '/people', { headers: { Authorization: 'Bearer ' + token } })
+    fetch(MH_API + '/ministry/' + encodeURIComponent(ministry) + '/roster', { headers: { Authorization: 'Bearer ' + token } })
       .then(function(r) { return r.json(); }).catch(function() { return []; })
       .then(function(data) { setAllPeople(Array.isArray(data) ? data : []); setPeopleLoading(false); });
   }

@@ -7442,8 +7442,8 @@ function AgendaTab({ ministry, token, lang }) {
 
       {/* ── 3. VOLUNTEER PICKER MODAL ── */}
       {pickerOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={function(e) { if (e.target === e.currentTarget) closePicker(); }}>
-          <div className="glass" style={{ borderRadius: '16px 16px 0 0', padding: '20px 0 0', width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }} onClick={function(e) { if (e.target === e.currentTarget) closePicker(); }}>
+          <div className="glass" style={{ borderRadius: 16, padding: '20px 0 0', width: '90%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
             <div style={{ padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{tx2.addVolunteer}</div>
@@ -7457,7 +7457,7 @@ function AgendaTab({ ministry, token, lang }) {
                 style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
                 autoFocus />
             </div>
-            <div style={{ overflowY: 'auto', flex: 1, padding: '0 20px 20px' }}>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 20px' }}>
               {peopleLoading ? (
                 <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx2.loading}</div>
               ) : filteredPeople.length === 0 ? (

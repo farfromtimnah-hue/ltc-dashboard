@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMe
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import SchedulingPrototype from './SchedulingPrototype';
 
 /*
  * ──────────────────────────────────────────────────────────────────────────
@@ -489,7 +488,7 @@ const L = {
     loginRestricted:"Acesso Restrito",loginEmail:"Email",loginPassword:"Senha",
     loginSignIn:"Entrar",loginSignInGoogle:"Entrar com Google",loginOr:"ou",loginSigningIn:"Entrando...",
     roleOwner:"Desenvolvedor",roleSeniorPastor:"Pastor Sênior",rolePastor:"Pastor",roleGroupLeader:"Líder de Grupo",
-    usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",scheduling:"Agendamento",
+    usersTab:"Usuários",groupLeaderMsg:"Em breve — área do líder de grupo",scheduling:"Escala",
     addUser:"Adicionar Usuário",userCreated:"Usuário criado com sucesso.",sendCredentials:"Envie as credenciais via WhatsApp.",
     userRoleSenior:"Pastor Sênior",userRolePastor:"Pastor",userRoleGroupLeader:"Líder de Grupo",
     attendance:"Presença",attOpenForm:"Abrir formulário",attQrLabel:"QR",
@@ -568,7 +567,7 @@ const L = {
     loginRestricted:"Restricted Access",loginEmail:"Email",loginPassword:"Password",
     loginSignIn:"Sign In",loginSignInGoogle:"Sign in with Google",loginOr:"or",loginSigningIn:"Signing in...",
     roleOwner:"Developer",roleSeniorPastor:"Senior Pastor",rolePastor:"Pastor",roleGroupLeader:"Group Leader",
-    usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",scheduling:"Scheduling",
+    usersTab:"Users",groupLeaderMsg:"Coming soon — group leader area",scheduling:"Schedule",
     addUser:"Add User",userCreated:"User created successfully.",sendCredentials:"Send credentials via WhatsApp.",
     userRoleSenior:"Senior Pastor",userRolePastor:"Pastor",userRoleGroupLeader:"Group Leader",
     attendance:"Attendance",attOpenForm:"Open form",attQrLabel:"QR",
@@ -8542,6 +8541,550 @@ function MobileDock({ items, moreItems, moreOpen, onMoreToggle, onMoreClose, act
   );
 }
 
+// ─── PASTOR SCHEDULING COMMAND CENTER ────────────────────────────────────────
+function PastorSchedulingTab({ token, lang }) {
+  const SERVICES = ['Culto Manha','Culto Tarde','Legacy','Rocket','Shine','Hero','Link','English Service','Culto Hope','Culto Fe'];
+  const SUNDAY_SERVICES = ['Culto Manha','Culto Tarde'];
+  const ALL_MINISTRIES = ["Worship Team","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Translation","Lagoinha Kids","Intercession","Volunteer Coffee","Hospitality - Welcome","Parking","Setup & Teardown","WE CARE","GC Leader"];
+  const STATUS_COLOR = { confirmed:'#34d399', pending:'#f59e0b', declined:'#f87171', wants_reschedule:'#fb923c', not_contacted:'#475a64' };
+
+  function nextSundayDate() {
+    var d = new Date(); var day = d.getDay();
+    var diff = day === 0 ? 0 : 7 - day;
+    d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d;
+  }
+  function fmtDate(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function fmtDisplay(d) {
+    var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+  }
+
+  const [selDate, setSelDate] = React.useState(nextSundayDate);
+  const [selService, setSelService] = React.useState('Culto Manha');
+  const [assignments, setAssignments] = React.useState([]);
+  const [positionsMap, setPositionsMap] = React.useState({});
+  const [notNeededMap, setNotNeededMap] = React.useState({});
+  const [loading, setLoading] = React.useState(false);
+  const [collapsedCards, setCollapsedCards] = React.useState({});
+  const [triageExpanded, setTriageExpanded] = React.useState(false);
+  const [pickerPos, setPickerPos] = React.useState(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [allPeople, setAllPeople] = React.useState([]);
+  const [peopleSearch, setPeopleSearch] = React.useState('');
+  const [peopleLoading, setPeopleLoading] = React.useState(false);
+  const [chipMenu, setChipMenu] = React.useState(null);
+  const [overflowMenu, setOverflowMenu] = React.useState(null);
+
+  const dateStr = fmtDate(selDate);
+  const isSundayService = SUNDAY_SERVICES.includes(selService);
+
+  const tx = {
+    add: lang==='PT' ? '+ Adicionar' : '+ Add',
+    viaPC: 'Via Planning Center',
+    notNeeded: lang==='PT' ? 'Não necessário' : 'Not needed',
+    unfilledLabel: lang==='PT' ? 'Posições sem voluntário' : 'Unfilled positions',
+    conflictsLabel: lang==='PT' ? 'Conflitos' : 'Conflicts',
+    unfilled: lang==='PT' ? 'sem preencher' : 'unfilled',
+    conflict1: lang==='PT' ? 'conflito de escala' : 'scheduling conflict',
+    conflictN: lang==='PT' ? 'conflitos de escala' : 'scheduling conflicts',
+    loading: lang==='PT' ? 'Carregando...' : 'Loading...',
+    search: lang==='PT' ? 'Buscar voluntário...' : 'Search volunteer...',
+    addVolunteer: lang==='PT' ? 'Adicionar voluntário' : 'Add volunteer',
+    noVolunteers: lang==='PT' ? 'Nenhum voluntário encontrado' : 'No volunteers found',
+    noPositions: lang==='PT' ? 'Nenhuma posição cadastrada.' : 'No positions on file.',
+    noVolsSlot: lang==='PT' ? 'Nenhum voluntário' : 'No volunteers',
+    alsoIn: lang==='PT' ? 'Também em' : 'Also in',
+    markNotNeeded: lang==='PT' ? 'Não necessário esta semana' : 'Mark as not needed',
+    undo: lang==='PT' ? 'desfazer' : 'undo',
+    confirmStatus: lang==='PT' ? 'Confirmar' : 'Confirm',
+    pendingStatus: lang==='PT' ? 'Pendente' : 'Mark pending',
+    declinedStatus: lang==='PT' ? 'Recusado' : 'Mark declined',
+    reschedStatus: lang==='PT' ? 'Reagendar' : 'Wants reschedule',
+    remove: lang==='PT' ? 'Remover' : 'Remove',
+  };
+
+  function loadPastorView() {
+    if (!token) return;
+    setLoading(true);
+    fetch(API+'/schedule/pastor-view?service_date='+dateStr+'&service_name='+encodeURIComponent(selService), {
+      headers: { Authorization: 'Bearer '+token }
+    }).then(r => r.json()).catch(() => ({}))
+      .then(data => {
+        const asgn = Array.isArray(data?.assignments) ? data.assignments : Array.isArray(data) ? data : [];
+        setAssignments(asgn);
+        // Parse not_needed from response
+        const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];
+        const nnMap = {};
+        nn.forEach(item => {
+          if (!item) return;
+          const m = item.ministry || ''; const p = item.position_name || '';
+          if (!m || !p) return;
+          if (!nnMap[m]) nnMap[m] = new Set();
+          nnMap[m].add(p);
+        });
+        setNotNeededMap(nnMap);
+        setLoading(false);
+      });
+  }
+
+  function loadPositionsForMinistries(ministries) {
+    if (!token) return;
+    (ministries || []).forEach(ministry => {
+      if (!ministry) return;
+      fetch(API+'/ministry-positions?ministry='+encodeURIComponent(ministry), {
+        headers: { Authorization: 'Bearer '+token }
+      }).then(r => r.json()).catch(() => [])
+        .then(data => {
+          const pos = Array.isArray(data) ? data.slice().sort((a,b) => (a?.display_order||0)-(b?.display_order||0)) : [];
+          setPositionsMap(prev => ({ ...prev, [ministry]: pos }));
+        });
+    });
+  }
+
+  React.useEffect(() => {
+    loadPastorView();
+    if (isSundayService) loadPositionsForMinistries(ALL_MINISTRIES);
+  }, [dateStr, selService, token]);
+
+  React.useEffect(() => {
+    if (isSundayService) return;
+    const derived = [...new Set((assignments||[]).map(a => a?.ministry).filter(Boolean))];
+    if (derived.length > 0) loadPositionsForMinistries(derived);
+  }, [assignments, isSundayService]);
+
+  const visibleMinistries = React.useMemo(() => {
+    if (isSundayService) {
+      return ALL_MINISTRIES.filter(m => {
+        const pos = positionsMap[m];
+        if (pos === undefined) return true; // still loading — show placeholder
+        if (pos.length > 0) return true;
+        return (assignments||[]).some(a => a?.ministry === m);
+      });
+    }
+    return [...new Set((assignments||[]).map(a => a?.ministry).filter(Boolean))];
+  }, [isSundayService, positionsMap, assignments]);
+
+  const assignmentsByMinistry = React.useMemo(() => {
+    const map = {};
+    (assignments||[]).forEach(a => {
+      if (!a) return;
+      const m = a.ministry || '';
+      if (!map[m]) map[m] = [];
+      map[m].push(a);
+    });
+    return map;
+  }, [assignments]);
+
+  // Build cross-ministry conflict map: personId → [ministries]
+  const conflictPersonMap = React.useMemo(() => {
+    const personMins = {};
+    (assignments||[]).forEach(a => {
+      if (!a?.person_id) return;
+      const pid = String(a.person_id);
+      if (!personMins[pid]) personMins[pid] = { name: a.person_name || '', ministries: [] };
+      if (!personMins[pid].ministries.includes(a.ministry)) personMins[pid].ministries.push(a.ministry);
+    });
+    const result = {};
+    Object.entries(personMins).forEach(([pid, v]) => {
+      if ((v.ministries||[]).length > 1) result[pid] = v;
+    });
+    return result;
+  }, [assignments]);
+
+  const triageAlerts = React.useMemo(() => {
+    const unfilled = [];
+    visibleMinistries.forEach(ministry => {
+      const positions = positionsMap[ministry] || [];
+      const ministryAsgn = assignmentsByMinistry[ministry] || [];
+      const notNeeded = notNeededMap[ministry] || new Set();
+      positions.forEach(pos => {
+        const posName = pos?.position_name || pos?.name || '';
+        if (!posName || notNeeded.has(posName)) return;
+        const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending')).length;
+        if (filled === 0) unfilled.push({ ministry, positionName: posName });
+      });
+    });
+    const conflicts = Object.values(conflictPersonMap);
+    return { unfilled, conflicts };
+  }, [visibleMinistries, positionsMap, assignmentsByMinistry, notNeededMap, conflictPersonMap]);
+
+  const hasTriage = triageAlerts.unfilled.length > 0 || triageAlerts.conflicts.length > 0;
+
+  function ministryDot(ministry) {
+    const positions = positionsMap[ministry] || [];
+    if (positions.length === 0) return null;
+    const ministryAsgn = assignmentsByMinistry[ministry] || [];
+    const notNeeded = notNeededMap[ministry] || new Set();
+    let anyBelowMin = false, anyUnfilled = false;
+    positions.forEach(pos => {
+      const posName = pos?.position_name || pos?.name || '';
+      if (!posName || notNeeded.has(posName)) return;
+      const minV = pos?.min_volunteers || pos?.min_count || 0;
+      const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending')).length;
+      if (filled === 0) anyUnfilled = true;
+      if (minV > 0 && filled < minV) anyBelowMin = true;
+    });
+    if (anyBelowMin) return '#f87171';
+    if (anyUnfilled) return '#f59e0b';
+    return '#34d399';
+  }
+
+  function prevDate() { setSelDate(d => { const nd = new Date(d); nd.setDate(nd.getDate()-7); return nd; }); }
+  function nextDate() { setSelDate(d => { const nd = new Date(d); nd.setDate(nd.getDate()+7); return nd; }); }
+  function toggleCard(ministry) { setCollapsedCards(prev => ({ ...prev, [ministry]: !(prev[ministry]===true) })); }
+
+  function loadPeople() {
+    if (peopleLoading || allPeople.length > 0) return;
+    setPeopleLoading(true);
+    fetch(API+'/people', { headers: { Authorization: 'Bearer '+token } })
+      .then(r => r.json()).catch(() => [])
+      .then(data => { setAllPeople(Array.isArray(data) ? data : []); setPeopleLoading(false); });
+  }
+  function openPicker(ministry, pos) {
+    setPickerPos({ ministry, positionName: pos?.position_name || pos?.name || '' });
+    setPeopleSearch(''); setPickerOpen(true); loadPeople();
+  }
+  function closePicker() { setPickerOpen(false); setPickerPos(null); setPeopleSearch(''); }
+
+  function assignPerson(person) {
+    if (!pickerPos || !person) return;
+    fetch(API+'/schedule/assignment', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry: pickerPos.ministry, position_name: pickerPos.positionName, person_id: person.id, service_date: dateStr, service_name: selService, status: 'pending' })
+    }).then(() => { closePicker(); loadPastorView(); });
+  }
+  function removeAssignment(id) {
+    if (!id) return;
+    fetch(API+'/schedule/assignment/'+id, { method: 'DELETE', headers: { Authorization: 'Bearer '+token } })
+      .then(() => { setChipMenu(null); loadPastorView(); });
+  }
+  function updateStatus(id, status) {
+    if (!id) return;
+    fetch(API+'/schedule/assignment/'+id, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    }).then(() => { setChipMenu(null); loadPastorView(); });
+  }
+  function doMarkNotNeeded(ministry, positionName) {
+    if (!ministry || !positionName) return;
+    fetch(API+'/schedule/position-not-needed', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry, position_name: positionName, service_date: dateStr, service_name: selService })
+    }).then(() => {
+      setNotNeededMap(prev => {
+        const s = new Set(prev[ministry] || []);
+        s.add(positionName);
+        return { ...prev, [ministry]: s };
+      });
+      setOverflowMenu(null);
+    });
+  }
+  function doUnmarkNotNeeded(ministry, positionName) {
+    if (!ministry || !positionName) return;
+    fetch(API+'/schedule/position-not-needed', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ministry, position_name: positionName, service_date: dateStr, service_name: selService })
+    }).then(() => {
+      setNotNeededMap(prev => {
+        const s = new Set(prev[ministry] || []);
+        s.delete(positionName);
+        return { ...prev, [ministry]: s };
+      });
+    });
+  }
+
+  const filteredPeople = React.useMemo(() => {
+    const q = (peopleSearch || '').toLowerCase().trim();
+    if (!q) return allPeople || [];
+    return (allPeople || []).filter(p => ((p?.preferred_name||'')+(p?.full_name||'')+(p?.name||'')).toLowerCase().includes(q));
+  }, [allPeople, peopleSearch]);
+
+  // Render a ministry card
+  function renderMinistryCard(ministry) {
+    const isCollapsed = collapsedCards[ministry] === true;
+    const positions = positionsMap[ministry] || [];
+    const ministryAsgn = assignmentsByMinistry[ministry] || [];
+    const notNeeded = notNeededMap[ministry] || new Set();
+    const dot = ministryDot(ministry);
+
+    // Group assignments by position
+    const asgnByPos = {};
+    ministryAsgn.forEach(a => {
+      if (!a) return;
+      const pn = a.position_name || '';
+      if (!asgnByPos[pn]) asgnByPos[pn] = [];
+      asgnByPos[pn].push(a);
+    });
+
+    return (
+      <div key={ministry} className="glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
+        {/* Card header */}
+        <button onClick={() => toggleCard(ministry)} style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer',
+          borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {dot && <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: '0 0 6px '+dot+'88' }} />}
+            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 14, color: '#e6f1f0' }}>{ministry}</span>
+          </div>
+          <span style={{ fontSize: 10, color: '#475a64' }}>{isCollapsed ? '▼' : '▲'}</span>
+        </button>
+
+        {/* Card body */}
+        {!isCollapsed && (
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {positions.length === 0 && (
+              <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontStyle: 'italic' }}>{tx.noPositions}</div>
+            )}
+            {positions.map(pos => {
+              if (!pos) return null;
+              const posName = pos.position_name || pos.name || '';
+              const posAsgn = asgnByPos[posName] || [];
+              const isNotNeeded = notNeeded.has(posName);
+              const minV = pos.min_volunteers || pos.min_count || 0;
+              const idealV = pos.ideal_volunteers || pos.ideal_count || 0;
+              const omKey = ministry+'::'+posName;
+
+              return (
+                <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{posName}</div>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', marginTop: 1 }}>{'min '+minV+' / ideal '+idealV}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {!isNotNeeded && (
+                        <button onClick={e => { e.stopPropagation(); openPicker(ministry, pos); }} style={{
+                          padding: '3px 10px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
+                          border: '1px solid rgba(94,234,212,0.25)', background: 'rgba(94,234,212,0.07)',
+                          color: '#5eead4', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}>{tx.add}</button>
+                      )}
+                      <div style={{ position: 'relative' }}>
+                        <button onClick={e => { e.stopPropagation(); setOverflowMenu(overflowMenu === omKey ? null : omKey); }} style={{
+                          background: 'none', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
+                          width: 24, height: 24, color: '#6b7a82', cursor: 'pointer', fontSize: 14,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>⋯</button>
+                        {overflowMenu === omKey && (
+                          <div style={{ position: 'absolute', right: 0, top: 28, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 300, minWidth: 220, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                            {!isNotNeeded
+                              ? <button onClick={() => doMarkNotNeeded(ministry, posName)} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.markNotNeeded}</button>
+                              : <button onClick={() => doUnmarkNotNeeded(ministry, posName)} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.undo}</button>
+                            }
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isNotNeeded ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx.notNeeded}</span>
+                      <button onClick={() => doUnmarkNotNeeded(ministry, posName)} style={{ fontSize: 11, color: '#5eead4', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: "'JetBrains Mono',monospace", padding: 0 }}>{tx.undo}</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {posAsgn.length === 0 && (
+                        <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx.noVolsSlot}</span>
+                      )}
+                      {posAsgn.map(a => {
+                        if (!a) return null;
+                        const isPC = a.source === 'planning_center';
+                        const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
+                        const personName = a.person_name || a.preferred_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
+                        const pid = String(a.person_id || '');
+                        const hasConflict = pid && conflictPersonMap[pid];
+                        const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
+                        const chipKey = a.id || (ministry+posName+personName);
+                        const isChipOpen = chipMenu?.id === a.id;
+
+                        if (isPC) {
+                          return (
+                            <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#6b7a82' }}>{personName}</span>
+                              <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>
+                              {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b', cursor: 'default' }}>⚠</span>}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={chipKey} style={{ position: 'relative' }}>
+                            <button onClick={e => { e.stopPropagation(); setChipMenu(isChipOpen ? null : { id: a.id, assignment: a }); }} style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
+                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: 999, cursor: 'pointer',
+                            }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
+                              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
+                              {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
+                            </button>
+                            {isChipOpen && (
+                              <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 400, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                                {[['confirmed',tx.confirmStatus,'#34d399'],['pending',tx.pendingStatus,'#f59e0b'],['declined',tx.declinedStatus,'#f87171'],['wants_reschedule',tx.reschedStatus,'#fb923c']].map(item => (
+                                  <button key={item[0]} onClick={() => updateStatus(a.id, item[0])} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
+                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: item[2], flexShrink: 0 }} />
+                                    {item[1]}
+                                  </button>
+                                ))}
+                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                                <button onClick={() => removeAssignment(a.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#f87171', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.remove}</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '24px 32px', maxWidth: 1200 }}>
+      {/* SERVICE SELECTOR */}
+      <div className="glass" style={{ borderRadius: 12, padding: '16px 20px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={prevDate} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, width: 30, height: 30, color: '#5eead4', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: '#e6f1f0', minWidth: 130, textAlign: 'center', fontWeight: 600 }}>{fmtDisplay(selDate)}</span>
+          <button onClick={nextDate} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, width: 30, height: 30, color: '#5eead4', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {SERVICES.map(svc => {
+            const active = selService === svc;
+            return (
+              <button key={svc} onClick={() => { setSelService(svc); setPositionsMap({}); }} style={{
+                padding: '4px 12px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer',
+                border: active ? '1px solid rgba(94,234,212,0.4)' : '1px solid rgba(255,255,255,0.07)',
+                background: active ? 'rgba(94,234,212,0.12)' : 'rgba(255,255,255,0.02)',
+                color: active ? '#5eead4' : '#6b7a82', fontWeight: active ? 600 : 400, whiteSpace: 'nowrap',
+              }}>{svc}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TRIAGE BAR */}
+      {hasTriage && (
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => setTriageExpanded(e => !e)} style={{
+            width: '100%', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)',
+            borderRadius: triageExpanded ? '10px 10px 0 0' : 10, padding: '10px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
+            color: '#fb923c', fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+          }}>
+            <span>
+              ⚠{triageAlerts.unfilled.length > 0 ? ' '+triageAlerts.unfilled.length+' '+tx.unfilled : ''}
+              {triageAlerts.unfilled.length > 0 && triageAlerts.conflicts.length > 0 ? ' — ' : ''}
+              {triageAlerts.conflicts.length > 0 ? triageAlerts.conflicts.length+' '+(triageAlerts.conflicts.length===1 ? tx.conflict1 : tx.conflictN) : ''}
+            </span>
+            <span style={{ fontSize: 10 }}>{triageExpanded ? '▲' : '▼'}</span>
+          </button>
+          {triageExpanded && (
+            <div style={{ background: 'rgba(251,146,60,0.05)', border: '1px solid rgba(251,146,60,0.2)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '12px 16px' }}>
+              {triageAlerts.unfilled.length > 0 && (
+                <div style={{ marginBottom: triageAlerts.conflicts.length > 0 ? 12 : 0 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tx.unfilledLabel}</div>
+                  {triageAlerts.unfilled.map((item, i) => (
+                    <div key={i} style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0', marginBottom: 3 }}>
+                      <span style={{ color: '#fb923c' }}>{item.ministry}</span> · {item.positionName}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {triageAlerts.conflicts.length > 0 && (
+                <div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{tx.conflictsLabel}</div>
+                  {triageAlerts.conflicts.map((item, i) => (
+                    <div key={i} style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0', marginBottom: 3 }}>
+                      <span style={{ color: '#f59e0b' }}>{item.name || '?'}</span> — {(item.ministries||[]).join(' + ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MINISTRY GRID */}
+      {loading ? (
+        <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '40px 0', textAlign: 'center' }}>{tx.loading}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {visibleMinistries.map(ministry => renderMinistryCard(ministry))}
+        </div>
+      )}
+
+      {/* VOLUNTEER PICKER MODAL */}
+      {pickerOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) closePicker(); }}>
+          <div className="glass" style={{ borderRadius: 16, padding: '20px 0 0', width: '90%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{tx.addVolunteer}</div>
+                {pickerPos && <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5eead4', marginTop: 2 }}>{pickerPos.positionName||''} — {pickerPos.ministry||''}</div>}
+              </div>
+              <button onClick={closePicker} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <div style={{ padding: '12px 20px', flexShrink: 0 }}>
+              <input type="text" placeholder={tx.search} value={peopleSearch}
+                onChange={e => setPeopleSearch(e.target.value)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                autoFocus />
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 20px' }}>
+              {peopleLoading ? (
+                <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx.loading}</div>
+              ) : filteredPeople.length === 0 ? (
+                <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx.noVolunteers}</div>
+              ) : filteredPeople.slice(0, 80).map(person => {
+                if (!person) return null;
+                const pName = person.preferred_name || person.full_name || person.name || '';
+                const topGift = person.gifting_1 ? (lang==='PT' ? (GIFTING_PT[person.gifting_1]||person.gifting_1) : person.gifting_1) : null;
+                const pMins = parseJSON(person.current_ministries);
+                return (
+                  <button key={person.id} onClick={() => assignPerson(person)} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left' }}>
+                    {person.photo_url
+                      ? <img src={person.photo_url} alt={pName} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(94,234,212,0.2)' }} />
+                      : <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,rgba(94,234,212,0.18),rgba(94,234,212,0.04))', border: '1px solid rgba(94,234,212,0.15)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#5eead4', fontFamily: "'Space Grotesk',sans-serif" }}>{(pName[0]||'?').toUpperCase()}</div>
+                    }
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pName}</div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                        {topGift && <span style={{ fontSize: 10, color: '#5eead4', fontFamily: "'JetBrains Mono',monospace" }}>{topGift}</span>}
+                        {(pMins||[]).slice(0,2).map(m => <span key={m} style={{ fontSize: 10, color: '#6b7a82', fontFamily: "'JetBrains Mono',monospace" }}>{lang==='PT'?(MINISTRY_PT[m]||m):m}</span>)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Click-away backdrop for dropdown menus */}
+      {(chipMenu || overflowMenu) && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }} onClick={() => { setChipMenu(null); setOverflowMenu(null); }} />
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
@@ -8802,7 +9345,7 @@ export default function App() {
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
-    { id: "scheduling", label: t.scheduling },
+    ...(effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner' ? [{ id:"scheduling", label:t.scheduling }] : []),
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
@@ -8810,7 +9353,7 @@ export default function App() {
   // Always visible: logo + PT/EN toggle. Collapse order as space shrinks:
   //   1) title text  2) gear + logout  3) view switcher  4) tabs (right→left).
   // The More button appears only once something has collapsed into it.
-  const TAB_GAP = 4;
+  const TAB_GAP = 6;
   const REGION_GAP = 10;
   const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor') || hasMinistryLeaderGrant;
 
@@ -8894,8 +9437,6 @@ export default function App() {
       action:()=>{ setBannerDismissed(true); setViewMode('ministry_leader_view'); setDockMoreOpen(false); } },
     { id:'people', label:lang==='PT'?'Pessoas':'People', Icon:IconUsers,
       action:()=>{ setBannerDismissed(true); setTab('people'); setViewMode('my_view'); setDockMoreOpen(false); } },
-    { id:'scheduling', label:lang==='PT'?'Agenda':'Schedule', Icon:IconCalendar,
-      action:()=>{ setBannerDismissed(true); setTab('scheduling'); setViewMode('my_view'); setDockMoreOpen(false); } },
     { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid, action:()=>setDockMoreOpen(o=>!o) },
   ];
   const mlMoreItems = [
@@ -8907,7 +9448,7 @@ export default function App() {
     { id:'logout_ml', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser, action:()=>signOut(auth) },
   ];
   const mlDockActiveId = viewMode === 'ministry_leader_view' ? 'ministry_leader_view'
-    : tab === 'people' ? 'people' : tab === 'scheduling' ? 'scheduling' : 'more';
+    : tab === 'people' ? 'people' : 'more';
 
   // Which dock set applies
   const activeDockItems = hasBlanketMLAccess ? blanketDockItems : mlDockItems;
@@ -9120,7 +9661,11 @@ export default function App() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && <SchedulingPrototype />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && (effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner') && (
+          <RefErrorBoundary lang={lang} onBack={() => setTab('analytics')}>
+            <PastorSchedulingTab token={token} lang={lang} />
+          </RefErrorBoundary>
+        )}
         {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
       </div>

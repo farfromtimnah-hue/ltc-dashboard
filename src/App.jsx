@@ -9474,17 +9474,12 @@ export default function App() {
       for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;
       return w;
     };
-    const s = { title: true, switcher: hasSwitcher, aux: true, tabCount: tabs.length, more: false };
+    const s = { tabCount: tabs.length, more: false };
     if (need(s) > room) {
-      s.title = false;                                       // 1) title text first (just hidden)
-      if (need(s) > room) {
-        s.more = true;                                       // beyond here, items go INTO More
-        if (need(s) > room) s.aux = false;                   // 2) gear + logout
-        if (need(s) > room) s.switcher = false;              // 3) view switcher
-        while (s.tabCount > 0 && need(s) > room) s.tabCount--; // 4) tabs, right → left
-      }
+      s.more = true;
+      while (s.tabCount > 0 && need(s) > room) s.tabCount--;
     }
-    showTitle = s.title; showSwitcher = s.switcher && hasSwitcher; showAux = s.aux;
+    showTitle = true; showSwitcher = hasSwitcher; showAux = true;
     visibleTabCount = s.tabCount; showMore = s.more;
   }
   const visibleTabs = tabs.slice(0, visibleTabCount);

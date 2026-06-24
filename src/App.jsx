@@ -9204,10 +9204,8 @@ export default function App() {
   // what to collapse into the More dropdown. No hardcoded per-item pixel estimates.
   const navRowRef = useRef(null);   // live nav inner row (gives available width)
   const navMeasRef = useRef(null);  // hidden mirror row (gives intrinsic item widths)
-  const tabStripRef = useRef(null); // tab strip container (direct width measurement)
   const [navRowW, setNavRowW] = useState(0);
   const [navMeas, setNavMeas] = useState(null);
-  const [tabStripW, setTabStripW] = useState(600);
   useEffect(() => {
     const el = navRowRef.current;
     if (!el) return;
@@ -9216,17 +9214,6 @@ export default function App() {
     });
     ro.observe(el);
     setNavRowW(el.getBoundingClientRect().width);
-    return () => ro.disconnect();
-  }, [token]);
-  useEffect(() => {
-    if (!tabStripRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setTabStripW(entry.contentRect.width);
-      }
-    });
-    ro.observe(tabStripRef.current);
-    setTabStripW(tabStripRef.current.getBoundingClientRect().width);
     return () => ro.disconnect();
   }, [token]);
   useEffect(() => {
@@ -9438,7 +9425,7 @@ export default function App() {
     );
   }
 
-  const roleLabel = { owner: 'Developer', senior_pastor: 'Senior Pastor', pastor: 'Pastor', ministry_leader: 'Ministry Leader', group_leader: 'Group Leader' };
+  const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
 
   const effectiveRole = viewMode === 'senior_pastor_view' ? 'senior_pastor'
     : viewMode === 'pastor_view' ? 'pastor'
@@ -9451,7 +9438,7 @@ export default function App() {
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
-    ...(['owner','senior_pastor','pastor'].includes(effectiveRole) ? [{ id:"scheduling", label:t.scheduling }] : []),
+    ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
@@ -9464,22 +9451,30 @@ export default function App() {
   const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor') || hasMinistryLeaderGrant;
 
   let showTitle = true, showSwitcher = hasSwitcher, showAux = true, visibleTabCount = tabs.length, showMore = false;
-  if (navMeas && tabStripW > 0) {
+  if (navMeas && navRowW > 0) {
     const m = navMeas;
-    const SAFETY = 16;
-    const room = tabStripW - SAFETY;
+    const PAD = 48, SAFETY = 16;
+    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + REGION_GAP * 2);
     const need = (s) => {
       let w = 0;
-      if (s.more) w += m.more + TAB_GAP;
+      if (s.title) w += m.title + REGION_GAP;
       for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;
+      if (s.switcher && hasSwitcher && m.switcher > 0) w += m.switcher + REGION_GAP;
+      if (s.aux) w += m.aux + REGION_GAP;
+      if (s.more) w += m.more + REGION_GAP;
       return w;
     };
-    const s = { tabCount: tabs.length, more: false };
+    const s = { title: true, switcher: hasSwitcher, aux: true, tabCount: tabs.length, more: false };
     if (need(s) > room) {
-      s.more = true;
-      while (s.tabCount > 0 && need(s) > room) s.tabCount--;
+      s.title = false;                                       // 1) title text first (just hidden)
+      if (need(s) > room) {
+        s.more = true;                                       // beyond here, items go INTO More
+        if (need(s) > room) s.aux = false;                   // 2) gear + logout
+        if (need(s) > room) s.switcher = false;              // 3) view switcher
+        while (s.tabCount > 0 && need(s) > room) s.tabCount--; // 4) tabs, right → left
+      }
     }
-    showTitle = true; showSwitcher = hasSwitcher; showAux = true;
+    showTitle = s.title; showSwitcher = s.switcher && hasSwitcher; showAux = s.aux;
     visibleTabCount = s.tabCount; showMore = s.more;
   }
   const visibleTabs = tabs.slice(0, visibleTabCount);
@@ -9604,7 +9599,6 @@ export default function App() {
   );
   const auxNav = () => (
     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-      {(roleLabel[effectiveRole] || roleLabel[role] || null) && <span style={{fontSize:'0.7rem',color:'#8899a6',letterSpacing:'0.05em',textTransform:'uppercase',whiteSpace:'nowrap'}}>{roleLabel[effectiveRole] || roleLabel[role]}</span>}
       <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#9881;</button>
       <button onClick={()=>signOut(auth)} title={t.logout} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#8618;</button>
     </div>
@@ -9644,7 +9638,7 @@ export default function App() {
           </div>
 
           {/* Tabs (collapse last, right → left) */}
-          <div ref={tabStripRef} style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"1 1 0",minWidth:0,overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
             {visibleTabs.map(t2=>tabBtn(t2))}
           </div>
 

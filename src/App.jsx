@@ -7163,6 +7163,7 @@ function AgendaTab({ ministry, token, lang }) {
   var [chipMenu, setChipMenu] = React.useState(null);
   var [overflowMenu, setOverflowMenu] = React.useState(null);
   var [conflictWarning, setConflictWarning] = React.useState(null);
+  var [confirmPopup, setConfirmPopup] = React.useState(null); // { person, posName }
 
   var dateStr = fmtDate(selDate);
 
@@ -7198,12 +7199,11 @@ function AgendaTab({ ministry, token, lang }) {
       .then(function(data) { setAllPeople(Array.isArray(data) ? data : []); setPeopleLoading(false); });
   }
 
-  function openPicker(pos) { setPickerPos(pos); setPeopleSearch(''); setPickerOpen(true); loadPeople(); }
-  function closePicker() { setPickerOpen(false); setPickerPos(null); setPeopleSearch(''); }
+  function openPicker(pos) { setPickerPos(pos); setPeopleSearch(''); setPickerOpen(true); setConfirmPopup(null); loadPeople(); }
+  function closePicker() { setPickerOpen(false); setPickerPos(null); setPeopleSearch(''); setConfirmPopup(null); }
 
-  function assignPerson(person) {
-    if (!pickerPos || !person) return;
-    var posName = (pickerPos.position_name || pickerPos.name || '');
+  function doScheduleAssignment(person, posName) {
+    if (!person || !posName) return;
     fetch(API + '/schedule/assignment', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -7215,9 +7215,38 @@ function AgendaTab({ ministry, token, lang }) {
           setConflictWarning({ name: pName, ministry: (err && err.conflicting_ministry) || '' });
         });
       }
-      closePicker();
       loadSchedule();
-    }).catch(function() { closePicker(); loadSchedule(); });
+    }).catch(function() { loadSchedule(); });
+  }
+
+  function scheduleOnly(person, posName) {
+    closePicker();
+    setConfirmPopup(null);
+    doScheduleAssignment(person, posName);
+  }
+
+  function addToRoleAndSchedule(person, posName) {
+    closePicker();
+    setConfirmPopup(null);
+    fetch(MH_API + '/volunteer-positions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ person_id: person.id, ministry_name: ministry, position_name: posName })
+    }).catch(function() {}).then(function() {
+      doScheduleAssignment(person, posName);
+    });
+  }
+
+  function handlePickerTap(person) {
+    if (!pickerPos || !person) return;
+    var posName = (pickerPos.position_name || pickerPos.name || '');
+    var personVPs = parseJSON(person.volunteer_positions, []);
+    var alreadyHasRole = (personVPs || []).some(function(vp) { return vp && vp.position_name === posName; });
+    if (alreadyHasRole) {
+      scheduleOnly(person, posName);
+    } else {
+      setConfirmPopup({ person: person, posName: posName });
+    }
   }
 
   function removeAssignment(id) {
@@ -7273,6 +7302,10 @@ function AgendaTab({ ministry, token, lang }) {
     noVolsSlot:     lang === 'PT' ? 'Nenhum voluntário'              : 'No volunteers',
     morning:        lang === 'PT' ? 'Culto Manhã (10:00)'            : 'Morning Service (10:00)',
     evening:        lang === 'PT' ? 'Culto Tarde (18:30)'            : 'Evening Service (18:30)',
+    inPosition:     lang === 'PT' ? 'Nesta posição'                  : 'In this position',
+    restOfTeam:     lang === 'PT' ? 'Resto da equipe'               : 'Rest of the team',
+    yesAdd:         lang === 'PT' ? 'Sim, adicionar'                 : 'Yes, add',
+    justOnce:       lang === 'PT' ? 'Só desta vez'                   : 'Just this once',
   };
 
   var filteredPeople = React.useMemo(function() {
@@ -7282,6 +7315,18 @@ function AgendaTab({ ministry, token, lang }) {
       return ((p.preferred_name || '') + ' ' + (p.full_name || '') + ' ' + (p.name || '')).toLowerCase().includes(q);
     });
   }, [allPeople, peopleSearch]);
+
+  var splitPeople = React.useMemo(function() {
+    var posName = pickerPos ? (pickerPos.position_name || pickerPos.name || '') : '';
+    var sec1 = [], sec2 = [];
+    (filteredPeople || []).forEach(function(p) {
+      if (!p) return;
+      var vps = parseJSON(p.volunteer_positions, []);
+      var hasRole = (vps || []).some(function(vp) { return vp && vp.position_name === posName; });
+      if (hasRole) sec1.push(p); else sec2.push(p);
+    });
+    return { sec1: sec1, sec2: sec2 };
+  }, [filteredPeople, pickerPos]);
 
   var assignmentsByPos = React.useMemo(function() {
     var map = {};
@@ -7461,14 +7506,14 @@ function AgendaTab({ ministry, token, lang }) {
                 <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx2.loading}</div>
               ) : filteredPeople.length === 0 ? (
                 <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx2.noVolunteers}</div>
-              ) : (
-                filteredPeople.slice(0, 80).map(function(person) {
+              ) : (function() {
+                function renderRow(person) {
                   if (!person) return null;
                   var pName = person.preferred_name || person.full_name || person.name || '';
                   var topGift = person.gifting_1 ? (lang === 'PT' ? (GIFTING_PT[person.gifting_1] || person.gifting_1) : person.gifting_1) : null;
                   var pMins = parseJSON(person.current_ministries);
                   return (
-                    <button key={person.id} onClick={function() { assignPerson(person); }} style={{
+                    <button key={person.id} onClick={function() { handlePickerTap(person); }} style={{
                       display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0',
                       background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
                       cursor: 'pointer', textAlign: 'left',
@@ -7489,9 +7534,58 @@ function AgendaTab({ ministry, token, lang }) {
                       </div>
                     </button>
                   );
-                })
-              )}
+                }
+                var showDivider = splitPeople.sec1.length > 0 && splitPeople.sec2.length > 0;
+                return (
+                  <div>
+                    {splitPeople.sec1.length > 0 && (
+                      <div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5eead4', padding: '10px 0 4px' }}>{tx2.inPosition}</div>
+                        {splitPeople.sec1.slice(0, 80).map(renderRow)}
+                      </div>
+                    )}
+                    {showDivider && <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '10px 0' }} />}
+                    {splitPeople.sec2.length > 0 && (
+                      <div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7a82', padding: '10px 0 4px' }}>{tx2.restOfTeam}</div>
+                        {splitPeople.sec2.slice(0, 80).map(renderRow)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
+
+            {/* Confirmation popup for Section 2 taps */}
+            {confirmPopup && confirmPopup.person && confirmPopup.posName && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                <div style={{ background: '#1a2a2f', border: '1px solid rgba(94,234,212,0.2)', borderRadius: 12, padding: '24px 24px 20px', maxWidth: 320, width: '90%', textAlign: 'center' }}>
+                  <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 14, fontWeight: 600, color: '#e6f1f0', marginBottom: 8 }}>
+                    {lang === 'PT'
+                      ? 'Adicionar ' + (confirmPopup.person.preferred_name || confirmPopup.person.full_name || confirmPopup.person.name || '') + ' à posição ' + confirmPopup.posName + '?'
+                      : 'Add ' + (confirmPopup.person.preferred_name || confirmPopup.person.full_name || confirmPopup.person.name || '') + ' to ' + confirmPopup.posName + '?'}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', marginBottom: 20 }}>
+                    {lang === 'PT' ? '"Sim, adicionar" salva a posição permanentemente.' : '"Yes, add" saves the role permanently.'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    <button onClick={function() { addToRoleAndSchedule(confirmPopup.person, confirmPopup.posName); }} style={{
+                      padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(94,234,212,0.35)',
+                      background: 'rgba(94,234,212,0.1)', color: '#5eead4',
+                      fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                    }}>{tx2.yesAdd}</button>
+                    <button onClick={function() { scheduleOnly(confirmPopup.person, confirmPopup.posName); }} style={{
+                      padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.04)', color: '#e6f1f0',
+                      fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer',
+                    }}>{tx2.justOnce}</button>
+                  </div>
+                  <button onClick={function() { setConfirmPopup(null); }} style={{ marginTop: 14, background: 'none', border: 'none', color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 10, cursor: 'pointer' }}>
+                    {lang === 'PT' ? 'cancelar' : 'cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

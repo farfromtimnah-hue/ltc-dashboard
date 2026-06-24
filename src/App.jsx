@@ -9227,20 +9227,7 @@ export default function App() {
     });
     ro.observe(tabStripRef.current);
     setTabStripW(tabStripRef.current.getBoundingClientRect().width);
-    requestAnimationFrame(() => {
-      if (tabStripRef.current) {
-        const w = tabStripRef.current.getBoundingClientRect().width;
-        if (w > 0) setTabStripW(w);
-      }
-    });
-    const onResize = () => {
-      if (tabStripRef.current) {
-        const w = tabStripRef.current.getBoundingClientRect().width;
-        if (w > 0) setTabStripW(w);
-      }
-    };
-    window.addEventListener('resize', onResize);
-    return () => { ro.disconnect(); window.removeEventListener('resize', onResize); };
+    return () => ro.disconnect();
   }, [token]);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);

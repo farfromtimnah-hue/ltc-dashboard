@@ -9454,7 +9454,7 @@ export default function App() {
   if (navMeas && navRowW > 0) {
     const m = navMeas;
     const PAD = 48, SAFETY = 16;
-    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + REGION_GAP * 2);
+    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + m.aux + REGION_GAP * 3);
     const need = (s) => {
       let w = 0;
       if (s.title) w += m.title + REGION_GAP;

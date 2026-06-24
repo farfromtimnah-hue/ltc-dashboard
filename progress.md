@@ -5,6 +5,13 @@
 ---
 
 DATE: 2026-06-24
+SESSION: More button refresh fix — ResizeObserver cold-fire fallback
+
+More button now survives refresh — added requestAnimationFrame fallback measurement for tabStripRef ResizeObserver cold-fire on cached load. On refresh, JS comes from browser cache and React mounts faster than the ResizeObserver fires with real dimensions; the RAF fires on the next paint and re-measures, ensuring tabStripW > 0 and the collapse calculation runs correctly. Also added a window resize listener as a secondary safety net. Commit: f4523b2. Date: 2026-06-24
+
+---
+
+DATE: 2026-06-24
 SESSION: GitHub Pages CDN cache fix
 
 GitHub Pages CDN cache fixed — `public/_headers` added. `index.html` set to

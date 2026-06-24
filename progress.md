@@ -5,6 +5,46 @@
 ---
 
 DATE: 2026-06-24
+SESSION: GitHub Pages CDN cache fix
+
+GitHub Pages CDN cache fixed — `public/_headers` added. `index.html` set to
+`no-cache, no-store, must-revalidate` so the browser always fetches the latest
+JS hash on deploy. JS/CSS/SVG assets set to `immutable` (max-age=31536000) since
+Vite hashes their filenames on every build. `vite.config.js` verified correct
+(`base: '/ltc-dashboard/'`, `outDir` defaults to `dist`). No changes to config.
+Commit: 1e1f9aa. Date: 2026-06-24
+
+---
+
+DATE: 2026-06-24
+SESSION: Nav collapse system — More button placement fixed
+
+More button placement fixed — moved from right-side aux region (after spacer/lang toggle)
+to immediately after the tab strip div, as a sibling in the same flex row.
+Nav collapse system now fully working: tabs collapse into More correctly, More appears at
+the end of the tab strip region, right side shows view switcher + gear + logout + PT/EN only.
+
+Three-commit series that built this:
+1. `5e57402` — tab strip flex changed from `0 1 auto` → `1 1 0`; tabStripRef + tabStripW
+   ResizeObserver added; room = tabStripW - SAFETY (direct measurement, no subtraction estimate).
+2. `54d3caa` — collapse sequence simplified: dead title/aux/switcher steps removed from need();
+   need() now only sums More button width + visible tab widths. Title, aux, switcher always shown
+   (live outside tab strip in flex layout).
+3. This commit — More button JSX moved from after spacer/lang toggle to after tab strip div.
+
+---
+
+DATE: 2026-06-24
+SESSION: Favicon + nav overflow investigation
+
+- Favicon added: `public/LTC2.svg` (circle + dove, no text) wired as `<link rel="icon" type="image/svg+xml" href="/LTC2.svg">` in `index.html`.
+- Debug logging: `console.log('NAV DEBUG', ...)` added immediately after the nav room calculation (App.jsx ~9457) to inspect `navRowW`, `room`, `m.logo`, `m.aux`, `m.langtoggle`, `tabCount`, `visibleTabCount`; removed after capture.
+- Nav room calculation fix (commit `7287b2d`): subtracts `m.aux` from available room so the aux region is not counted as usable tab space.
+- Nav overflow status: More button still not appearing; tabs overflowing without collapsing. Root cause under investigation.
+
+---
+
+DATE: 2026-06-24
 SESSION: PastorSchedulingTab triage counts — fix not_contacted treated as unfilled
 COMMIT: (see below)
 

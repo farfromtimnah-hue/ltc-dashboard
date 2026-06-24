@@ -7188,7 +7188,7 @@ function AgendaTab({ ministry, token, lang }) {
     fetch(url, { headers: { Authorization: 'Bearer ' + token } })
       .then(function(r) { return r.json(); }).catch(function() { return {}; })
       .then(function(data) {
-        setAssignments(Array.isArray(data.assignments) ? data.assignments : []);
+        setAssignments(Array.isArray(data) ? data : (Array.isArray(data.assignments) ? data.assignments : []));
         var nn = new Set(((data.not_needed) || []).map(function(x) { return x && x.position_name; }).filter(Boolean));
         setNotNeededSet(nn);
         setSchedLoading(false);

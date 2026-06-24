@@ -8704,7 +8704,8 @@ function PastorSchedulingTab({ token, lang }) {
       headers: { Authorization: 'Bearer '+token }
     }).then(r => r.json()).catch(() => ({}))
       .then(data => {
-        const asgn = Array.isArray(data) ? data : (data?.assignments || data?.ministries || []);
+        const ministriesRaw = data?.ministries || [];
+        const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
         setAssignments(asgn);
         // Parse not_needed from response
         const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];

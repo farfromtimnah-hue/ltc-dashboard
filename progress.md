@@ -4,6 +4,33 @@
 
 ---
 
+DATE: 2026-06-24
+SESSION: PastorSchedulingTab triage counts — fix not_contacted treated as unfilled
+COMMIT: (see below)
+
+ROOT CAUSE: Both `triageAlerts` (src/App.jsx ~8796) and `ministryDot` (~8816) counted a
+position as filled only when the assignment status was NOT 'declined'. This used an implicit
+`!== 'declined'` check — which accidentally excluded any status that was undefined or
+unexpected, but more critically revealed that the intent of the check was unclear. When
+WhatsApp automation is added later, `not_contacted` assignments will need a 48hr timer
+condition before being treated as pending; using the implicit form makes that future branch
+invisible. The explicit three-way check makes it safe to add the timer condition without
+risk of accidentally changing behavior for 'confirmed' or 'pending' rows.
+
+FIX: Both sites changed from:
+  `a?.status !== 'declined'`
+to:
+  `a?.status === 'confirmed' || a?.status === 'pending' || a?.status === 'not_contacted'`
+
+This is intentional — do NOT collapse to `!== 'declined'`. When WhatsApp automation is
+added, the `not_contacted` branch will gain a 48hr timer condition; the explicit form makes
+that a clean one-line addition with no risk of side effects on the other two statuses.
+
+CHIP RENDER PATH: confirmed untouched — chips render from the assignments array directly
+(no status filter in the chip render path); this fix only affects the triage count logic.
+
+---
+
 DATE: 2026-06-17 (latest+1)
 SESSION: Last position row sliced at scroll boundary — real fix
 COMMIT: 9620e54 (pushed to main)
@@ -2692,3 +2719,42 @@ UPDATE connections SET discipleship_stage = 'Placed' WHERE stage = 'Placed in Mi
 
 ### Deploy
 Deploys via GitHub Actions on push to `main`. **Wait for the green checkmark on the Actions run before testing live.**
+
+---
+
+DATE: 2026-06-24
+SESSION: PastorSchedulingTab — unfilled count bug fix
+COMMIT: pending
+
+### Root Cause
+`PastorSchedulingTab` was correctly fetching assignments from `GET /schedule/pastor-view` (network
+confirmed). The D1 rows for 2026-06-28 had `status = 'not_contacted'`. Two client-side functions
+only counted a position as "filled" when `status === 'confirmed' || status === 'pending'`:
+
+- `triageAlerts` (App.jsx ~8796) — drove the "37 unfilled" counter
+- `ministryDot` (App.jsx ~8816) — drove the red/yellow/green dot per ministry card
+
+Since `not_contacted` matched neither condition, every scheduled-but-not-yet-contacted assignment
+was treated as an empty slot, inflating the unfilled count to include all scheduled positions.
+
+### Fix
+Changed both filter expressions from:
+```js
+a?.status === 'confirmed' || a?.status === 'pending'
+```
+to:
+```js
+a?.status !== 'declined'
+```
+A position is "filled" as soon as anyone is scheduled for it, regardless of contact status. Only a
+`declined` assignment (volunteer said no) leaves the slot truly empty. This matches the semantic
+intent: `not_contacted`, `pending`, `confirmed`, and `wants_reschedule` all mean someone IS on the
+schedule.
+
+### Render path was already correct
+`posAsgn.map(a => ...)` renders all assignments without a status filter, so `not_contacted` chips
+would have displayed correctly once the triage counts were fixed. The chip color for `not_contacted`
+was already defined in `STATUS_COLOR` (grey `#475a64`).
+
+### Files changed
+- `src/App.jsx` lines ~8796 and ~8816 (two one-line filter changes, no structural changes)

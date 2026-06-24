@@ -8793,7 +8793,7 @@ function PastorSchedulingTab({ token, lang }) {
       positions.forEach(pos => {
         const posName = pos?.position_name || pos?.name || '';
         if (!posName || notNeeded.has(posName)) return;
-        const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending')).length;
+        const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending' || a?.status === 'not_contacted')).length;
         if (filled === 0) unfilled.push({ ministry, positionName: posName });
       });
     });
@@ -8813,7 +8813,7 @@ function PastorSchedulingTab({ token, lang }) {
       const posName = pos?.position_name || pos?.name || '';
       if (!posName || notNeeded.has(posName)) return;
       const minV = pos?.min_volunteers || pos?.min_count || 0;
-      const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending')).length;
+      const filled = ministryAsgn.filter(a => a?.position_name === posName && (a?.status === 'confirmed' || a?.status === 'pending' || a?.status === 'not_contacted')).length;
       if (filled === 0) anyUnfilled = true;
       if (minV > 0 && filled < minV) anyBelowMin = true;
     });

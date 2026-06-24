@@ -9455,8 +9455,7 @@ export default function App() {
     const m = navMeas;
     const PAD = 48, SAFETY = 16;
     const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + m.aux + REGION_GAP * 3);
-    console.log('NAV DEBUG', {navRowW, room, mLogo: m.logo, mAux: m.aux, mLangtoggle: m.langtoggle, tabCount: tabs.length, visibleTabCount});
-    const need = (s) => {
+const need = (s) => {
       let w = 0;
       if (s.title) w += m.title + REGION_GAP;
       for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;

@@ -7129,7 +7129,12 @@ function RecursosTab({ ministry, token, lang }) {
 function AgendaTab({ ministry, token, lang }) {
   // Sunday ministries have two services; group ministries use their own name as service.
   var isSundayMinistry = !SPECIAL_GROUPS.includes(ministry);
-  var services = isSundayMinistry ? ['Culto Manha', 'Culto Tarde'] : [ministry];
+  var services = isSundayMinistry
+    ? [
+        { label: lang === 'PT' ? 'Culto Manhã (10:00)' : 'Morning Service (10:00)', value: 'Culto Manha' },
+        { label: lang === 'PT' ? 'Culto Tarde (18:30)' : 'Evening Service (18:30)', value: 'Culto Tarde' },
+      ]
+    : [{ label: ministry, value: ministry }];
 
   function nextSundayDate() {
     var d = new Date();
@@ -7148,7 +7153,7 @@ function AgendaTab({ ministry, token, lang }) {
   }
 
   var [selDate, setSelDate] = React.useState(function() { return nextSundayDate(); });
-  var [selService, setSelService] = React.useState(services[0]);
+  var [selService, setSelService] = React.useState(services[0].value);
 
   var [positions, setPositions] = React.useState([]);
   var [assignments, setAssignments] = React.useState([]);
@@ -7339,12 +7344,6 @@ function AgendaTab({ ministry, token, lang }) {
     return map;
   }, [assignments]);
 
-  function svcLabel(svc) {
-    if (svc === 'Culto Manha') return tx2.morning;
-    if (svc === 'Culto Tarde') return tx2.evening;
-    return svc;
-  }
-
   return (
     <div style={{ position: 'relative' }}>
       {/* ── 1. SERVICE SELECTOR ── */}
@@ -7357,14 +7356,14 @@ function AgendaTab({ ministry, token, lang }) {
         {services.length > 1 && (
           <div style={{ display: 'flex', gap: 6 }}>
             {services.map(function(svc) {
-              var active = selService === svc;
+              var active = selService === svc.value;
               return (
-                <button key={svc} onClick={function() { setSelService(svc); }} style={{
+                <button key={svc.value} onClick={function() { setSelService(svc.value); }} style={{
                   padding: '4px 12px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer',
                   border: active ? '1px solid rgba(94,234,212,0.4)' : '1px solid rgba(255,255,255,0.07)',
                   background: active ? 'rgba(94,234,212,0.12)' : 'rgba(255,255,255,0.02)',
                   color: active ? '#5eead4' : '#6b7a82', fontWeight: active ? 600 : 400, transition: 'all 0.15s',
-                }}>{svcLabel(svc)}</button>
+                }}>{svc.label}</button>
               );
             })}
           </div>

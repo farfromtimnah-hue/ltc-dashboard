@@ -8637,7 +8637,7 @@ function MobileDock({ items, moreItems, moreOpen, onMoreToggle, onMoreClose, act
 
 // ─── PASTOR SCHEDULING COMMAND CENTER ────────────────────────────────────────
 function PastorSchedulingTab({ token, lang }) {
-  const SERVICES = ['Culto Manha','Culto Tarde','Legacy','Rocket','Shine','Hero','Link','English Service','Culto Hope','Culto Fe'];
+  const SERVICES = ['Culto Manha','Culto Tarde','Legacy','Rocket','Shine','Hero','Link','English Service','Culto Hope','Culto Fé'];
   const SUNDAY_SERVICES = ['Culto Manha','Culto Tarde'];
   const ALL_MINISTRIES = ["Worship Team","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Translation","Lagoinha Kids","Intercession","Volunteer Coffee","Hospitality - Welcome","Parking","Setup & Teardown","WE CARE","GC Leader"];
   const STATUS_COLOR = { confirmed:'#34d399', pending:'#f59e0b', declined:'#f87171', wants_reschedule:'#fb923c', not_contacted:'#475a64' };

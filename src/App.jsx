@@ -9235,7 +9235,7 @@ export default function App() {
       aux: widthOf('[data-meas="aux"]'),
       tabs: Array.from(root.querySelectorAll('[data-meas="tab"]')).map(n => n.getBoundingClientRect().width),
     });
-  }, [token, lang, role, viewMode, tabs.length]);
+  }, [token, lang, role, viewMode]);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];

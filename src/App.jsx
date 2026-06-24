@@ -7179,9 +7179,18 @@ function AgendaTab({ ministry, token, lang }) {
   function loadSchedule() {
     if (!ministry || !token || !selService) return;
     setSchedLoading(true);
-    fetch(API + '/schedule?ministry=' + encodeURIComponent(ministry) + '&service_date=' + dateStr + '&service_name=' + encodeURIComponent(selService), { headers: { Authorization: 'Bearer ' + token } })
-      .then(function(r) { return r.json(); }).catch(function() { return {}; })
+    var url = API + '/schedule?ministry=' + encodeURIComponent(ministry) + '&service_date=' + dateStr + '&service_name=' + encodeURIComponent(selService);
+    console.log('[AgendaTab] loadSchedule URL:', url);
+    fetch(url, { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) {
+        console.log('[AgendaTab] loadSchedule response status:', r.status);
+        return r.json();
+      }).catch(function(err) {
+        console.log('[AgendaTab] loadSchedule fetch/parse error:', err);
+        return {};
+      })
       .then(function(data) {
+        console.log('[AgendaTab] loadSchedule parsed data:', JSON.stringify(data));
         setAssignments(Array.isArray(data.assignments) ? data.assignments : []);
         var nn = new Set(((data.not_needed) || []).map(function(x) { return x && x.position_name; }).filter(Boolean));
         setNotNeededSet(nn);
@@ -7391,6 +7400,7 @@ function AgendaTab({ ministry, token, lang }) {
           {(positions || []).map(function(pos) {
             var posName = (pos && (pos.position_name || pos.name)) || '';
             var posAssignments = assignmentsByPos[posName] || [];
+            console.log('[AgendaTab] slot "' + posName + '" => assignments:', JSON.stringify(posAssignments), '| assignmentsByPos keys:', JSON.stringify(Object.keys(assignmentsByPos)));
             var isNotNeeded = notNeededSet.has(posName);
             var minV = (pos && (pos.min_volunteers || pos.min_count)) || 0;
             var idealV = (pos && (pos.ideal_volunteers || pos.ideal_count)) || 0;

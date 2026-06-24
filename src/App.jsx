@@ -1663,28 +1663,6 @@ function RadialGauge({ value, max, color="#5eead4", size=84, thickness=6 }) {
 
 // ─── ANALYTICS TAB ────────────────────────────────────────────────
 // ─── SERVICE ATTENDANCE TAB ───────────────────────────────────────
-const ATTENDANCE_DATA = [
-  { date:'2026-06-04', service:'Culto Fé', templo:106, volunteers:23, kids:12, total:118 },
-  { date:'2026-06-03', service:'Culto Hope', templo:116, volunteers:26, kids:14, total:130 },
-  { date:'2026-06-01', service:'Sunday 6:30PM', templo:103, volunteers:30, kids:11, total:114 },
-  { date:'2026-06-01', service:'Sunday 10AM', templo:198, volunteers:46, kids:22, total:220 },
-  { date:'2026-05-31', service:'English Service', templo:18, volunteers:16, kids:2, total:20 },
-  { date:'2026-05-31', service:'Rocket', templo:63, volunteers:17, kids:null, total:63 },
-  { date:'2026-05-30', service:'Legacy', templo:84, volunteers:21, kids:null, total:84 },
-  { date:'2026-05-28', service:'Culto Fé', templo:109, volunteers:24, kids:14, total:123 },
-  { date:'2026-05-27', service:'Culto Hope', templo:124, volunteers:27, kids:16, total:140 },
-  { date:'2026-05-25', service:'Sunday 6:30PM', templo:108, volunteers:33, kids:12, total:120 },
-  { date:'2026-05-25', service:'Sunday 10AM', templo:211, volunteers:47, kids:24, total:235 },
-  { date:'2026-05-24', service:'English Service', templo:21, volunteers:16, kids:2, total:23 },
-  { date:'2026-05-24', service:'Rocket', templo:58, volunteers:16, kids:null, total:58 },
-  { date:'2026-05-23', service:'Legacy', templo:79, volunteers:20, kids:null, total:79 },
-  { date:'2026-05-21', service:'Culto Fé', templo:102, volunteers:23, kids:10, total:112 },
-  { date:'2026-05-18', service:'Sunday 10AM', templo:195, volunteers:44, kids:20, total:215 },
-  { date:'2026-05-17', service:'English Service', templo:22, volunteers:17, kids:3, total:25 },
-  { date:'2026-05-11', service:'Sunday 10AM', templo:203, volunteers:45, kids:21, total:224 },
-  { date:'2026-05-10', service:'English Service', templo:18, volunteers:16, kids:2, total:20 },
-  { date:'2026-05-04', service:'Sunday 10AM', templo:187, volunteers:42, kids:18, total:205 },
-];
 
 const ALL_SERVICES = ['Sunday 10AM','Sunday 6:30PM','Culto Hope','Culto Fé','Legacy','Rocket','English Service'];
 const NO_KIDS_SERVICES = new Set(['Rocket','Legacy']);
@@ -1715,16 +1693,39 @@ function volPctColor(pct) {
   return '#f87171';
 }
 
-function ServiceAttendanceTab({ t, lang }) {
+function ServiceAttendanceTab({ t, lang, token }) {
   const [selectedService, setSelectedService] = useState('Sunday 10AM');
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
+
+  useEffect(() => {
+    async function fetchAll() {
+      try {
+        const results = await Promise.all(
+          ALL_SERVICES.map(svc =>
+            fetch(`${API}/attendance?service_name=${encodeURIComponent(svc)}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            }).then(r => r.json()).then(j => (j.success && Array.isArray(j.data)) ? j.data : [])
+          )
+        );
+        setAttendanceData(results.flat());
+      } catch {
+        setAttendanceData([]);
+      } finally {
+        setLoadingAttendance(false);
+      }
+    }
+    if (token) fetchAll();
+  }, [token]);
 
   // Section 2 metrics
-  const latestSunday10 = ATTENDANCE_DATA.find(d => d.service === 'Sunday 10AM');
-  const latestEnglish  = ATTENDANCE_DATA.find(d => d.service === 'English Service');
-  const cutoff = '2026-05-06'; // 30 days before 2026-06-05
-  const last30 = ATTENDANCE_DATA.filter(d => d.date >= cutoff);
-  const avgVol = last30.length ? Math.round(last30.reduce((s,d) => s + d.volunteers, 0) / last30.length) : 0;
-  const kidsRows = last30.filter(d => d.kids !== null);
+  const latestSunday10 = attendanceData.find(d => d.service_name === 'Sunday 10AM');
+  const latestEnglish  = attendanceData.find(d => d.service_name === 'English Service');
+  const today = new Date().toISOString().slice(0,10);
+  const cutoffDate = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
+  const last30 = attendanceData.filter(d => d.service_date >= cutoffDate);
+  const avgVol = last30.length ? Math.round(last30.reduce((s,d) => s + (d.voluntarios||0), 0) / last30.length) : 0;
+  const kidsRows = last30.filter(d => d.kids !== null && d.kids !== undefined);
   const avgKids = kidsRows.length ? Math.round(kidsRows.reduce((s,d) => s + d.kids, 0) / kidsRows.length) : 0;
 
   const metrics = [
@@ -1735,29 +1736,29 @@ function ServiceAttendanceTab({ t, lang }) {
   ];
 
   // Section 3 trend chart data
-  const trendData = ATTENDANCE_DATA
-    .filter(d => d.service === selectedService)
-    .sort((a,b) => a.date.localeCompare(b.date))
-    .map(d => ({ date: d.date.slice(5), templo: d.templo, volunteers: d.volunteers, kids: d.kids }));
+  const trendData = attendanceData
+    .filter(d => d.service_name === selectedService)
+    .sort((a,b) => a.service_date.localeCompare(b.service_date))
+    .map(d => ({ date: d.service_date.slice(5), templo: d.templo, volunteers: d.voluntarios, kids: d.kids }));
   const showKids = !NO_KIDS_SERVICES.has(selectedService);
 
   // Section 4 — avg total by service
   const avgByService = ALL_SERVICES.map(svc => {
-    const rows = ATTENDANCE_DATA.filter(d => d.service === svc);
+    const rows = attendanceData.filter(d => d.service_name === svc);
     const avg = rows.length ? Math.round(rows.reduce((s,d) => s + d.total, 0) / rows.length) : 0;
     return { service: svc, avg };
   }).sort((a,b) => b.avg - a.avg);
 
   // Section 4 — volunteer ratio by service
   const volRatioByService = ALL_SERVICES.map(svc => {
-    const rows = ATTENDANCE_DATA.filter(d => d.service === svc);
+    const rows = attendanceData.filter(d => d.service_name === svc);
     if (!rows.length) return { service: svc, ratio: 0 };
-    const ratio = Math.round(rows.reduce((s,d) => s + (d.volunteers / (d.total||1)) * 100, 0) / rows.length);
+    const ratio = Math.round(rows.reduce((s,d) => s + ((d.voluntarios||0) / (d.total||1)) * 100, 0) / rows.length);
     return { service: svc, ratio };
   }).sort((a,b) => b.ratio - a.ratio);
 
   // Section 5 log — most recent first
-  const logRows = [...ATTENDANCE_DATA].sort((a,b) => b.date.localeCompare(a.date) || a.service.localeCompare(b.service));
+  const logRows = [...attendanceData].sort((a,b) => b.service_date.localeCompare(a.service_date) || a.service_name.localeCompare(b.service_name));
 
   const monoSm = { fontFamily:"'JetBrains Mono',monospace", fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase' };
   const sectionTitle = (label) => (
@@ -1765,6 +1766,8 @@ function ServiceAttendanceTab({ t, lang }) {
       {label}
     </div>
   );
+
+  if (loadingAttendance) return <div style={{padding:40,color:'#475a64',fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>{t ? t.loading : 'Loading...'}</div>;
 
   return (
     <div style={{padding:'32px 28px', display:'flex', flexDirection:'column', gap:20}}>
@@ -1888,14 +1891,14 @@ function ServiceAttendanceTab({ t, lang }) {
             </thead>
             <tbody>
               {logRows.map((row, i) => {
-                const pct = row.total > 0 ? Math.round((row.volunteers / row.total) * 100) : 0;
+                const pct = row.total > 0 ? Math.round(((row.voluntarios||0) / row.total) * 100) : 0;
                 return (
                   <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.03)'}}>
-                    <td style={{padding:'8px 12px', color:'#6b7a82', fontFamily:"'JetBrains Mono',monospace", fontSize:12}}>{row.date}</td>
-                    <td style={{padding:'8px 12px'}}><ServiceChip service={row.service} /></td>
+                    <td style={{padding:'8px 12px', color:'#6b7a82', fontFamily:"'JetBrains Mono',monospace", fontSize:12}}>{row.service_date}</td>
+                    <td style={{padding:'8px 12px'}}><ServiceChip service={row.service_name} /></td>
                     <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.templo}</td>
-                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.volunteers}</td>
-                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.kids !== null ? row.kids : '—'}</td>
+                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.voluntarios}</td>
+                    <td style={{padding:'8px 12px', color:'#aebac0'}}>{row.kids !== null && row.kids !== undefined ? row.kids : '—'}</td>
                     <td style={{padding:'8px 12px', fontWeight:600, color:'#e6f1f0'}}>{row.total}</td>
                     <td style={{padding:'8px 12px', fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:600, color:volPctColor(pct)}}>{pct}%</td>
                   </tr>
@@ -9741,7 +9744,7 @@ export default function App() {
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "attendance" && <ServiceAttendanceTab t={t} lang={lang} />}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "attendance" && <ServiceAttendanceTab token={token} t={t} lang={lang} />}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "health" && (

@@ -9425,7 +9425,7 @@ export default function App() {
     );
   }
 
-  const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
+  const roleLabel = { owner: 'Developer', senior_pastor: 'Senior Pastor', pastor: 'Pastor', ministry_leader: 'Ministry Leader', group_leader: 'Group Leader' };
 
   const effectiveRole = viewMode === 'senior_pastor_view' ? 'senior_pastor'
     : viewMode === 'pastor_view' ? 'pastor'
@@ -9438,7 +9438,7 @@ export default function App() {
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
-    ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
+    ...(['owner','senior_pastor','pastor'].includes(effectiveRole) ? [{ id:"scheduling", label:t.scheduling }] : []),
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
@@ -9599,6 +9599,7 @@ export default function App() {
   );
   const auxNav = () => (
     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+      {(roleLabel[effectiveRole] || roleLabel[role] || null) && <span style={{fontSize:'0.7rem',color:'#8899a6',letterSpacing:'0.05em',textTransform:'uppercase',whiteSpace:'nowrap'}}>{roleLabel[effectiveRole] || roleLabel[role]}</span>}
       <button onClick={()=>setShowSettings(true)} title={t.settings} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#9881;</button>
       <button onClick={()=>signOut(auth)} title={t.logout} className="btn-ghost" style={{padding:"7px 10px",borderRadius:8,fontSize:14,lineHeight:1,color:"#aebac0"}}>&#8618;</button>
     </div>

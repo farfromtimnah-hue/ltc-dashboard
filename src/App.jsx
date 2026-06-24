@@ -8700,7 +8700,7 @@ function PastorSchedulingTab({ token, lang }) {
   function loadPastorView() {
     if (!token) return;
     setLoading(true);
-    fetch(API+'/schedule/pastor-view?service_date='+dateStr+'&service_name='+encodeURIComponent(selService), {
+    fetch(API+'/schedule/pastor-view?start='+dateStr+'&end='+dateStr+'&service_name='+encodeURIComponent(selService), {
       headers: { Authorization: 'Bearer '+token }
     }).then(r => r.json()).catch(() => ({}))
       .then(data => {

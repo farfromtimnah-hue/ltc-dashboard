@@ -9438,7 +9438,7 @@ export default function App() {
     { id: "gifting", label: t.byGifting },
     { id: "health", label: t.ministryHealth },
     { id: "reference", label: t.reference },
-    ...(effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner' ? [{ id:"scheduling", label:t.scheduling }] : []),
+    ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
@@ -9754,7 +9754,7 @@ export default function App() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && (effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner') && (
+        {!(viewMode === 'group_leader' && glGroup) && tab === "scheduling" && ['owner','senior_pastor','pastor'].includes(role) && (
           <RefErrorBoundary lang={lang} onBack={() => setTab('analytics')}>
             <PastorSchedulingTab token={token} lang={lang} />
           </RefErrorBoundary>

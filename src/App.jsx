@@ -8697,32 +8697,6 @@ function PastorSchedulingTab({ token, lang }) {
     remove: lang==='PT' ? 'Remover' : 'Remove',
   };
 
-  function loadPastorView() {
-    if (!token) return;
-    setLoading(true);
-    fetch(API+'/schedule/pastor-view?service_date='+dateStr+'&service_name='+encodeURIComponent(selService), {
-      headers: { Authorization: 'Bearer '+token }
-    }).then(r => r.json()).catch(() => ({}))
-      .then(data => {
-        const ministriesRaw = data?.ministries || [];
-        const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
-        setAssignments(asgn);
-        console.log('[PastorView] asgn after parse:', JSON.stringify(asgn));
-        // Parse not_needed from response
-        const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];
-        const nnMap = {};
-        nn.forEach(item => {
-          if (!item) return;
-          const m = item.ministry || ''; const p = item.position_name || '';
-          if (!m || !p) return;
-          if (!nnMap[m]) nnMap[m] = new Set();
-          nnMap[m].add(p);
-        });
-        setNotNeededMap(nnMap);
-        setLoading(false);
-      });
-  }
-
   function loadPositionsForMinistries(ministries) {
     if (!token) return;
     (ministries || []).forEach(ministry => {
@@ -8738,8 +8712,31 @@ function PastorSchedulingTab({ token, lang }) {
   }
 
   React.useEffect(() => {
-    loadPastorView();
+    if (!token) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(API+'/schedule/pastor-view?service_date='+dateStr+'&service_name='+encodeURIComponent(selService), {
+      headers: { Authorization: 'Bearer '+token }
+    }).then(r => r.json()).catch(() => ({}))
+      .then(data => {
+        if (cancelled) return;
+        const ministriesRaw = data?.ministries || [];
+        const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
+        setAssignments(asgn);
+        const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];
+        const nnMap = {};
+        nn.forEach(item => {
+          if (!item) return;
+          const m = item.ministry || ''; const p = item.position_name || '';
+          if (!m || !p) return;
+          if (!nnMap[m]) nnMap[m] = new Set();
+          nnMap[m].add(p);
+        });
+        setNotNeededMap(nnMap);
+        setLoading(false);
+      });
     if (isSundayService) loadPositionsForMinistries(ALL_MINISTRIES);
+    return () => { cancelled = true; };
   }, [dateStr, selService, token]);
 
   React.useEffect(() => {
@@ -8768,7 +8765,6 @@ function PastorSchedulingTab({ token, lang }) {
       if (!map[m]) map[m] = [];
       map[m].push(a);
     });
-    console.log('[PastorView] assignmentsByMinistry:', JSON.stringify(map));
     return map;
   }, [assignments]);
 
@@ -8789,7 +8785,6 @@ function PastorSchedulingTab({ token, lang }) {
   }, [assignments]);
 
   const triageAlerts = React.useMemo(() => {
-    console.log('[PastorView] unfilled count input:', JSON.stringify(assignments));
     const unfilled = [];
     visibleMinistries.forEach(ministry => {
       const positions = positionsMap[ministry] || [];

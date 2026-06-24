@@ -9483,7 +9483,7 @@ export default function App() {
   // ── Shared renderers (live nav + hidden measurement mirror use the same markup) ──
   const tabBtn = (t2) => (
     <button key={t2.id} onClick={() => { setBannerDismissed(true); setTab(t2.id); }}
-      style={{background:"transparent",border:"none",padding:"6px 10px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
+      style={{background:"transparent",border:"none",padding:"6px 8px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:11,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
       onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
       onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
       {t2.label}

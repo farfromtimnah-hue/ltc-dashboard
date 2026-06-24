@@ -9204,8 +9204,10 @@ export default function App() {
   // what to collapse into the More dropdown. No hardcoded per-item pixel estimates.
   const navRowRef = useRef(null);   // live nav inner row (gives available width)
   const navMeasRef = useRef(null);  // hidden mirror row (gives intrinsic item widths)
+  const tabStripRef = useRef(null); // tab strip container (direct width measurement)
   const [navRowW, setNavRowW] = useState(0);
   const [navMeas, setNavMeas] = useState(null);
+  const [tabStripW, setTabStripW] = useState(600);
   useEffect(() => {
     const el = navRowRef.current;
     if (!el) return;
@@ -9214,6 +9216,17 @@ export default function App() {
     });
     ro.observe(el);
     setNavRowW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, [token]);
+  useEffect(() => {
+    if (!tabStripRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setTabStripW(entry.contentRect.width);
+      }
+    });
+    ro.observe(tabStripRef.current);
+    setTabStripW(tabStripRef.current.getBoundingClientRect().width);
     return () => ro.disconnect();
   }, [token]);
   useEffect(() => {
@@ -9451,17 +9464,14 @@ export default function App() {
   const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor') || hasMinistryLeaderGrant;
 
   let showTitle = true, showSwitcher = hasSwitcher, showAux = true, visibleTabCount = tabs.length, showMore = false;
-  if (navMeas && navRowW > 0) {
+  if (navMeas && tabStripW > 0) {
     const m = navMeas;
-    const PAD = 48, SAFETY = 16;
-    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + m.aux + REGION_GAP * 3);
-const need = (s) => {
+    const SAFETY = 16;
+    const room = tabStripW - SAFETY;
+    const need = (s) => {
       let w = 0;
-      if (s.title) w += m.title + REGION_GAP;
+      if (s.more) w += m.more + TAB_GAP;
       for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;
-      if (s.switcher && hasSwitcher && m.switcher > 0) w += m.switcher + REGION_GAP;
-      if (s.aux) w += m.aux + REGION_GAP;
-      if (s.more) w += m.more + REGION_GAP;
       return w;
     };
     const s = { title: true, switcher: hasSwitcher, aux: true, tabCount: tabs.length, more: false };
@@ -9639,7 +9649,7 @@ const need = (s) => {
           </div>
 
           {/* Tabs (collapse last, right → left) */}
-          <div style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
+          <div ref={tabStripRef} style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"1 1 0",minWidth:0,overflow:"hidden"}}>
             {visibleTabs.map(t2=>tabBtn(t2))}
           </div>
 

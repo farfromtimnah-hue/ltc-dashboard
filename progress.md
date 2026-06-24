@@ -5,6 +5,20 @@
 ---
 
 DATE: 2026-06-24
+SESSION: Favicon PNG fallback added
+
+Favicon PNG fallback added — favicon.png generated via sharp at 32x32, PNG link added to index.html as Safari fallback. Commit: 4bab6f0. Date: 2026-06-24
+
+---
+
+DATE: 2026-06-24
+SESSION: Nav restored to f00b435 (pre-nav-rebuild)
+
+Nav restored to f00b435 (pre-nav-rebuild, last known good state before overnight nav work). All nav rebuild commits from feaa0fc through 631c5c3 abandoned. Commit: f107337. Date: 2026-06-24
+
+---
+
+DATE: 2026-06-24
 SESSION: Nav restored to working commit 54d3caa
 
 Nav restored to working commit 54d3caa — RAF patch and revert chain caused refresh regression; App.jsx reset via git checkout. Commit: 631c5c3. Date: 2026-06-24

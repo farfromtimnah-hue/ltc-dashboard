@@ -9643,24 +9643,12 @@ export default function App() {
             {showTitle && titleEl()}
           </div>
 
-          {/* Tabs (collapse last, right → left) */}
+          {/* Tabs (collapse last, right → left) + More at right edge of strip */}
           <div ref={tabStripRef} style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"1 1 0",minWidth:0,overflow:"hidden"}}>
             {visibleTabs.map(t2=>tabBtn(t2))}
           </div>
 
-          {/* View switcher (collapses 3rd) */}
-          {showSwitcher && switcherNav()}
-
-          {/* Gear + logout (collapse 2nd) */}
-          {showAux && auxNav()}
-
-          {/* Spacer pushes lang toggle + More to the right */}
-          <div style={{flex:"1 1 0",minWidth:0}} />
-
-          {/* PT/EN toggle — always visible */}
-          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
-
-          {/* More — only when something is collapsed into it */}
+          {/* More — appears immediately after tab strip when tabs overflow */}
           {showMore && (
             <div style={{flex:"0 0 auto",position:"relative"}}>
               {moreBtn()}
@@ -9687,6 +9675,18 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* View switcher (collapses 3rd) */}
+          {showSwitcher && switcherNav()}
+
+          {/* Gear + logout (collapse 2nd) */}
+          {showAux && auxNav()}
+
+          {/* Spacer pushes lang toggle to the right */}
+          <div style={{flex:"1 1 0",minWidth:0}} />
+
+          {/* PT/EN toggle — always visible */}
+          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
 
         </div>
 

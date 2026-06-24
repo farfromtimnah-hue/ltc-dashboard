@@ -8707,6 +8707,7 @@ function PastorSchedulingTab({ token, lang }) {
         const ministriesRaw = data?.ministries || [];
         const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
         setAssignments(asgn);
+        console.log('[PastorView] asgn after parse:', JSON.stringify(asgn));
         // Parse not_needed from response
         const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];
         const nnMap = {};
@@ -8767,6 +8768,7 @@ function PastorSchedulingTab({ token, lang }) {
       if (!map[m]) map[m] = [];
       map[m].push(a);
     });
+    console.log('[PastorView] assignmentsByMinistry:', JSON.stringify(map));
     return map;
   }, [assignments]);
 
@@ -8787,6 +8789,7 @@ function PastorSchedulingTab({ token, lang }) {
   }, [assignments]);
 
   const triageAlerts = React.useMemo(() => {
+    console.log('[PastorView] unfilled count input:', JSON.stringify(assignments));
     const unfilled = [];
     visibleMinistries.forEach(ministry => {
       const positions = positionsMap[ministry] || [];

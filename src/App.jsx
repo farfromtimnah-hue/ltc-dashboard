@@ -8827,7 +8827,13 @@ function PastorSchedulingTab({ token, lang }) {
 
   function prevDate() { setSelDate(d => { const nd = new Date(d); nd.setDate(nd.getDate()-7); return nd; }); }
   function nextDate() { setSelDate(d => { const nd = new Date(d); nd.setDate(nd.getDate()+7); return nd; }); }
-  function toggleCard(ministry) { setCollapsedCards(prev => ({ ...prev, [ministry]: !(prev[ministry]===false) })); }
+  function toggleCard(ministry) {
+    setCollapsedCards(prev => {
+      const next = { ...prev };
+      next[ministry] = !prev[ministry];
+      return next;
+    });
+  }
 
   function loadPeople() {
     if (peopleLoading || allPeople.length > 0) return;
@@ -8901,7 +8907,7 @@ function PastorSchedulingTab({ token, lang }) {
 
   // Render a ministry card
   function renderMinistryCard(ministry) {
-    const isCollapsed = collapsedCards[ministry] !== false;
+    const isCollapsed = !collapsedCards[ministry];
     const positions = positionsMap[ministry] || [];
     const ministryAsgn = assignmentsByMinistry[ministry] || [];
     const notNeeded = notNeededMap[ministry] || new Set();

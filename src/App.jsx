@@ -8358,7 +8358,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
           const isPnnSaving = pnnSavingArea === areaKey || (isNotNeeded && pnnSavingArea === "_unmark_");
 
           const assignedPersonName = firstAssignment
-            ? (firstAssignment?.person_name || (() => { const p = allPersons.find(x => x && x.id === firstAssignment?.person_id); return p ? displayName(p) : String(firstAssignment?.person_id || ""); })())
+            ? (firstAssignment?.person_name || (() => { const p = allPersons.find(x => x && x.id === firstAssignment?.person_id); return p ? displayName(p) : (firstAssignment?.unmatched_name || String(firstAssignment?.person_id || "")); })())
             : null;
 
           return (

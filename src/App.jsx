@@ -8024,17 +8024,21 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const upcomingDates = useMemo(() => {
     const dates = [];
     const today = new Date();
+    const serviceDay = (groupName === 'English Service') ? 6 : 0;
     const dayOfWeek = today.getDay();
-    const daysToSun = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    let daysToService = (serviceDay - dayOfWeek + 7) % 7;
     const base = new Date(today);
-    base.setDate(today.getDate() + daysToSun);
+    base.setDate(today.getDate() + daysToService);
     for (let i = 0; i < 8; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i * 7);
-      dates.push(d.toISOString().slice(0, 10));
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      dates.push(`${yyyy}-${mm}-${dd}`);
     }
     return dates;
-  }, []);
+  }, [groupName]);
 
   const schedDate = upcomingDates[schedDateIdx] || upcomingDates[0] || "";
 

@@ -8377,16 +8377,12 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
           const pnnId = pnn && typeof pnn === "object" ? (pnn?.id || null) : null;
           const isNotNeeded = !!pnn;
           const isSaving = savingArea === areaKey;
-          const isDeleting = !!(firstAssignment && deletingId === firstAssignment?.id);
-          const isStatusSaving = !!(firstAssignment && statusSavingId === firstAssignment?.id);
           const isPnnSaving = pnnSavingArea === areaKey || (isNotNeeded && pnnSavingArea === "_unmark_");
 
-          const assignedPersonName = firstAssignment
-            ? (firstAssignment?.person_name || (() => { const p = allPersons.find(x => x && x.id === firstAssignment?.person_id); return p ? displayName(p) : (firstAssignment?.unmatched_name || String(firstAssignment?.person_id || "")); })())
-            : null;
-
-          const areaStatus = firstAssignment?.status || null;
-          const areaColor = !firstAssignment ? "#ef4444" : areaStatus === "confirmed" ? "#22c55e" : "#eab308";
+          const allAreaAssignments = area.assignments && area.assignments.length > 0 ? area.assignments : (firstAssignment ? [firstAssignment] : []);
+          const hasConfirmed = allAreaAssignments.some(a => a.status === "confirmed");
+          const hasPending = allAreaAssignments.some(a => a.status !== "confirmed" && a.status !== "declined");
+          const areaColor = allAreaAssignments.length === 0 ? "#ef4444" : hasConfirmed ? "#22c55e" : hasPending ? "#eab308" : "#ef4444";
 
           return (
             <div key={areaKey || String(area?.display_order)} style={{
@@ -8412,24 +8408,31 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                       {tx.unmarkNotNeeded}
                     </button>
                   </div>
-                ) : firstAssignment ? (
+                ) : allAreaAssignments.length > 0 ? (
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,fontWeight:600,color:areaColor,background:`${areaColor}1f`,border:`1px solid ${areaColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>{assignedPersonName}</span>
-                    <select
-                      disabled={isStatusSaving}
-                      value={firstAssignment?.status || "not_contacted"}
-                      onChange={e => doUpdateStatus(firstAssignment?.id, e.target.value)}
-                      style={{fontSize:11,background:"#0f1e24",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#aebac0",padding:"2px 6px",cursor:"pointer",opacity:isStatusSaving?0.4:1}}>
-                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <button onClick={()=>{ if (!isSaving) { setAssignPickerArea(area); setAssignPickerSearch(""); } }}
-                      style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isSaving?0.4:1}}>
-                      {tx.reassign}
-                    </button>
-                    <button onClick={()=>{ if (!isDeleting) doDeleteAssignment(firstAssignment?.id); }}
-                      style={{fontSize:11,color:"#e07070",background:"none",border:"1px solid rgba(220,100,100,0.2)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isDeleting?0.4:1}}>
-                      {tx.remove}
-                    </button>
+                    {allAreaAssignments.map(asgn => {
+                      const asgnName = asgn.person_name || (() => { const p = allPersons.find(x => x && x.id === asgn.person_id); return p ? displayName(p) : (asgn.unmatched_name || String(asgn.person_id || "")); })();
+                      const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
+                      const isPcSource = asgn.source === "planning_center";
+                      const asgnDeleting = deletingId === asgn.id;
+                      return (
+                        <div key={asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>{asgnName}</span>
+                          {!isPcSource && (
+                            <>
+                              <button onClick={()=>{ if (!isSaving) { setAssignPickerArea(area); setAssignPickerSearch(""); } }}
+                                style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isSaving?0.4:1}}>
+                                {tx.reassign}
+                              </button>
+                              <button onClick={()=>{ if (!asgnDeleting) doDeleteAssignment(asgn.id); }}
+                                style={{fontSize:11,color:"#e07070",background:"none",border:"1px solid rgba(220,100,100,0.2)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:asgnDeleting?0.4:1}}>
+                                {tx.remove}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{display:"flex",alignItems:"center",gap:8}}>

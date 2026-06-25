@@ -8349,23 +8349,30 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
       {/* Section C — Service Attendance */}
       {PCO_SERVICE_TYPE_IDS[groupName] && (
         <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:16}}>{tx.svcAttTitle}</div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:4}}>{tx.svcAttTitle}</div>
           {svcAttData.length === 0 ? (
             <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{tx.svcAttNoData}</div>
           ) : (() => {
+            const sorted = [...svcAttData].sort((a,b) => a.service_date.localeCompare(b.service_date));
+            const earliest = sorted[0]?.service_date?.slice(5) || "";
+            const latest10 = sorted.slice(-10);
             const latest = svcAttData[0];
+            const dateRange = earliest && latest10.length ? `${earliest} — ${latest10[latest10.length-1]?.service_date?.slice(5)||""}` : "";
             const statCards = [
               { label: tx.svcAttSanctuary, value: latest.templo ?? "—" },
               { label: tx.svcAttVols,      value: latest.voluntarios ?? "—" },
               { label: tx.svcAttKids,      value: latest.kids ?? "—" },
               { label: tx.svcAttTotal,     value: latest.total ?? "—" },
             ];
-            const chartData = [...svcAttData].reverse().slice(-10).map(d => ({
+            const chartData = latest10.map(d => ({
               label: d.service_date ? d.service_date.slice(5) : "",
               total: d.total || 0,
+              templo: d.templo || 0,
+              voluntarios: d.voluntarios || 0,
             }));
             return (
               <>
+                {dateRange && <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64",marginBottom:16}}>{dateRange}</div>}
                 <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
                   {statCards.map(sc => (
                     <div key={sc.label} style={{flex:"1 1 80px",minWidth:72,background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10,padding:"10px 14px"}}>
@@ -8381,6 +8388,16 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                     <Tooltip cursor={{fill:"rgba(94,234,212,0.06)"}} contentStyle={{background:"#0c1a24",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:"#aebac0"}} itemStyle={{color:"#e6f1f0"}} />
                     <Bar dataKey="total" name={tx.svcAttTotal} fill="#5eead4" radius={[4,4,0,0]} maxBarSize={40}
                       label={{position:"top",fill:"#5eead4",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,margin:"20px 0 8px"}}>SERVING RATIO</div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={chartData} margin={{top:16,right:8,bottom:4,left:0}}>
+                    <XAxis dataKey="label" tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip cursor={{fill:"rgba(94,234,212,0.06)"}} contentStyle={{background:"#0c1a24",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:"#aebac0"}} itemStyle={{color:"#e6f1f0"}} />
+                    <Bar dataKey="templo" name={tx.svcAttSanctuary} stackId="a" fill="#5eead4" maxBarSize={40} />
+                    <Bar dataKey="voluntarios" name={tx.svcAttVols} stackId="a" fill="#f59e0b" radius={[4,4,0,0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               </>

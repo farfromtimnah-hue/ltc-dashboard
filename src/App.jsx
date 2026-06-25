@@ -8372,7 +8372,17 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             }));
             return (
               <>
-                {dateRange && <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64",marginBottom:16}}>{dateRange}</div>}
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+                  {dateRange && <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64"}}>{dateRange}</span>}
+                  <a href={`https://wa.me/?text=${encodeURIComponent("https://farfromtimnah-hue.github.io/ministry-gifting/service-attendance-form.html")}`} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 10px",textDecoration:"none",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                    📲 WhatsApp
+                  </a>
+                  <button onClick={()=>navigator.clipboard.writeText("https://farfromtimnah-hue.github.io/ministry-gifting/service-attendance-form.html")}
+                    style={{fontSize:11,color:"#6b7a82",background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,padding:"2px 10px",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                    Copy Link
+                  </button>
+                </div>
                 <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
                   {statCards.map(sc => (
                     <div key={sc.label} style={{flex:"1 1 80px",minWidth:72,background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10,padding:"10px 14px"}}>

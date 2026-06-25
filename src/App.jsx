@@ -8052,6 +8052,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     'Legacy': '1401015',
     'Link': '1635885',
   };
+  const pcoSyncedRef = useRef({});
 
   useEffect(() => {
     if (!token || !groupName || !schedDate) return;
@@ -8066,7 +8067,9 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         setSchedData(areas);
         setSchedLoading(false);
         const serviceTypeId = PCO_SERVICE_TYPE_IDS[groupName];
-        if (serviceTypeId && areas.some(a => a.is_locked_external === 1)) {
+        const syncKey = `${groupName}:${schedDate}`;
+        if (serviceTypeId && areas.some(a => a.is_locked_external === 1) && !pcoSyncedRef.current[syncKey]) {
+          pcoSyncedRef.current[syncKey] = true;
           fetch(`${API}/schedule/planning-center/sync`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

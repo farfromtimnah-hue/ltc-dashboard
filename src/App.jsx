@@ -8947,13 +8947,16 @@ function PastorSchedulingTab({ token, lang }) {
               if (!pos) return null;
               const posName = pos.position_name || pos.name || '';
               const posAsgn = asgnByPos[posName] || [];
+              const posStatus = posAsgn.length === 0 ? 'empty' : posAsgn.some(a => a.status === 'confirmed') ? 'confirmed' : 'pending';
+              const posColor = posStatus === 'confirmed' ? '#22c55e' : posStatus === 'pending' ? '#eab308' : '#ef4444';
+              const posBg = posStatus === 'confirmed' ? 'rgba(34,197,94,0.12)' : posStatus === 'pending' ? 'rgba(234,179,8,0.12)' : 'rgba(239,68,68,0.12)';
               const isNotNeeded = notNeeded.has(posName);
               const minV = pos.min_volunteers || pos.min_count || 0;
               const idealV = pos.ideal_volunteers || pos.ideal_count || 0;
               const omKey = ministry+'::'+posName;
 
               return (
-                <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px' }}>
+                <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
                     <div>
                       <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{posName}</div>
@@ -9008,7 +9011,7 @@ function PastorSchedulingTab({ token, lang }) {
 
                         if (isPC) {
                           return (
-                            <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999 }}>
+                            <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999 }}>
                               <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
                               <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#6b7a82' }}>{personName}</span>
                               <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>
@@ -9021,7 +9024,7 @@ function PastorSchedulingTab({ token, lang }) {
                           <div key={chipKey} style={{ position: 'relative' }}>
                             <button onClick={e => { e.stopPropagation(); setChipMenu(isChipOpen ? null : { id: a.id, assignment: a }); }} style={{
                               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
-                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                              background: posBg, border: `1px solid ${posColor}40`,
                               borderRadius: 999, cursor: 'pointer',
                             }}>
                               <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />

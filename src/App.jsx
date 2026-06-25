@@ -8474,7 +8474,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                       const asgnName = asgn.person_name || (() => { const p = allPersons.find(x => x && x.id === asgn.person_id); return p ? displayName(p) : (asgn.unmatched_name || String(asgn.person_id || "")); })();
                       const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
                       const isPcSource = asgn.source === "planning_center";
-                      const asgnDeleting = deletingId === asgn.id;
+                      const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
                       return (
                         <div key={asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
                           {asgn.position_name && asgn.position_name !== areaKey && (
@@ -8487,7 +8487,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                                 style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isSaving?0.4:1}}>
                                 {tx.reassign}
                               </button>
-                              <button onClick={()=>{ if (!asgnDeleting) doDeleteAssignment(asgn.id); }}
+                              <button onClick={()=>{ if (!asgnDeleting) doDeleteAssignment(asgn.assignment_id || asgn.id); }}
                                 style={{fontSize:11,color:"#e07070",background:"none",border:"1px solid rgba(220,100,100,0.2)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:asgnDeleting?0.4:1}}>
                                 {tx.remove}
                               </button>

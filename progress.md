@@ -5,6 +5,24 @@
 ---
 
 DATE: 2026-06-24
+SESSION: PastorSchedulingTab — color coded position rows + card toggle fix
+
+Two fixes to PastorSchedulingTab (src/App.jsx):
+
+1. Card expand/collapse toggle fixed (commit 4cbf1b1): previous logic `collapsedCards[ministry] !== false` was fragile — undefined (never clicked) evaluated correctly but the toggle `!(prev[ministry]===false)` double-inverted unexpectedly. Replaced with simple boolean pattern: `isCollapsed = !collapsedCards[ministry]` and `next[ministry] = !prev[ministry]`. Cards start collapsed (undefined = falsy), first click expands, second collapses. Clean and predictable.
+
+2. Color coded position rows and chips (commit 60e5b22): each position row in renderMinistryCard now derives posStatus/posColor/posBg from posAsgn. GREEN (#22c55e) = at least one confirmed assignment; YELLOW (#eab308) = assignments exist but none confirmed; RED (#ef4444) = no assignments. Color applied as 4px left border on the position row div, and as tinted background + colored border on both the interactive chip button and Planning Center (locked) chip div.
+
+---
+
+DATE: 2026-06-24
+SESSION: Attendance tab connected to live D1 data
+
+Attendance tab now live — fetches real data from Worker GET /attendance for all 7 services in parallel. Dummy data (ATTENDANCE_DATA constant) removed. ServiceAttendanceTab now accepts token prop and uses Promise.all to fetch each service on mount. Field names aligned to Worker schema: service_name, service_date, voluntarios. Loading state added; token threaded from App render site. Commit: f62d61e. Date: 2026-06-24
+
+---
+
+DATE: 2026-06-24
 SESSION: Favicon PNG fallback added
 
 Favicon PNG fallback added — favicon.png generated via sharp at 32x32, PNG link added to index.html as Safari fallback. Commit: 4bab6f0. Date: 2026-06-24

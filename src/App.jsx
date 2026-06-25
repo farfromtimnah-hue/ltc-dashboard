@@ -8417,6 +8417,9 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                       const asgnDeleting = deletingId === asgn.id;
                       return (
                         <div key={asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                          {asgn.position_name && asgn.position_name !== areaKey && (
+                            <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
+                          )}
                           <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>{asgnName}</span>
                           {!isPcSource && (
                             <>

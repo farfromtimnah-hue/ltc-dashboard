@@ -8042,6 +8042,17 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
   const schedDate = upcomingDates[schedDateIdx] || upcomingDates[0] || "";
 
+  const PCO_SERVICE_TYPE_IDS = {
+    'English Service': '1707498',
+    'Culto Fé': '1162055',
+    'Sunday 10AM': '1162648',
+    'Sunday 6:30PM EN': '1213946',
+    'Rocket': '1242401',
+    'Culto Hope': '1259513',
+    'Legacy': '1401015',
+    'Link': '1635885',
+  };
+
   useEffect(() => {
     if (!token || !groupName || !schedDate) return;
     setSchedLoading(true);
@@ -8051,8 +8062,18 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     })
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
-        setSchedData(Array.isArray(data) ? data : (Array.isArray(data?.areas) ? data.areas : []));
+        const areas = Array.isArray(data) ? data : (Array.isArray(data?.areas) ? data.areas : []);
+        setSchedData(areas);
         setSchedLoading(false);
+        const serviceTypeId = PCO_SERVICE_TYPE_IDS[groupName];
+        if (serviceTypeId && areas.some(a => a.is_locked_external === 1)) {
+          fetch(`${API}/schedule/planning-center/sync`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ service_type_id: serviceTypeId, service_date: schedDate }),
+          });
+          setTimeout(() => setSchedRefresh(c => c + 1), 2000);
+        }
       })
       .catch(() => { setSchedError(true); setSchedLoading(false); });
   }, [token, groupName, schedDate, schedRefresh]);

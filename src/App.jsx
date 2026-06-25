@@ -8361,10 +8361,14 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             ? (firstAssignment?.person_name || (() => { const p = allPersons.find(x => x && x.id === firstAssignment?.person_id); return p ? displayName(p) : (firstAssignment?.unmatched_name || String(firstAssignment?.person_id || "")); })())
             : null;
 
+          const areaStatus = firstAssignment?.status || null;
+          const areaColor = !firstAssignment ? "#ef4444" : areaStatus === "confirmed" ? "#22c55e" : "#eab308";
+
           return (
             <div key={areaKey || String(area?.display_order)} style={{
               display:"flex",alignItems:"flex-start",gap:10,padding:"12px 0",
               borderBottom:"1px solid rgba(255,255,255,0.04)",
+              borderLeft:`4px solid ${areaColor}`,paddingLeft:10,
               opacity:isNotNeeded ? 0.45 : 1,
             }}>
               {/* Area name */}
@@ -8386,7 +8390,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                   </div>
                 ) : firstAssignment ? (
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontSize:13,color:"#e6f1f0",fontWeight:500}}>{assignedPersonName}</span>
+                    <span style={{fontSize:12,fontWeight:600,color:areaColor,background:`${areaColor}1f`,border:`1px solid ${areaColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>{assignedPersonName}</span>
                     <select
                       disabled={isStatusSaving}
                       value={firstAssignment?.status || "not_contacted"}

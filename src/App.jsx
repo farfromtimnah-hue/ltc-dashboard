@@ -8398,7 +8398,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
               {/* Assignment content */}
               <div style={{flex:1,minWidth:0}}>
-                {isLocked ? (
+                {isLocked && allAreaAssignments.length === 0 ? (
                   <span style={{fontSize:12,color:"#475a64",fontStyle:"italic"}}>{tx.pcLocked}</span>
                 ) : isNotNeeded ? (
                   <div style={{display:"flex",alignItems:"center",gap:8}}>

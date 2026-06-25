@@ -8391,15 +8391,43 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                   </BarChart>
                 </ResponsiveContainer>
                 <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,margin:"20px 0 8px"}}>SERVING RATIO</div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={chartData} margin={{top:16,right:8,bottom:4,left:0}}>
-                    <XAxis dataKey="label" tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} width={28} />
-                    <Tooltip cursor={{fill:"rgba(94,234,212,0.06)"}} contentStyle={{background:"#0c1a24",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:"#aebac0"}} itemStyle={{color:"#e6f1f0"}} />
-                    <Bar dataKey="templo" name={tx.svcAttSanctuary} stackId="a" fill="#5eead4" maxBarSize={40} />
-                    <Bar dataKey="voluntarios" name={tx.svcAttVols} stackId="a" fill="#f59e0b" radius={[4,4,0,0]} maxBarSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {(() => {
+                  const donutSanctuary = latest.templo || 0;
+                  const donutVols = latest.voluntarios || 0;
+                  const donutTotal = donutSanctuary + donutVols;
+                  const volPct = donutTotal > 0 ? Math.round((donutVols / donutTotal) * 100) : 0;
+                  const donutData = [
+                    { name: tx.svcAttSanctuary, value: donutSanctuary },
+                    { name: tx.svcAttVols,      value: donutVols },
+                  ];
+                  return (
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+                      <div style={{position:"relative",width:120,height:120}}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={donutData} cx="50%" cy="50%" innerRadius={34} outerRadius={52} dataKey="value" stroke="none">
+                              <Cell fill="#5eead4" />
+                              <Cell fill="#f59e0b" />
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",pointerEvents:"none"}}>
+                          <div style={{fontSize:18,fontWeight:700,color:"#f59e0b",fontFamily:"'Space Grotesk',sans-serif"}}>{volPct}%</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:16,justifyContent:"center"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"#6b7a82"}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:"#5eead4"}} />
+                          {tx.svcAttSanctuary} ({donutSanctuary})
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"#6b7a82"}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:"#f59e0b"}} />
+                          {tx.svcAttVols} ({donutVols})
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}

@@ -7966,6 +7966,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [deletingId, setDeletingId] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [pnnSavingArea, setPnnSavingArea] = useState(null);
+  const [svcAttData, setSvcAttData] = useState([]);
 
   const tx = {
     serving:       lang === "PT" ? "Servindo"        : "Serving",
@@ -7999,6 +8000,12 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     noUnfilled:       lang === "PT" ? "Nenhuma area em aberto para este servico." : "No unfilled areas for this service.",
     noScheduleData:   lang === "PT" ? "Nenhum dado de agendamento para esta data." : "No schedule data for this date.",
     schedErr:         lang === "PT" ? "Erro ao carregar agendamento." : "Error loading schedule.",
+    svcAttTitle:      lang === "PT" ? "PRESENCA DO SERVICO" : "SERVICE ATTENDANCE",
+    svcAttNoData:     lang === "PT" ? "Nenhum dado de presenca ainda." : "No attendance data yet.",
+    svcAttSanctuary:  lang === "PT" ? "Templo" : "Sanctuary",
+    svcAttVols:       lang === "PT" ? "Voluntarios" : "Volunteers",
+    svcAttKids:       lang === "PT" ? "Kids" : "Kids",
+    svcAttTotal:      lang === "PT" ? "Total" : "Total",
   };
 
   useEffect(() => {
@@ -8082,6 +8089,16 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   }, [token, groupName, schedDate, schedRefresh]);
 
   function refreshSchedule() { setSchedRefresh(c => c + 1); }
+
+  useEffect(() => {
+    if (!token || !groupName || !PCO_SERVICE_TYPE_IDS[groupName]) return;
+    fetch(`${API}/attendance?service_name=${encodeURIComponent(groupName)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(j => setSvcAttData((j.success && Array.isArray(j.data)) ? j.data.sort((a, b) => b.service_date.localeCompare(a.service_date)) : []))
+      .catch(() => setSvcAttData([]));
+  }, [token, groupName]);
 
   const STATUS_OPTIONS = [
     { value: "not_contacted",    label: lang === "PT" ? "Nao contatado"   : "Not Contacted" },
@@ -8328,6 +8345,49 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
       {/* Section B — Group Health Analytics (4C) */}
       <GroupHealthBox attending={attending} serving={serving} lang={lang} groupName={groupName} />
+
+      {/* Section C — Service Attendance */}
+      {PCO_SERVICE_TYPE_IDS[groupName] && (
+        <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:16}}>{tx.svcAttTitle}</div>
+          {svcAttData.length === 0 ? (
+            <div style={{color:"#475a64",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{tx.svcAttNoData}</div>
+          ) : (() => {
+            const latest = svcAttData[0];
+            const statCards = [
+              { label: tx.svcAttSanctuary, value: latest.templo ?? "—" },
+              { label: tx.svcAttVols,      value: latest.voluntarios ?? "—" },
+              { label: tx.svcAttKids,      value: latest.kids ?? "—" },
+              { label: tx.svcAttTotal,     value: latest.total ?? "—" },
+            ];
+            const chartData = [...svcAttData].reverse().slice(-10).map(d => ({
+              label: d.service_date ? d.service_date.slice(5) : "",
+              total: d.total || 0,
+            }));
+            return (
+              <>
+                <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+                  {statCards.map(sc => (
+                    <div key={sc.label} style={{flex:"1 1 80px",minWidth:72,background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10,padding:"10px 14px"}}>
+                      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",color:"#6b7a82",marginBottom:4}}>{sc.label}</div>
+                      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:22,color:"#e6f1f0"}}>{sc.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={chartData} margin={{top:16,right:8,bottom:4,left:0}}>
+                    <XAxis dataKey="label" tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{fill:"#475a64",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip cursor={{fill:"rgba(94,234,212,0.06)"}} contentStyle={{background:"#0c1a24",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}} labelStyle={{color:"#aebac0"}} itemStyle={{color:"#e6f1f0"}} />
+                    <Bar dataKey="total" name={tx.svcAttTotal} fill="#5eead4" radius={[4,4,0,0]} maxBarSize={40}
+                      label={{position:"top",fill:"#5eead4",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Section D — Service Scheduler */}
       <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>

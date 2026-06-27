@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -751,6 +751,67 @@ const css = `
     to   { transform: translateX(0); opacity: 1; }
   }
   .drawer-panel { animation: drawerSlide 0.32s cubic-bezier(0.16,1,0.3,1); }
+
+  /* ── Nav container queries ───────────────────────────────────────── */
+  .nav-inner { container-type: inline-size; container-name: nav-inner; }
+
+  /* Tab labels: hidden by default (icon-only is the safe first-paint state) */
+  .tab-lbl { display: none; }
+  /* Switcher label: hidden by default */
+  .nav-switcher-lbl { display: none; }
+  /* Wide (≥1100px): show labels */
+  @container nav-inner (min-width: 1100px) {
+    .tab-lbl { display: inline; }
+    .nav-switcher-lbl { display: inline; }
+  }
+
+  /* Narrow (<860px): hide secondary tabs + title, show More button */
+  @container nav-inner (max-width: 859px) {
+    .tab-secondary { display: none !important; }
+    .nav-title { display: none !important; }
+  }
+
+  /* More button: hidden by default, visible only at narrow */
+  .nav-more-btn { display: none !important; }
+  @container nav-inner (max-width: 859px) {
+    .nav-more-btn { display: flex !important; }
+  }
+
+  /* ── View Switcher Modal ──────────────────────────────────────────── */
+  .vsm-overlay {
+    position: fixed; inset: 0; z-index: 400;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  @media (min-width: 640px) {
+    .vsm-overlay { align-items: center; }
+  }
+  .vsm-sheet {
+    background: #0d1c26; border: 1px solid rgba(94,234,212,0.12);
+    border-bottom: none; border-radius: 16px 16px 0 0;
+    width: 100%; max-width: 480px; max-height: 80vh;
+    overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 16px);
+    animation: vsmIn 0.22s cubic-bezier(0.16,1,0.3,1);
+  }
+  @media (min-width: 640px) {
+    .vsm-sheet { border-radius: 16px; border-bottom: 1px solid rgba(94,234,212,0.12); }
+  }
+  @keyframes vsmIn {
+    from { transform: translateY(32px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .vsm-opt {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: transparent; border: none; padding: 14px 20px;
+    color: #aebac0; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 500; letter-spacing: 0.06em;
+    cursor: pointer; text-align: left;
+    transition: background 0.12s, color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vsm-opt:hover { background: rgba(94,234,212,0.08); color: #5eead4; }
+  .vsm-opt-active { color: #5eead4; background: rgba(94,234,212,0.06); }
 
   @keyframes modalIn {
     from { transform: scale(0.96) translateY(8px); opacity: 0; }
@@ -8817,6 +8878,137 @@ function MobileDock({ items, moreItems, moreOpen, onMoreToggle, onMoreClose, act
   );
 }
 
+// ─── VIEW SWITCHER MODAL ──────────────────────────────────────────────────────
+function ViewSwitcherModal({
+  open, onClose, viewMode, lang,
+  hasBlanketMLAccess, glGroup, glMinistry,
+  onApplyView, onGlGroupChange, onGlMinistryChange,
+  VIEW_OPTS, GL_GROUPS, MH_MINISTRIES,
+}) {
+  const [phase, setPhase] = React.useState(1);
+  const [pending, setPending] = React.useState(null);
+
+  // Reset phase when modal opens
+  React.useEffect(() => {
+    if (open) { setPhase(1); setPending(null); }
+  }, [open]);
+
+  if (!open) return null;
+
+  const needsGroup = (v) =>
+    v === 'group_leader' || (v === 'ministry_leader_view' && hasBlanketMLAccess);
+
+  const handleViewSelect = (v) => {
+    if (needsGroup(v)) {
+      // If a group is already selected for this view, skip to Phase 2 auto-apply
+      const existingGroup = v === 'group_leader' ? glGroup : glMinistry;
+      if (existingGroup) {
+        onApplyView(v);
+        onClose();
+        return;
+      }
+      setPending(v);
+      setPhase(2);
+      return;
+    }
+    onApplyView(v);
+    onClose();
+  };
+
+  const handleGroupSelect = (val) => {
+    if (pending === 'group_leader') onGlGroupChange(val);
+    else onGlMinistryChange(val);
+    onApplyView(pending);
+    onClose();
+  };
+
+  const phase2List = pending === 'group_leader' ? GL_GROUPS : MH_MINISTRIES;
+  const phase2ActiveVal = pending === 'group_leader' ? glGroup : glMinistry;
+
+  // Single-option auto-apply: if phase 2 has only one choice, apply it immediately
+  React.useEffect(() => {
+    if (phase === 2 && phase2List && phase2List.length === 1) {
+      handleGroupSelect(phase2List[0]);
+    }
+  }, [phase, phase2List]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hdr = (txt) => (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px 10px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        {phase === 2 && (
+          <button onClick={() => { setPhase(1); setPending(null); }}
+            style={{background:'transparent',border:'none',cursor:'pointer',
+              color:'#aebac0',fontFamily:"'JetBrains Mono',monospace",fontSize:11,
+              letterSpacing:'0.06em',padding:'4px 8px',borderRadius:6,
+              display:'flex',alignItems:'center',gap:4}}>
+            ← {lang === 'PT' ? 'Voltar' : 'Back'}
+          </button>
+        )}
+        <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'10px',
+          letterSpacing:'0.18em',textTransform:'uppercase',color:'#5eead4'}}>
+          {txt}
+        </span>
+      </div>
+      <button onClick={onClose}
+        style={{background:'transparent',border:'none',cursor:'pointer',
+          color:'#6b7a82',fontSize:18,lineHeight:1,padding:'4px 6px',borderRadius:6}}>
+        ×
+      </button>
+    </div>
+  );
+
+  const divider = <div style={{height:1,background:'rgba(255,255,255,0.06)',margin:'0 0 4px'}} />;
+
+  const p = lang === 'PT';
+  const title1 = p ? 'Trocar Visão' : 'Switch View';
+  const title2 = pending === 'group_leader'
+    ? (p ? 'Escolher Grupo' : 'Select Group')
+    : (p ? 'Escolher Ministério' : 'Select Ministry');
+
+  return (
+    <div className="vsm-overlay" onClick={onClose}>
+      <div className="vsm-sheet" onClick={e => e.stopPropagation()}>
+        {phase === 1 ? (
+          <>
+            {hdr(title1)}
+            {divider}
+            {VIEW_OPTS.map(([key, label]) => (
+              <button key={key}
+                className={'vsm-opt' + (viewMode === key ? ' vsm-opt-active' : '')}
+                onClick={() => handleViewSelect(key)}>
+                <span style={{flex:1}}>{label}</span>
+                {viewMode === key && (
+                  <span style={{color:'#5eead4',fontSize:14,flexShrink:0}}>✓</span>
+                )}
+                {needsGroup(key) && (
+                  <span style={{color:'#475a64',fontSize:10,flexShrink:0,marginLeft:4}}>›</span>
+                )}
+              </button>
+            ))}
+            <div style={{height:8}} />
+          </>
+        ) : (
+          <>
+            {hdr(title2)}
+            {divider}
+            {phase2List.map(item => (
+              <button key={item}
+                className={'vsm-opt' + (phase2ActiveVal === item ? ' vsm-opt-active' : '')}
+                onClick={() => handleGroupSelect(item)}>
+                <span style={{flex:1}}>{item}</span>
+                {phase2ActiveVal === item && (
+                  <span style={{color:'#5eead4',fontSize:14,flexShrink:0}}>✓</span>
+                )}
+              </button>
+            ))}
+            <div style={{height:8}} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── PASTOR SCHEDULING COMMAND CENTER ────────────────────────────────────────
 function PastorSchedulingTab({ token, lang }) {
   const SERVICES = ['Culto Manha','Culto Tarde','Legacy','Rocket','Shine','Hero','Link','English Service','Culto Hope','Culto Fé'];
@@ -9471,43 +9663,12 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [dockMoreOpen, setDockMoreOpen] = useState(false);
-  // Priority+ nav: measure the actual rendered width of the nav row and of every
-  // collapsible item (via getBoundingClientRect on a hidden mirror row), then decide
-  // what to collapse into the More dropdown. No hardcoded per-item pixel estimates.
-  const navRowRef = useRef(null);   // live nav inner row (gives available width)
-  const navMeasRef = useRef(null);  // hidden mirror row (gives intrinsic item widths)
-  const [navRowW, setNavRowW] = useState(0);
-  const [navMeas, setNavMeas] = useState(null);
-  useEffect(() => {
-    const el = navRowRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) setNavRowW(entry.contentRect.width);
-    });
-    ro.observe(el);
-    setNavRowW(el.getBoundingClientRect().width);
-    return () => ro.disconnect();
-  }, [token]);
+  const [showViewSwitcher, setShowViewSwitcher] = useState(false);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  useLayoutEffect(() => {
-    if (navRowRef.current) setNavRowW(navRowRef.current.getBoundingClientRect().width);
-    const root = navMeasRef.current;
-    if (!root) return;
-    const widthOf = sel => { const n = root.querySelector(sel); return n ? n.getBoundingClientRect().width : 0; };
-    setNavMeas({
-      logo: widthOf('[data-meas="logo"]'),
-      title: widthOf('[data-meas="title"]'),
-      langtoggle: widthOf('[data-meas="langtoggle"]'),
-      more: widthOf('[data-meas="more"]'),
-      switcher: widthOf('[data-meas="switcher"]'),
-      aux: widthOf('[data-meas="aux"]'),
-      tabs: Array.from(root.querySelectorAll('[data-meas="tab"]')).map(n => n.getBoundingClientRect().width),
-    });
-  }, [token, lang, role, viewMode]);
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
@@ -9597,6 +9758,8 @@ export default function App() {
         action:()=>{ setBannerDismissed(true); setTab('my_group'); setDockMoreOpen(false); } },
       { id:'health', label:lang==='PT'?'Saude':'Health', Icon:IconHeart,
         action:()=>{ setBannerDismissed(true); setTab('health'); setDockMoreOpen(false); } },
+      { id:'switcher', label:lang==='PT'?'Visão':'View', Icon:IconUsers,
+        action:()=>{ setShowViewSwitcher(true); setDockMoreOpen(false); } },
       { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid,
         action:()=>setDockMoreOpen(o=>!o) },
     ];
@@ -9714,58 +9877,47 @@ export default function App() {
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
 
-  // ── Priority+ collapse: measured, not hardcoded ──────────────────
-  // Always visible: logo + PT/EN toggle. Collapse order as space shrinks:
-  //   1) title text  2) gear + logout  3) view switcher  4) tabs (right→left).
-  // The More button appears only once something has collapsed into it.
-  const TAB_GAP = 6;
-  const REGION_GAP = 10;
-  const hasSwitcher = (role === 'owner' || role === 'senior_pastor' || role === 'pastor') || hasMinistryLeaderGrant;
-
-  let showTitle = true, showSwitcher = hasSwitcher, showAux = true, visibleTabCount = tabs.length, showMore = false;
-  if (navMeas && navRowW > 0) {
-    const m = navMeas;
-    const PAD = 48, SAFETY = 16;
-    const room = navRowW - PAD - SAFETY - (m.logo + m.langtoggle + REGION_GAP * 2);
-    const need = (s) => {
-      let w = 0;
-      if (s.title) w += m.title + REGION_GAP;
-      for (let i = 0; i < s.tabCount; i++) w += (m.tabs[i] || 0) + TAB_GAP;
-      if (s.switcher && hasSwitcher && m.switcher > 0) w += m.switcher + REGION_GAP;
-      if (s.aux) w += m.aux + REGION_GAP;
-      if (s.more) w += m.more + REGION_GAP;
-      return w;
-    };
-    const s = { title: true, switcher: hasSwitcher, aux: true, tabCount: tabs.length, more: false };
-    if (need(s) > room) {
-      s.title = false;                                       // 1) title text first (just hidden)
-      if (need(s) > room) {
-        s.more = true;                                       // beyond here, items go INTO More
-        if (need(s) > room) s.aux = false;                   // 2) gear + logout
-        if (need(s) > room) s.switcher = false;              // 3) view switcher
-        while (s.tabCount > 0 && need(s) > room) s.tabCount--; // 4) tabs, right → left
-      }
-    }
-    showTitle = s.title; showSwitcher = s.switcher && hasSwitcher; showAux = s.aux;
-    visibleTabCount = s.tabCount; showMore = s.more;
-  }
-  const visibleTabs = tabs.slice(0, visibleTabCount);
-  const overflowTabs = tabs.slice(visibleTabCount);
-
-  // ── Shared renderers (live nav + hidden measurement mirror use the same markup) ──
-  const tabBtn = (t2) => (
-    <button key={t2.id} onClick={() => { setBannerDismissed(true); setTab(t2.id); }}
-      style={{background:"transparent",border:"none",padding:"6px 8px",position:"relative",color:tab===t2.id?"#e6f1f0":"#6b7a82",fontSize:11,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase",cursor:"pointer",transition:"color 0.18s",whiteSpace:"nowrap",flexShrink:0}}
-      onMouseEnter={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#aebac0"; }}
-      onMouseLeave={e=>{ if(tab!==t2.id) e.currentTarget.style.color="#6b7a82"; }}>
-      {t2.label}
-      {tab===t2.id && <span style={{position:"absolute",left:0,right:0,bottom:-2,height:2,background:"linear-gradient(90deg,transparent,#5eead4,transparent)",boxShadow:"0 0 12px #5eead4"}} />}
-    </button>
-  );
-  const onViewChange = (e) => { const v=e.target.value; setBannerDismissed(true); setViewMode(v); if(v==='my_view'){ setGlGroup(""); setGlMinistry(""); } if(['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab("people"); };
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
   const hasAnyMLAccess = hasBlanketMLAccess || hasMinistryLeaderGrant;
+  const hasSwitcher = hasAnyMLAccess;
+
+  // Apply a view mode change by value (used by ViewSwitcherModal and dock items)
+  const applyViewChange = (v) => {
+    setBannerDismissed(true);
+    setViewMode(v);
+    if (v === 'my_view') { setGlGroup(''); setGlMinistry(''); }
+    if (['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab('people');
+  };
+
+  // Secondary tabs: hidden at narrow widths, always in More drawer
+  const SECONDARY_TABS = new Set(['attendance','gifting','reference','users']);
+  const TAB_ICONS = {
+    analytics: IconBarChart, attendance: IconCalendar, people: IconUsers,
+    gifting: IconStar, health: IconHeart, reference: IconUser,
+    scheduling: IconCalendar, users: IconUser,
+  };
+  const tabBtn = (t2) => {
+    const Ic = TAB_ICONS[t2.id];
+    const isActive = tab === t2.id;
+    return (
+      <button key={t2.id}
+        className={SECONDARY_TABS.has(t2.id) ? 'tab-secondary' : undefined}
+        onClick={() => { setBannerDismissed(true); setTab(t2.id); }}
+        style={{background:'transparent',border:'none',padding:'6px 8px',position:'relative',
+          color:isActive?'#e6f1f0':'#6b7a82',fontSize:11,fontFamily:"'JetBrains Mono',monospace",
+          fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer',
+          transition:'color 0.18s',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}
+        onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.color='#aebac0'; }}
+        onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.color='#6b7a82'; }}>
+        {Ic && <Ic s={14} c="currentColor" />}
+        <span className="tab-lbl">{t2.label}</span>
+        {isActive && <span style={{position:'absolute',left:0,right:0,bottom:-2,height:2,
+          background:'linear-gradient(90deg,transparent,#5eead4,transparent)',
+          boxShadow:'0 0 12px #5eead4'}} />}
+      </button>
+    );
+  };
 
   // ── Mobile dock item definitions (isMobile=true only) ────────────
   // Blanket-access dock (owner / senior_pastor / pastor)
@@ -9773,10 +9925,12 @@ export default function App() {
     { id:'people',     label:lang==='PT'?'Pessoas':'People',   Icon:IconUsers,    action:()=>{ setBannerDismissed(true); setTab('people');    setDockMoreOpen(false); } },
     { id:'analytics',  label:lang==='PT'?'Anal.':'Analytics',  Icon:IconBarChart, action:()=>{ setBannerDismissed(true); setTab('analytics'); setDockMoreOpen(false); } },
     { id:'scheduling', label:lang==='PT'?'Agenda':'Schedule',  Icon:IconCalendar, action:()=>{ setBannerDismissed(true); setTab('scheduling');setDockMoreOpen(false); } },
-    { id:'health',     label:lang==='PT'?'Saude':'Health',     Icon:IconHeart,    action:()=>{ setBannerDismissed(true); setTab('health');    setDockMoreOpen(false); } },
+    { id:'switcher',   label:lang==='PT'?'Visão':'View',       Icon:IconUsers,    action:()=>{ setShowViewSwitcher(true); setDockMoreOpen(false); } },
     { id:'more',       label:lang==='PT'?'Mais':'More',        Icon:IconGrid,     action:()=>setDockMoreOpen(o=>!o) },
   ];
   const blanketMoreItems = [
+    { id:'health', label:lang==='PT'?'Saude':'Health', Icon:IconHeart,
+      action:()=>{ setBannerDismissed(true); setTab('health'); } },
     ...(effectiveRole==='pastor'||effectiveRole==='senior_pastor'||effectiveRole==='owner'
       ? [{ id:'attendance', label:lang==='PT'?'Cultos':'Attendance', Icon:IconCalendar,
            action:()=>{ setBannerDismissed(true); setTab('attendance'); } }] : []),
@@ -9792,9 +9946,10 @@ export default function App() {
     { id:'logout_dock', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser,
       action:()=>signOut(auth) },
   ];
-  const blanketDockOverflowIds = new Set(['attendance','gifting','reference','users']);
+  const blanketDockOverflowIds = new Set(['health','attendance','gifting','reference','users']);
   const blanketDockActiveId = blanketDockOverflowIds.has(tab) ? 'more'
-    : ['people','analytics','scheduling','health'].includes(tab) ? tab : 'more';
+    : ['people','analytics','scheduling'].includes(tab) ? tab
+    : viewMode !== 'my_view' ? 'switcher' : 'more';
 
   // ML-grant dock (has ministry_leader grant but no blanket access)
   const mlDockItems = [
@@ -9802,6 +9957,8 @@ export default function App() {
       action:()=>{ setBannerDismissed(true); setViewMode('ministry_leader_view'); setDockMoreOpen(false); } },
     { id:'people', label:lang==='PT'?'Pessoas':'People', Icon:IconUsers,
       action:()=>{ setBannerDismissed(true); setTab('people'); setViewMode('my_view'); setDockMoreOpen(false); } },
+    { id:'switcher', label:lang==='PT'?'Visão':'View', Icon:IconUsers,
+      action:()=>{ setShowViewSwitcher(true); setDockMoreOpen(false); } },
     { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid, action:()=>setDockMoreOpen(o=>!o) },
   ];
   const mlMoreItems = [
@@ -9830,44 +9987,22 @@ export default function App() {
     ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
     ...(hasAnyMLAccess ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
   ];
-  const selStyle = {background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",color:"#aebac0",borderRadius:8,padding:"6px 8px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",maxWidth:170};
-  const switcherNav = () => (
-    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-      <select value={viewMode} onChange={onViewChange} style={selStyle}>
-        {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
-      </select>
-      {viewMode==='group_leader' && (
-        <select value={glGroup} onChange={e=>handleGlGroupChange(e.target.value)} style={{...selStyle,maxWidth:150}}>
-          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-        </select>
-      )}
-      {viewMode==='ministry_leader_view' && hasBlanketMLAccess && (
-        <select value={glMinistry} onChange={e=>setGlMinistry(e.target.value)} style={{...selStyle,maxWidth:170}}>
-          <option value="">{lang==="PT"?"Escolher ministerio...":"Select ministry..."}</option>
-          {MH_MINISTRIES.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
-      )}
-    </div>
-  );
-  const switcherMore = () => (
-    <div className="pp-sub">
-      <select value={viewMode} onChange={onViewChange}>
-        {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
-      </select>
-      {viewMode==='group_leader' && (
-        <select value={glGroup} onChange={e=>handleGlGroupChange(e.target.value)}>
-          <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
-          {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-        </select>
-      )}
-      {viewMode==='ministry_leader_view' && hasBlanketMLAccess && (
-        <select value={glMinistry} onChange={e=>setGlMinistry(e.target.value)}>
-          <option value="">{lang==="PT"?"Escolher ministerio...":"Select ministry..."}</option>
-          {MH_MINISTRIES.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
-      )}
-    </div>
+  // View switcher button (desktop nav + More drawer)
+  const viewSwitcherCurrentLabel = () => {
+    if (viewMode === 'group_leader') return glGroup ? `GL: ${glGroup}` : (lang === 'PT' ? 'Lider' : 'Leader');
+    if (viewMode === 'ministry_leader_view') return glMinistry || (lang === 'PT' ? 'Ministerio' : 'Ministry');
+    const opt = VIEW_OPTS.find(o => o[0] === viewMode);
+    return opt ? opt[1] : (lang === 'PT' ? 'Visao' : 'View');
+  };
+  const viewSwitcherBtn = () => (
+    <button onClick={() => setShowViewSwitcher(true)}
+      className="btn-ghost"
+      style={{padding:'6px 10px',borderRadius:8,fontSize:11,color:'#aebac0',
+        display:'inline-flex',alignItems:'center',gap:5,whiteSpace:'nowrap',flexShrink:0,
+        fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:'0.06em'}}>
+      <IconUsers s={14} c="currentColor" />
+      <span className="nav-switcher-lbl">{viewSwitcherCurrentLabel()}</span>
+    </button>
   );
   const auxNav = () => (
     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
@@ -9887,87 +10022,68 @@ export default function App() {
       {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
     </button>
   );
-  const titleEl = () => (
-    <>
-      <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
-      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap",flexShrink:0}}>{t.dashboard}</span>
-    </>
-  );
-
   return (
     <div className="app" style={{height:"100vh",display:"flex",flexDirection:"column"}}>
       <style>{css}</style>
 
-      {/* Nav: logo + title | tabs | switcher | gear/logout | (spacer) | PT/EN | More
+      {/* Nav: CSS container queries handle icon+label → icon-only → secondary-tabs-hidden.
           Hidden on mobile — replaced by the fixed bottom dock below. */}
       {!isMobile && <div className="nav" style={{flexShrink:0,zIndex:50}}>
-        <div ref={navRowRef} style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:REGION_GAP,height:52}}>
+        <div className="nav-inner" style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:10,height:52}}>
 
-          {/* Logo (always) + title (collapses 1st) */}
+          {/* Logo + title (title hidden via .nav-title CSS at narrow) */}
           <div style={{display:"flex",alignItems:"center",gap:12,flex:"0 0 auto"}}>
             <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block",flexShrink:0}} />
-            {showTitle && titleEl()}
+            <div className="nav-title" style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+              <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
+            </div>
           </div>
 
-          {/* Tabs (collapse last, right → left) */}
-          <div style={{display:"flex",alignItems:"center",gap:TAB_GAP,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
-            {visibleTabs.map(t2=>tabBtn(t2))}
+          {/* All tabs — CSS hides .tab-lbl at medium, hides .tab-secondary at narrow */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
+            {tabs.map(t2=>tabBtn(t2))}
           </div>
 
-          {/* View switcher (collapses 3rd) */}
-          {showSwitcher && switcherNav()}
+          {/* View switcher button — only when hasSwitcher */}
+          {hasSwitcher && viewSwitcherBtn()}
 
-          {/* Gear + logout (collapse 2nd) */}
-          {showAux && auxNav()}
+          {/* Gear + logout — always visible at desktop widths */}
+          {auxNav()}
 
-          {/* Spacer pushes lang toggle + More to the right */}
+          {/* Spacer */}
           <div style={{flex:"1 1 0",minWidth:0}} />
 
           {/* PT/EN toggle — always visible */}
           <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
 
-          {/* More — only when something is collapsed into it */}
-          {showMore && (
-            <div style={{flex:"0 0 auto",position:"relative"}}>
-              {moreBtn()}
-              {moreOpen && (
-                <>
-                  <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
-                  <div className="pp-dropdown">
-                    {overflowTabs.map(t2=>(
-                      <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
-                        onClick={()=>{setBannerDismissed(true);setTab(t2.id);setMoreOpen(false);}}>
-                        {t2.label}
-                      </button>
-                    ))}
-                    {overflowTabs.length>0 && ((!showSwitcher && hasSwitcher) || !showAux) && <div className="pp-divider"/>}
-                    {!showSwitcher && hasSwitcher && switcherMore()}
-                    {!showAux && (
-                      <>
-                        <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>&#9881; {t.settings}</button>
-                        <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>&#8618; {t.logout}</button>
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          {/* More button — CSS shows only at narrow (<860px container width).
+              Drawer contains secondary tabs + Switch View + utility. */}
+          <div className="nav-more-btn" style={{flex:"0 0 auto",position:"relative"}}>
+            {moreBtn()}
+            {moreOpen && (
+              <>
+                <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
+                <div className="pp-dropdown">
+                  {tabs.filter(t2=>SECONDARY_TABS.has(t2.id)).map(t2=>(
+                    <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
+                      onClick={()=>{setBannerDismissed(true);setTab(t2.id);setMoreOpen(false);}}>
+                      {t2.label}
+                    </button>
+                  ))}
+                  <div className="pp-divider"/>
+                  {hasSwitcher && (
+                    <button className="pp-item" onClick={()=>{setShowViewSwitcher(true);setMoreOpen(false);}}>
+                      {lang==="PT"?"Trocar Visão":"Switch View"}
+                    </button>
+                  )}
+                  <button className="pp-item" onClick={()=>{setShowSettings(true);setMoreOpen(false);}}>&#9881; {t.settings}</button>
+                  <button className="pp-item" onClick={()=>{signOut(auth);setMoreOpen(false);}}>&#8618; {t.logout}</button>
+                </div>
+              </>
+            )}
+          </div>
 
-        </div>
-
-        {/* Hidden mirror row — used ONLY to measure intrinsic widths via getBoundingClientRect */}
-        <div ref={navMeasRef} aria-hidden="true"
-          style={{position:"absolute",top:-9999,left:0,visibility:"hidden",pointerEvents:"none",display:"flex",alignItems:"center",whiteSpace:"nowrap"}}>
-          <span data-meas="logo" style={{display:"inline-flex"}}>
-            <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="" style={{height:32,width:"auto"}} />
-          </span>
-          <span data-meas="title" style={{display:"inline-flex",alignItems:"center",gap:12}}>{titleEl()}</span>
-          {tabs.map(t2=><span key={t2.id} data-meas="tab" style={{display:"inline-flex"}}>{tabBtn(t2)}</span>)}
-          {hasSwitcher && <span data-meas="switcher" style={{display:"inline-flex"}}>{switcherNav()}</span>}
-          <span data-meas="aux" style={{display:"inline-flex"}}>{auxNav()}</span>
-          <span data-meas="langtoggle" style={{display:"inline-flex"}}>{langToggle()}</span>
-          <span data-meas="more" style={{display:"inline-flex"}}>{moreBtn()}</span>
         </div>
       </div>}
 
@@ -10042,6 +10158,24 @@ export default function App() {
           lang={lang}
           onClose={() => setShowSettings(false)}
           onSaved={d => { setTemplatePT(d.whatsapp_template_pt); setTemplateEN(d.whatsapp_template_en); }}
+        />
+      )}
+
+      {hasSwitcher && (
+        <ViewSwitcherModal
+          open={showViewSwitcher}
+          onClose={() => setShowViewSwitcher(false)}
+          viewMode={viewMode}
+          lang={lang}
+          hasBlanketMLAccess={hasBlanketMLAccess}
+          glGroup={glGroup}
+          glMinistry={glMinistry}
+          onApplyView={applyViewChange}
+          onGlGroupChange={handleGlGroupChange}
+          onGlMinistryChange={setGlMinistry}
+          VIEW_OPTS={VIEW_OPTS}
+          GL_GROUPS={GL_GROUPS}
+          MH_MINISTRIES={MH_MINISTRIES}
         />
       )}
 

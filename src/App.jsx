@@ -8888,32 +8888,12 @@ function ViewSwitcherModal({
   const [phase, setPhase] = React.useState(1);
   const [pending, setPending] = React.useState(null);
 
-  // Reset phase when modal opens
-  React.useEffect(() => {
-    if (open) { setPhase(1); setPending(null); }
-  }, [open]);
-
-  if (!open) return null;
+  // Derived values hoisted above all hooks so hook order is unconditional
+  const phase2List = pending === 'group_leader' ? GL_GROUPS : MH_MINISTRIES;
+  const phase2ActiveVal = pending === 'group_leader' ? glGroup : glMinistry;
 
   const needsGroup = (v) =>
     v === 'group_leader' || (v === 'ministry_leader_view' && hasBlanketMLAccess);
-
-  const handleViewSelect = (v) => {
-    if (needsGroup(v)) {
-      // If a group is already selected for this view, skip to Phase 2 auto-apply
-      const existingGroup = v === 'group_leader' ? glGroup : glMinistry;
-      if (existingGroup) {
-        onApplyView(v);
-        onClose();
-        return;
-      }
-      setPending(v);
-      setPhase(2);
-      return;
-    }
-    onApplyView(v);
-    onClose();
-  };
 
   const handleGroupSelect = (val) => {
     if (pending === 'group_leader') onGlGroupChange(val);
@@ -8922,15 +8902,31 @@ function ViewSwitcherModal({
     onClose();
   };
 
-  const phase2List = pending === 'group_leader' ? GL_GROUPS : MH_MINISTRIES;
-  const phase2ActiveVal = pending === 'group_leader' ? glGroup : glMinistry;
+  const handleViewSelect = (v) => {
+    if (needsGroup(v)) {
+      const existingGroup = v === 'group_leader' ? glGroup : glMinistry;
+      if (existingGroup) { onApplyView(v); onClose(); return; }
+      setPending(v);
+      setPhase(2);
+      return;
+    }
+    onApplyView(v);
+    onClose();
+  };
 
-  // Single-option auto-apply: if phase 2 has only one choice, apply it immediately
+  // All hooks unconditionally before any early return
   React.useEffect(() => {
-    if (phase === 2 && phase2List && phase2List.length === 1) {
+    if (open) { setPhase(1); setPending(null); }
+  }, [open]);
+
+  // Single-option auto-apply: guard is inside the effect so hook order never changes
+  React.useEffect(() => {
+    if (open && phase === 2 && phase2List && phase2List.length === 1) {
       handleGroupSelect(phase2List[0]);
     }
-  }, [phase, phase2List]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, phase, phase2List]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open) return null;
 
   const hdr = (txt) => (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px 10px'}}>

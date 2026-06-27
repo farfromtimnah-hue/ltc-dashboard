@@ -8905,8 +8905,8 @@ function ViewSwitcherModal({
 
   const handleViewSelect = (v) => {
     if (needsGroup(v)) {
-      const existingGroup = v === 'group_leader' ? glGroup : glMinistry;
-      if (existingGroup) { onApplyView(v); onClose(); return; }
+      // Always advance to Phase 2 so the user can confirm or switch group/ministry.
+      // The current selection is pre-highlighted via phase2ActiveVal.
       setPending(v);
       setPhase(2);
       return;

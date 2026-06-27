@@ -8547,16 +8547,21 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                 ) : allAreaAssignments.length > 0 ? (
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     {allAreaAssignments.map(asgn => {
-                      const asgnName = asgn.person_name || (() => { const p = allPersons.find(x => x && x.id === asgn.person_id); return p ? displayName(p) : (asgn.unmatched_name || String(asgn.person_id || "")); })();
-                      const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
                       const isPcSource = asgn.source === "planning_center";
+                      const linkedPerson = allPersons.find(x => x && x.id === asgn.person_id);
+                      const asgnName = (isPcSource && !asgn.person_id)
+                        ? (lang === "PT" ? "Voluntário" : "Volunteer")
+                        : (asgn.person_name || (linkedPerson ? displayName(linkedPerson) : (asgn.unmatched_name || String(asgn.person_id || ""))));
+                      const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
                       const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
                       return (
                         <div key={asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
                           {asgn.position_name && asgn.position_name !== areaKey && (
                             <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
                           )}
-                          <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>{asgnName}</span>
+                          <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif",display:"inline-flex",alignItems:"center",gap:4}}>
+                            {asgnName}{isPcSource && !asgn.person_id && <span style={{fontSize:9,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>🔒</span>}
+                          </span>
                           {!isPcSource && (
                             <>
                               <button onClick={()=>{ if (!isSaving) { setAssignPickerArea(area); setAssignPickerSearch(""); } }}
@@ -9188,7 +9193,7 @@ function PastorSchedulingTab({ token, lang }) {
                         if (!a) return null;
                         const isPC = a.source === 'planning_center';
                         const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
-                        const personName = a.person_name || a.preferred_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
+                        const personName = a.person_name || a.preferred_name || a.unmatched_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
                         const pid = String(a.person_id || '');
                         const hasConflict = pid && conflictPersonMap[pid];
                         const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
@@ -9251,7 +9256,7 @@ function PastorSchedulingTab({ token, lang }) {
                       if (!a) return null;
                       const isPC = a.source === 'planning_center';
                       const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
-                      const personName = a.person_name || a.preferred_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
+                      const personName = a.person_name || a.preferred_name || a.unmatched_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
                       const pid = String(a.person_id || '');
                       const hasConflict = pid && conflictPersonMap[pid];
                       const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];

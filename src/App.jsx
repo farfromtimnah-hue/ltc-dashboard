@@ -8610,7 +8610,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                     {allAreaAssignments.map(asgn => {
                       const isPcSource = asgn.source === "planning_center";
                       const linkedPerson = allPersons.find(x => x && x.id === asgn.person_id);
-                      const asgnName = (isPcSource && !asgn.person_id)
+                      const hasNoName = !asgn.person_name && !linkedPerson && !asgn.unmatched_name && !asgn.person_id;
+                      const asgnName = hasNoName
                         ? (lang === "PT" ? "Voluntário" : "Volunteer")
                         : (asgn.person_name || (linkedPerson ? displayName(linkedPerson) : (asgn.unmatched_name || String(asgn.person_id || ""))));
                       const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
@@ -8621,7 +8622,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                             <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
                           )}
                           <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif",display:"inline-flex",alignItems:"center",gap:4}}>
-                            {asgnName}{isPcSource && !asgn.person_id && <span style={{fontSize:9,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>🔒</span>}
+                            {asgnName}{hasNoName && <span style={{fontSize:9,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>🔒</span>}
                           </span>
                           {!isPcSource && (
                             <>

@@ -8617,7 +8617,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                       const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
                       const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
                       return (
-                        <div key={asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div key={asgn.assignment_id} style={{display:"flex",alignItems:"center",gap:6}}>
                           {asgn.position_name && asgn.position_name !== areaKey && (
                             <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
                           )}

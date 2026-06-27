@@ -8829,6 +8829,11 @@ function PastorSchedulingTab({ token, lang }) {
     var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
   }
+  function nextOccurrence(targetDow) {
+    var d = new Date(); var cur = d.getDay();
+    var diff = (targetDow - cur + 7) % 7;
+    d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d;
+  }
 
   const [selDate, setSelDate] = React.useState(nextSundayDate);
   const [selService, setSelService] = React.useState('Culto Manha');
@@ -8845,6 +8850,9 @@ function PastorSchedulingTab({ token, lang }) {
   const [peopleLoading, setPeopleLoading] = React.useState(false);
   const [chipMenu, setChipMenu] = React.useState(null);
   const [overflowMenu, setOverflowMenu] = React.useState(null);
+  const [refreshKey, setRefreshKey] = React.useState(0);
+
+  function loadPastorView() { setRefreshKey(k => k+1); }
 
   const dateStr = fmtDate(selDate);
   const isSundayService = SUNDAY_SERVICES.includes(selService);
@@ -8914,7 +8922,7 @@ function PastorSchedulingTab({ token, lang }) {
       });
     if (isSundayService) loadPositionsForMinistries(ALL_MINISTRIES);
     return () => { cancelled = true; };
-  }, [dateStr, selService, token]);
+  }, [dateStr, selService, token, refreshKey]);
 
   React.useEffect(() => {
     if (isSundayService) return;
@@ -9244,7 +9252,16 @@ function PastorSchedulingTab({ token, lang }) {
           {SERVICES.map(svc => {
             const active = selService === svc;
             return (
-              <button key={svc} onClick={() => { setSelService(svc); setPositionsMap({}); }} style={{
+              <button key={svc} onClick={() => {
+                setSelService(svc);
+                setPositionsMap({});
+                if (svc !== 'Shine' && svc !== 'Hero') {
+                  const dow = (svc === 'Culto Manha' || svc === 'Culto Tarde')
+                    ? 0
+                    : GROUP_SERVICE_DAY[svc];
+                  if (dow !== undefined) setSelDate(nextOccurrence(dow));
+                }
+              }} style={{
                 padding: '4px 12px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer',
                 border: active ? '1px solid rgba(94,234,212,0.4)' : '1px solid rgba(255,255,255,0.07)',
                 background: active ? 'rgba(94,234,212,0.12)' : 'rgba(255,255,255,0.02)',

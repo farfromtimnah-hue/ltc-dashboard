@@ -7947,6 +7947,17 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
   );
 }
 
+const MANUAL_DATE_GROUPS = new Set(['SHINE', 'HERO', 'CRIE']);
+const GROUP_SERVICE_DAY = {
+  'Legacy': 5,
+  'Rocket': 6,
+  'Link': 0,
+  'Culto Hope': 2,
+  'Culto Fé': 3,
+  'Carisma Serve Team': 6,
+  'English Service': 6,
+};
+
 function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -7955,6 +7966,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [expandedMinistry, setExpandedMinistry] = useState(null);
   const [alsoServingOpen, setAlsoServingOpen] = useState(false);
   const [schedDateIdx, setSchedDateIdx] = useState(0);
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [schedRefresh, setSchedRefresh] = useState(0);
   const [schedData, setSchedData] = useState(null);
   const [schedLoading, setSchedLoading] = useState(false);
@@ -8029,9 +8041,10 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   }, [token, groupName]);
 
   const upcomingDates = useMemo(() => {
+    if (MANUAL_DATE_GROUPS.has(groupName)) return [];
     const dates = [];
     const today = new Date();
-    const serviceDay = (groupName === 'English Service') ? 6 : 0;
+    const serviceDay = GROUP_SERVICE_DAY[groupName] ?? 0;
     const dayOfWeek = today.getDay();
     let daysToService = (serviceDay - dayOfWeek + 7) % 7;
     const base = new Date(today);
@@ -8047,7 +8060,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     return dates;
   }, [groupName]);
 
-  const schedDate = upcomingDates[schedDateIdx] || upcomingDates[0] || "";
+  const schedDate = MANUAL_DATE_GROUPS.has(groupName) ? manualDate : (upcomingDates[schedDateIdx] || upcomingDates[0] || "");
 
   const PCO_SERVICE_TYPE_IDS = {
     'English Service': '1707498',
@@ -8063,6 +8076,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
   useEffect(() => {
     if (!token || !groupName || !schedDate) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(schedDate)) { console.warn('[GroupLeaderView] invalid schedDate:', schedDate); return; }
     setSchedLoading(true);
     setSchedError(false);
     fetch(`${API}/group-schedule?group_name=${encodeURIComponent(groupName)}&service_date=${encodeURIComponent(schedDate)}`, {
@@ -8450,27 +8464,34 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
         {/* Date selector */}
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:20,flexWrap:"wrap"}}>
-          <button onClick={()=>setSchedDateIdx(i=>Math.max(0,i-1))} disabled={schedDateIdx===0}
-            style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===0?"#475a64":"#aebac0",cursor:schedDateIdx===0?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
-            {"<"}
-          </button>
-          {upcomingDates.slice(Math.max(0,schedDateIdx-1), schedDateIdx+4).map((d) => {
-            const absIdx = upcomingDates.indexOf(d);
-            const isSelected = d === schedDate;
-            return (
-              <button key={d} onClick={()=>setSchedDateIdx(absIdx)}
-                style={{padding:"5px 12px",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",
-                  background:isSelected?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
-                  border:isSelected?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.05)",
-                  color:isSelected?"#5eead4":"#6b7a82",fontWeight:isSelected?600:400}}>
-                {d}
+          {MANUAL_DATE_GROUPS.has(groupName) ? (
+            <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)}
+              style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,color:"#c5cfd4",padding:"5px 12px",fontSize:13,fontFamily:"'JetBrains Mono',monospace",outline:"none",cursor:"pointer"}} />
+          ) : (
+            <>
+              <button onClick={()=>setSchedDateIdx(i=>Math.max(0,i-1))} disabled={schedDateIdx===0}
+                style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===0?"#475a64":"#aebac0",cursor:schedDateIdx===0?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
+                {"<"}
               </button>
-            );
-          })}
-          <button onClick={()=>setSchedDateIdx(i=>Math.min(upcomingDates.length-1,i+1))} disabled={schedDateIdx===upcomingDates.length-1}
-            style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===upcomingDates.length-1?"#475a64":"#aebac0",cursor:schedDateIdx===upcomingDates.length-1?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
-            {">"}
-          </button>
+              {upcomingDates.slice(Math.max(0,schedDateIdx-1), schedDateIdx+4).map((d) => {
+                const absIdx = upcomingDates.indexOf(d);
+                const isSelected = d === schedDate;
+                return (
+                  <button key={d} onClick={()=>setSchedDateIdx(absIdx)}
+                    style={{padding:"5px 12px",borderRadius:8,fontSize:12,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",
+                      background:isSelected?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"rgba(255,255,255,0.02)",
+                      border:isSelected?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.05)",
+                      color:isSelected?"#5eead4":"#6b7a82",fontWeight:isSelected?600:400}}>
+                    {d}
+                  </button>
+                );
+              })}
+              <button onClick={()=>setSchedDateIdx(i=>Math.min(upcomingDates.length-1,i+1))} disabled={schedDateIdx===upcomingDates.length-1}
+                style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,color:schedDateIdx===upcomingDates.length-1?"#475a64":"#aebac0",cursor:schedDateIdx===upcomingDates.length-1?"default":"pointer",padding:"4px 10px",fontSize:14,lineHeight:1}}>
+                {">"}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Area list */}
@@ -9353,6 +9374,7 @@ export default function App() {
   const [lang, setLang] = useState("PT");
   const [viewMode, setViewMode] = useState("my_view");
   const [glGroup, setGlGroup] = useState("");
+  function handleGlGroupChange(val) { setGlGroup(val); }
   const [glMinistry, setGlMinistry] = useState("");
   const [welcomeBlessing] = useState(() => Math.floor(Math.random() * 3));
   const [welcomeVision] = useState(() => Math.floor(Math.random() * 4));
@@ -9730,7 +9752,7 @@ export default function App() {
         {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
       </select>
       {viewMode==='group_leader' && (
-        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)} style={{...selStyle,maxWidth:150}}>
+        <select value={glGroup} onChange={e=>handleGlGroupChange(e.target.value)} style={{...selStyle,maxWidth:150}}>
           <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
           {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
         </select>
@@ -9749,7 +9771,7 @@ export default function App() {
         {VIEW_OPTS.map(o=><option key={o[0]} value={o[0]}>{o[1]}</option>)}
       </select>
       {viewMode==='group_leader' && (
-        <select value={glGroup} onChange={e=>setGlGroup(e.target.value)}>
+        <select value={glGroup} onChange={e=>handleGlGroupChange(e.target.value)}>
           <option value="">{lang==="PT"?"Escolher grupo...":"Select group..."}</option>
           {GL_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
         </select>

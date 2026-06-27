@@ -9104,6 +9104,9 @@ function PastorSchedulingTab({ token, lang }) {
       asgnByPos[pn].push(a);
     });
 
+    const knownPosNames = new Set(positions.map(p => p?.position_name || p?.name || '').filter(Boolean));
+    const unmatchedPosNames = [...new Set(ministryAsgn.map(a => a?.position_name || '').filter(pn => pn && !knownPosNames.has(pn)))];
+
     return (
       <div key={ministry} className="glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
         {/* Card header */}
@@ -9136,6 +9139,7 @@ function PastorSchedulingTab({ token, lang }) {
               const minV = pos.min_volunteers || pos.min_count || 0;
               const idealV = pos.ideal_volunteers || pos.ideal_count || 0;
               const omKey = ministry+'::'+posName;
+
 
               return (
                 <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
@@ -9230,6 +9234,65 @@ function PastorSchedulingTab({ token, lang }) {
                       })}
                     </div>
                   )}
+                </div>
+              );
+            })}
+
+            {unmatchedPosNames.map(posName => {
+              const posAsgn = asgnByPos[posName] || [];
+              const posStatus = posAsgn.some(a => a.status === 'confirmed') ? 'confirmed' : 'pending';
+              const posColor = posStatus === 'confirmed' ? '#22c55e' : '#eab308';
+              const posBg   = posStatus === 'confirmed' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)';
+              return (
+                <div key={'_u_'+posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
+                  <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', marginBottom: 8 }}>{posName}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {posAsgn.map(a => {
+                      if (!a) return null;
+                      const isPC = a.source === 'planning_center';
+                      const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
+                      const personName = a.person_name || a.preferred_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
+                      const pid = String(a.person_id || '');
+                      const hasConflict = pid && conflictPersonMap[pid];
+                      const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
+                      const chipKey = a.id || (ministry+posName+personName);
+                      const isChipOpen = chipMenu?.id === a.id;
+                      if (isPC) {
+                        return (
+                          <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#6b7a82' }}>{personName}</span>
+                            <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>
+                            {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b', cursor: 'default' }}>⚠</span>}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={chipKey} style={{ position: 'relative' }}>
+                          <button onClick={e => { e.stopPropagation(); setChipMenu(isChipOpen ? null : { id: a.id, assignment: a }); }} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
+                            background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999, cursor: 'pointer',
+                          }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
+                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
+                            {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
+                          </button>
+                          {isChipOpen && (
+                            <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 400, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                              {[['confirmed',tx.confirmStatus,'#34d399'],['pending',tx.pendingStatus,'#f59e0b'],['declined',tx.declinedStatus,'#f87171'],['wants_reschedule',tx.reschedStatus,'#fb923c']].map(item => (
+                                <button key={item[0]} onClick={() => updateStatus(a.id, item[0])} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
+                                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: item[2], flexShrink: 0 }} />
+                                  {item[1]}
+                                </button>
+                              ))}
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                              <button onClick={() => removeAssignment(a.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#f87171', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.remove}</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}

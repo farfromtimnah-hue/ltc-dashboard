@@ -8157,7 +8157,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify({ service_type_id: serviceTypeId, service_date: schedDate }),
           });
-          setTimeout(() => setSchedRefresh(c => c + 1), 2000);
+          setTimeout(() => setSchedRefresh(c => c + 1), 4000);
         }
       })
       .catch(() => { setSchedError(true); setSchedLoading(false); });

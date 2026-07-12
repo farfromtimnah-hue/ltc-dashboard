@@ -9624,7 +9624,54 @@ function PastorSchedulingTab({ token, lang }) {
   );
 }
 
-export default function App() {
+// Top-level crash guard for the whole app. Unlike RefErrorBoundary (which
+// swallows the error and shows a generic "something went wrong" message
+// scoped to one sub-section), this one renders the actual error message and
+// component stack directly on the page. It exists because a Rules-of-Hooks
+// violation (React error #310, "Rendered more hooks than during the previous
+// render") once crashed the app to a silent full white screen with nothing
+// in the DOM and no visible clue, which made it much harder than necessary
+// to diagnose without opening DevTools before the crash happened. If App()
+// ever throws during render again, this shows the message/stack in place so
+// Nicole or a future session can read it straight off the page.
+class RootErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, info: null };
+  }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{minHeight:"100vh",background:"#050a10",color:"#e6f1f0",
+          fontFamily:"'JetBrains Mono',monospace",fontSize:13,padding:32,
+          whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700,
+            color:"#ef4444",marginBottom:16}}>
+            App crashed during render
+          </div>
+          <div style={{color:"#5eead4",marginBottom:8,fontWeight:600}}>
+            {String((this.state.error && this.state.error.message) || this.state.error)}
+          </div>
+          <div style={{color:"#aebac0",marginTop:16}}>
+            {this.state.error && this.state.error.stack}
+          </div>
+          {this.state.info && this.state.info.componentStack && (
+            <div style={{color:"#6b7a82",marginTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:16}}>
+              {this.state.info.componentStack}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppInner() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -9674,6 +9721,102 @@ export default function App() {
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];
+
+  // Tab set + overflow-observer effect must be declared here, unconditionally,
+  // BEFORE any early return below (auth loading, login screen, group_leader,
+  // member_portal). Hooks cannot live after a conditional return — doing so
+  // previously caused "Rendered more hooks than during the previous render"
+  // (React error #310): the login-screen render (token not yet set) returned
+  // early and skipped this useEffect entirely, while the post-login render
+  // (role/tabs known) reached it, so the hook count differed between renders.
+  // effectiveRole/tabs only need viewMode/role/t, all already assigned above,
+  // so computing them here is safe even before role is known (tabs is just
+  // ["analytics"] until role resolves; the effect body no-ops until the DOM
+  // refs it needs are mounted, which only happens on the authenticated render).
+  const effectiveRoleForTabs = viewMode === 'senior_pastor_view' ? 'senior_pastor'
+    : viewMode === 'pastor_view' ? 'pastor'
+    : role;
+  const tabs = [
+    { id: "analytics", label: t.analytics },
+    ...(effectiveRoleForTabs === 'pastor' || effectiveRoleForTabs === 'senior_pastor' || effectiveRoleForTabs === 'owner' ? [{ id: "attendance", label: t.attendance }] : []),
+    { id: "people", label: t.people },
+    { id: "gifting", label: t.byGifting },
+    { id: "health", label: t.ministryHealth },
+    { id: "reference", label: t.reference },
+    ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
+  ];
+  if (effectiveRoleForTabs === 'owner') tabs.push({ id: "users", label: t.usersTab });
+  const tabIdsKey = tabs.map(t2 => t2.id).join(',');
+
+  // Recompute which tabs overflow whenever the tab set changes, the nav
+  // container resizes (covers window resize + orientation change, since
+  // ResizeObserver fires for both), or the observer's own IntersectionObserver
+  // callback reports a change. Also re-checks once web fonts finish loading
+  // (document.fonts.ready), since a font swap can change each tab's natural
+  // width without firing a resize event.
+  useEffect(() => {
+    if (isMobile) { setNavOverflowIds([]); return; }
+    const container = navInnerRef.current;
+    const sentinel = navSentinelRef.current;
+    const strip = navStripRef.current;
+    const measureRow = navMeasureRowRef.current;
+    if (!container || !sentinel || !strip || !measureRow) return;
+
+    const ids = tabs.map(t2 => t2.id);
+
+    const recompute = () => {
+      const containerRect = container.getBoundingClientRect();
+      // Keep the hidden measure row anchored to the visible strip's real left
+      // edge so both rows share the same coordinate space before comparing.
+      measureRow.style.left = `${strip.getBoundingClientRect().left - containerRect.left}px`;
+      // The sentinel is a real flex item positioned right where the always-
+      // visible switcher/aux/lang/More items begin claiming space, so its
+      // left edge IS the true trailing boundary available to tabs — no
+      // pixel math against a calculated container width needed.
+      const boundaryRight = sentinel.getBoundingClientRect().left;
+      const overflowing = [];
+      // Tab priority for collapsing is right-to-left (last tab collapses
+      // first), matching the tab strip's left-to-right reading order.
+      for (let i = ids.length - 1; i >= 0; i--) {
+        const id = ids[i];
+        const el = navMeasureRefs.current.get(id);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        const fits = r.right <= boundaryRight && r.left >= containerRect.left;
+        if (!fits) overflowing.push(id);
+      }
+      setNavOverflowIds(prev => {
+        if (prev.length === overflowing.length && prev.every((v, idx) => v === overflowing[idx])) return prev;
+        return overflowing;
+      });
+    };
+
+    // IntersectionObserver drives re-evaluation off real rendered visibility
+    // (not a one-off width snapshot): any time a measured tab or the trailing
+    // sentinel crosses the container's visible bounds, recompute.
+    const io = new IntersectionObserver(() => recompute(), { root: container, threshold: [0, 1] });
+    io.observe(sentinel);
+    navMeasureRefs.current.forEach(el => io.observe(el));
+
+    // ResizeObserver on the container itself catches window resize and
+    // orientation change (both change container width) without a hardcoded
+    // delay or timeout.
+    const ro = new ResizeObserver(() => recompute());
+    ro.observe(container);
+
+    let cancelled = false;
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { if (!cancelled) recompute(); });
+    }
+
+    recompute();
+
+    return () => {
+      cancelled = true;
+      io.disconnect();
+      ro.disconnect();
+    };
+  }, [tabIdsKey, isMobile]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -9864,91 +10007,7 @@ export default function App() {
 
   const roleLabel = { owner: t.roleOwner, senior_pastor: t.roleSeniorPastor, pastor: t.rolePastor, group_leader: t.roleGroupLeader };
 
-  const effectiveRole = viewMode === 'senior_pastor_view' ? 'senior_pastor'
-    : viewMode === 'pastor_view' ? 'pastor'
-    : role;
-
-  const tabs = [
-    { id: "analytics", label: t.analytics },
-    ...(effectiveRole === 'pastor' || effectiveRole === 'senior_pastor' || effectiveRole === 'owner' ? [{ id: "attendance", label: t.attendance }] : []),
-    { id: "people", label: t.people },
-    { id: "gifting", label: t.byGifting },
-    { id: "health", label: t.ministryHealth },
-    { id: "reference", label: t.reference },
-    ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
-  ];
-  if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
-  const tabIdsKey = tabs.map(t2 => t2.id).join(',');
-
-  // Recompute which tabs overflow whenever the tab set changes, the nav
-  // container resizes (covers window resize + orientation change, since
-  // ResizeObserver fires for both), or the observer's own IntersectionObserver
-  // callback reports a change. Also re-checks once web fonts finish loading
-  // (document.fonts.ready), since a font swap can change each tab's natural
-  // width without firing a resize event.
-  useEffect(() => {
-    if (isMobile) { setNavOverflowIds([]); return; }
-    const container = navInnerRef.current;
-    const sentinel = navSentinelRef.current;
-    const strip = navStripRef.current;
-    const measureRow = navMeasureRowRef.current;
-    if (!container || !sentinel || !strip || !measureRow) return;
-
-    const ids = tabs.map(t2 => t2.id);
-
-    const recompute = () => {
-      const containerRect = container.getBoundingClientRect();
-      // Keep the hidden measure row anchored to the visible strip's real left
-      // edge so both rows share the same coordinate space before comparing.
-      measureRow.style.left = `${strip.getBoundingClientRect().left - containerRect.left}px`;
-      // The sentinel is a real flex item positioned right where the always-
-      // visible switcher/aux/lang/More items begin claiming space, so its
-      // left edge IS the true trailing boundary available to tabs — no
-      // pixel math against a calculated container width needed.
-      const boundaryRight = sentinel.getBoundingClientRect().left;
-      const overflowing = [];
-      // Tab priority for collapsing is right-to-left (last tab collapses
-      // first), matching the tab strip's left-to-right reading order.
-      for (let i = ids.length - 1; i >= 0; i--) {
-        const id = ids[i];
-        const el = navMeasureRefs.current.get(id);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        const fits = r.right <= boundaryRight && r.left >= containerRect.left;
-        if (!fits) overflowing.push(id);
-      }
-      setNavOverflowIds(prev => {
-        if (prev.length === overflowing.length && prev.every((v, idx) => v === overflowing[idx])) return prev;
-        return overflowing;
-      });
-    };
-
-    // IntersectionObserver drives re-evaluation off real rendered visibility
-    // (not a one-off width snapshot): any time a measured tab or the trailing
-    // sentinel crosses the container's visible bounds, recompute.
-    const io = new IntersectionObserver(() => recompute(), { root: container, threshold: [0, 1] });
-    io.observe(sentinel);
-    navMeasureRefs.current.forEach(el => io.observe(el));
-
-    // ResizeObserver on the container itself catches window resize and
-    // orientation change (both change container width) without a hardcoded
-    // delay or timeout.
-    const ro = new ResizeObserver(() => recompute());
-    ro.observe(container);
-
-    let cancelled = false;
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => { if (!cancelled) recompute(); });
-    }
-
-    recompute();
-
-    return () => {
-      cancelled = true;
-      io.disconnect();
-      ro.disconnect();
-    };
-  }, [tabIdsKey, isMobile]);
+  const effectiveRole = effectiveRoleForTabs;
 
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
@@ -10099,7 +10158,7 @@ export default function App() {
   );
   const moreBtn = () => (
     <button onClick={()=>setMoreOpen(o=>!o)} className="btn-ghost"
-      style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+      style={{padding:"8px 14px",borderRadius:8,fontSize:12,color:"#aebac0",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",minWidth:64,justifyContent:"center"}}>
       {lang==="PT"?"Mais":"More"} <span style={{fontSize:9,lineHeight:1}}>&#9660;</span>
     </button>
   );
@@ -10300,5 +10359,13 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <RootErrorBoundary>
+      <AppInner />
+    </RootErrorBoundary>
   );
 }

@@ -10320,7 +10320,7 @@ function AppInner() {
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && tab === "scheduling" && ['owner','senior_pastor','pastor'].includes(role) && (
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && ['owner','senior_pastor','pastor'].includes(role) && (
           <RefErrorBoundary lang={lang} onBack={() => setTab('analytics')}>
             <PastorSchedulingTab token={token} lang={lang} />
           </RefErrorBoundary>

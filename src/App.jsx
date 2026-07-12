@@ -10194,11 +10194,14 @@ function AppInner() {
           {/* Sentinel: a real (non-absolute) zero-width flex item immediately
               after the tab strip. Because the tab strip above is flex:1 (sized
               by layout, not by its own content), the sentinel always lands
-              exactly where the fixed-size switcher/aux/lang/More items begin —
+              exactly where the fixed-size More/switcher/aux/lang items begin —
               the true trailing edge available to tabs — independent of how
-              many tabs are currently visible. The IntersectionObserver compares
-              each measured tab's position against this element's rendered
-              bounds, so overflow reflects actual geometry, not pixel math. */}
+              many tabs are currently visible. This holds regardless of which
+              fixed-size items sit after the sentinel or in what order, since
+              the tab strip remains the only flex-growing item ahead of it.
+              The IntersectionObserver compares each measured tab's position
+              against this element's rendered bounds, so overflow reflects
+              actual geometry, not pixel math. */}
           <div ref={navSentinelRef} className="nav-sentinel" />
 
           {/* Hidden measure row: every tab at natural size, never clipped or
@@ -10212,21 +10215,13 @@ function AppInner() {
             {tabs.map(t2=>tabBtn(t2,{measuring:true}))}
           </div>
 
-          {/* View switcher button — only when hasSwitcher */}
-          {hasSwitcher && viewSwitcherBtn()}
-
-          {/* Gear + logout — always visible at desktop widths */}
-          {auxNav()}
-
-          {/* Spacer */}
-          <div style={{flex:"1 1 0",minWidth:0}} />
-
-          {/* PT/EN toggle — always visible. Never collapses. */}
-          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
-
-          {/* More button — always visible when any tab has overflowed; also
-              serves as a permanent escape hatch. Drawer contains overflowed
-              tabs + Switch View + utility. */}
+          {/* More button — moved here, immediately after the sentinel and
+              directly adjacent to the tab strip / view switcher, instead of
+              its old spot next to the language toggle on the far right. Only
+              this button's position changed; the settings gear, switch-view
+              icon, and language toggle all stay where they were. Still
+              always visible when any tab has overflowed; still a permanent
+              escape hatch. Drawer contents unchanged. */}
           <div className="nav-more-btn" style={{flex:"0 0 auto",position:"relative"}}>
             {moreBtn()}
             {moreOpen && (
@@ -10251,6 +10246,18 @@ function AppInner() {
               </>
             )}
           </div>
+
+          {/* View switcher button — only when hasSwitcher */}
+          {hasSwitcher && viewSwitcherBtn()}
+
+          {/* Gear + logout — always visible at desktop widths. Unmoved. */}
+          {auxNav()}
+
+          {/* Spacer */}
+          <div style={{flex:"1 1 0",minWidth:0}} />
+
+          {/* PT/EN toggle — always visible. Never collapses. Unmoved. */}
+          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
 
         </div>
       </div>}

@@ -755,42 +755,13 @@ const css = `
   }
   .drawer-panel { animation: drawerSlide 0.32s cubic-bezier(0.16,1,0.3,1); }
 
-  /* ── Nav container queries ───────────────────────────────────────────
-     Safety-first defaults: every nav item (tabs, title, More button) is
-     visible by default. Container queries only ever HIDE things once a
-     width tier is positively confirmed - nothing depends on a container
-     query successfully matching to become visible. This way, if Safari's
-     container-query engine fails to (re)evaluate on a hard refresh (a
-     known WebKit bug where results can be cached/stale across a late
-     layout/font-swap pass), the nav degrades to "everything shown,
-     possibly a bit crowded" instead of "items vanish with no fallback." */
-  .nav-inner { container-type: inline-size; container-name: nav-inner; }
-
-  /* Tab labels: hidden by default (icon-only is the safe first-paint state) */
-  .tab-lbl { display: none; }
-  /* Switcher label: hidden by default */
-  .nav-switcher-lbl { display: none; }
-  /* Wide (≥1100px): show labels */
-  @container nav-inner (min-width: 1100px) {
-    .tab-lbl { display: inline; }
-    .nav-switcher-lbl { display: inline; }
-  }
-
-  /* More button: visible by default (safe fallback). Hidden only once a
-     wide container is positively confirmed, so secondary tabs are still
-     reachable even if the narrow-hide query below never fires. */
-  .nav-more-btn { display: flex; }
-  @container nav-inner (min-width: 860px) {
-    .nav-more-btn { display: none !important; }
-  }
-
-  /* Narrow (<860px): hide secondary tabs + title once wide-enough is
-     positively confirmed NOT to match. Default (no query support, or
-     query not yet evaluated) leaves them visible - never invisible. */
-  @container nav-inner (max-width: 859px) {
-    .tab-secondary { display: none !important; }
-    .nav-title { display: none !important; }
-  }
+  /* ── Nav overflow (IntersectionObserver-driven) ───────────────────────
+     Every tab renders in the strip by default (no CSS-only hide/show
+     tiers, no container-query breakpoints). A JS IntersectionObserver
+     watches each tab plus a trailing sentinel against the nav-inner
+     container's actual rendered bounds and moves whichever tabs are not
+     fully visible into the More drawer. See the overflow effect in App(). */
+  .nav-sentinel { flex: 0 0 1px; width: 1px; height: 1px; }
 
   /* ── View Switcher Modal ──────────────────────────────────────────── */
   .vsm-overlay {
@@ -9682,39 +9653,23 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Nudge Safari to re-evaluate the nav's CSS container queries after the
-  // page's first layout pass. Safari can compute (and cache) container
-  // query results before web fonts swap in and before layout is fully
-  // settled on a hard refresh, leaving stale results in place indefinitely
-  // (no built-in re-check runs afterward). Forcing a reflow at each of
-  // these checkpoints - fonts ready, next paint, resize, orientation
-  // change - gives the container query engine a fresh layout to evaluate
-  // against. This is a nudge, not a measurement: the CSS above already
-  // defaults every nav item to visible, so this only helps the icon-only
-  // and secondary-tab tiers resolve to their correct (narrower) state
-  // sooner, it never affects whether items are reachable.
-  useEffect(() => {
-    const navInner = document.querySelector('.nav-inner');
-    if (!navInner) return;
-    const nudge = () => { void navInner.offsetWidth; };
-    let raf1 = null, raf2 = null;
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => {
-        raf1 = requestAnimationFrame(() => {
-          nudge();
-          raf2 = requestAnimationFrame(nudge);
-        });
-      });
-    }
-    window.addEventListener('resize', nudge);
-    window.addEventListener('orientationchange', nudge);
-    return () => {
-      if (raf1) cancelAnimationFrame(raf1);
-      if (raf2) cancelAnimationFrame(raf2);
-      window.removeEventListener('resize', nudge);
-      window.removeEventListener('orientationchange', nudge);
-    };
-  }, [isMobile]);
+  // ── Desktop nav overflow (IntersectionObserver, not width math) ──────────
+  // IDs of tabs currently pushed into the More drawer because they no longer
+  // fully fit the nav strip. A hidden "measure" copy of every tab is always
+  // rendered at natural size (see tabBtn's measuring mode) inside the same
+  // scroll container as the visible nav; an IntersectionObserver watches
+  // each measure-tab plus a trailing sentinel against that container's real
+  // bounding box. Whichever tabs are not >=99% intersecting are overflowed,
+  // lowest-priority (rightmost in the tab order) first. This reports actual
+  // rendered visibility rather than a calculated snapshot, so it needs no
+  // hardcoded delay and re-resolves itself after web fonts finish loading,
+  // on resize, and on orientation change without any manual re-trigger.
+  const [navOverflowIds, setNavOverflowIds] = useState([]);
+  const navInnerRef = useRef(null);
+  const navStripRef = useRef(null);
+  const navMeasureRowRef = useRef(null);
+  const navMeasureRefs = useRef(new Map());
+  const navSentinelRef = useRef(null);
 
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -9923,6 +9878,77 @@ export default function App() {
     ...(['owner','senior_pastor','pastor'].includes(role) ? [{ id:"scheduling", label:t.scheduling }] : []),
   ];
   if (effectiveRole === 'owner') tabs.push({ id: "users", label: t.usersTab });
+  const tabIdsKey = tabs.map(t2 => t2.id).join(',');
+
+  // Recompute which tabs overflow whenever the tab set changes, the nav
+  // container resizes (covers window resize + orientation change, since
+  // ResizeObserver fires for both), or the observer's own IntersectionObserver
+  // callback reports a change. Also re-checks once web fonts finish loading
+  // (document.fonts.ready), since a font swap can change each tab's natural
+  // width without firing a resize event.
+  useEffect(() => {
+    if (isMobile) { setNavOverflowIds([]); return; }
+    const container = navInnerRef.current;
+    const sentinel = navSentinelRef.current;
+    const strip = navStripRef.current;
+    const measureRow = navMeasureRowRef.current;
+    if (!container || !sentinel || !strip || !measureRow) return;
+
+    const ids = tabs.map(t2 => t2.id);
+
+    const recompute = () => {
+      const containerRect = container.getBoundingClientRect();
+      // Keep the hidden measure row anchored to the visible strip's real left
+      // edge so both rows share the same coordinate space before comparing.
+      measureRow.style.left = `${strip.getBoundingClientRect().left - containerRect.left}px`;
+      // The sentinel is a real flex item positioned right where the always-
+      // visible switcher/aux/lang/More items begin claiming space, so its
+      // left edge IS the true trailing boundary available to tabs — no
+      // pixel math against a calculated container width needed.
+      const boundaryRight = sentinel.getBoundingClientRect().left;
+      const overflowing = [];
+      // Tab priority for collapsing is right-to-left (last tab collapses
+      // first), matching the tab strip's left-to-right reading order.
+      for (let i = ids.length - 1; i >= 0; i--) {
+        const id = ids[i];
+        const el = navMeasureRefs.current.get(id);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        const fits = r.right <= boundaryRight && r.left >= containerRect.left;
+        if (!fits) overflowing.push(id);
+      }
+      setNavOverflowIds(prev => {
+        if (prev.length === overflowing.length && prev.every((v, idx) => v === overflowing[idx])) return prev;
+        return overflowing;
+      });
+    };
+
+    // IntersectionObserver drives re-evaluation off real rendered visibility
+    // (not a one-off width snapshot): any time a measured tab or the trailing
+    // sentinel crosses the container's visible bounds, recompute.
+    const io = new IntersectionObserver(() => recompute(), { root: container, threshold: [0, 1] });
+    io.observe(sentinel);
+    navMeasureRefs.current.forEach(el => io.observe(el));
+
+    // ResizeObserver on the container itself catches window resize and
+    // orientation change (both change container width) without a hardcoded
+    // delay or timeout.
+    const ro = new ResizeObserver(() => recompute());
+    ro.observe(container);
+
+    let cancelled = false;
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { if (!cancelled) recompute(); });
+    }
+
+    recompute();
+
+    return () => {
+      cancelled = true;
+      io.disconnect();
+      ro.disconnect();
+    };
+  }, [tabIdsKey, isMobile]);
 
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
@@ -9937,28 +9963,36 @@ export default function App() {
     if (['new_believer_view','start_class_view','baptism_view','cafe_view'].includes(v)) setTab('people');
   };
 
-  // Secondary tabs: hidden at narrow widths, always in More drawer
-  const SECONDARY_TABS = new Set(['attendance','gifting','reference','users']);
   const TAB_ICONS = {
     analytics: IconBarChart, attendance: IconCalendar, people: IconUsers,
     gifting: IconStar, health: IconHeart, reference: IconUser,
     scheduling: IconCalendar, users: IconUser,
   };
-  const tabBtn = (t2) => {
+  // Tabs currently pushed into the More drawer because they no longer fully
+  // intersect the nav strip (see the IntersectionObserver wiring below).
+  const overflowSet = new Set(navOverflowIds);
+  const tabBtn = (t2, opts) => {
+    const measuring = !!(opts && opts.measuring);
     const Ic = TAB_ICONS[t2.id];
     const isActive = tab === t2.id;
     return (
       <button key={t2.id}
-        className={SECONDARY_TABS.has(t2.id) ? 'tab-secondary' : undefined}
-        onClick={() => { setBannerDismissed(true); setTab(t2.id); }}
+        data-nav-tab-id={t2.id}
+        ref={measuring
+          ? (el => { if (el) navMeasureRefs.current.set(t2.id, el); else navMeasureRefs.current.delete(t2.id); })
+          : undefined}
+        onClick={measuring ? undefined : () => { setBannerDismissed(true); setTab(t2.id); }}
+        tabIndex={measuring ? -1 : 0}
+        aria-hidden={measuring ? true : undefined}
         style={{background:'transparent',border:'none',padding:'6px 8px',position:'relative',
           color:isActive?'#e6f1f0':'#6b7a82',fontSize:11,fontFamily:"'JetBrains Mono',monospace",
           fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer',
-          transition:'color 0.18s',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}
-        onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.color='#aebac0'; }}
-        onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.color='#6b7a82'; }}>
+          transition:'color 0.18s',alignItems:'center',gap:5,flexShrink:0,whiteSpace:'nowrap',
+          display: (!measuring && overflowSet.has(t2.id)) ? 'none' : 'inline-flex'}}
+        onMouseEnter={measuring ? undefined : e=>{ if(!isActive) e.currentTarget.style.color='#aebac0'; }}
+        onMouseLeave={measuring ? undefined : e=>{ if(!isActive) e.currentTarget.style.color='#6b7a82'; }}>
         {Ic && <Ic s={14} c="currentColor" />}
-        <span className="tab-lbl">{t2.label}</span>
+        <span>{t2.label}</span>
         {isActive && <span style={{position:'absolute',left:0,right:0,bottom:-2,height:2,
           background:'linear-gradient(90deg,transparent,#5eead4,transparent)',
           boxShadow:'0 0 12px #5eead4'}} />}
@@ -10073,23 +10107,50 @@ export default function App() {
     <div className="app" style={{height:"100vh",display:"flex",flexDirection:"column"}}>
       <style>{css}</style>
 
-      {/* Nav: CSS container queries handle icon+label → icon-only → secondary-tabs-hidden.
-          Hidden on mobile — replaced by the fixed bottom dock below. */}
+      {/* Nav: overflow is handled by IntersectionObserver watching a hidden,
+          always-full-width measure row against the nav-inner container's
+          real rendered bounds. Hidden on mobile — replaced by the fixed
+          bottom dock below. */}
       {!isMobile && <div className="nav" style={{flexShrink:0,zIndex:50}}>
-        <div className="nav-inner" style={{maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:10,height:52}}>
+        <div ref={navInnerRef} className="nav-inner" style={{position:"relative",maxWidth:1600,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",gap:10,height:52}}>
 
-          {/* Logo + title (title hidden via .nav-title CSS at narrow) */}
+          {/* Logo + title. Never collapses. */}
           <div style={{display:"flex",alignItems:"center",gap:12,flex:"0 0 auto"}}>
             <img src={`${import.meta.env.BASE_URL}LTC1.svg`} alt="Lagoinha Tampa" style={{height:32,width:"auto",objectFit:"contain",display:"block",flexShrink:0}} />
-            <div className="nav-title" style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
               <div style={{width:1,height:24,background:"rgba(255,255,255,0.06)",flexShrink:0}} />
               <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,whiteSpace:"nowrap"}}>{t.dashboard}</span>
             </div>
           </div>
 
-          {/* All tabs — CSS hides .tab-lbl at medium, hides .tab-secondary at narrow */}
-          <div style={{display:"flex",alignItems:"center",gap:6,flex:"0 1 auto",minWidth:0,overflow:"hidden"}}>
+          {/* Visible tab strip: flex:1 so this box always occupies exactly the
+              space left over after the fixed-size items around it (logo/title,
+              switcher, aux, lang toggle, More), regardless of how many tabs are
+              currently visible inside it. Tabs pushed into navOverflowIds
+              render display:none so the row reflows to fill freed space. */}
+          <div ref={navStripRef} style={{display:"flex",alignItems:"center",gap:6,flex:"1 1 auto",minWidth:0,overflow:"hidden"}}>
             {tabs.map(t2=>tabBtn(t2))}
+          </div>
+
+          {/* Sentinel: a real (non-absolute) zero-width flex item immediately
+              after the tab strip. Because the tab strip above is flex:1 (sized
+              by layout, not by its own content), the sentinel always lands
+              exactly where the fixed-size switcher/aux/lang/More items begin —
+              the true trailing edge available to tabs — independent of how
+              many tabs are currently visible. The IntersectionObserver compares
+              each measured tab's position against this element's rendered
+              bounds, so overflow reflects actual geometry, not pixel math. */}
+          <div ref={navSentinelRef} className="nav-sentinel" />
+
+          {/* Hidden measure row: every tab at natural size, never clipped or
+              shrunk. Its left offset is set imperatively (see the overflow
+              effect) to match the visible strip's real left edge each time
+              layout is recomputed, so the two rows always share the same
+              coordinate space — no width math beyond reading that offset,
+              no magic numbers or timeouts. */}
+          <div ref={navMeasureRowRef} aria-hidden="true" style={{position:"absolute",top:0,left:0,
+            display:"flex",alignItems:"center",gap:6,visibility:"hidden",pointerEvents:"none",height:52}}>
+            {tabs.map(t2=>tabBtn(t2,{measuring:true}))}
           </div>
 
           {/* View switcher button — only when hasSwitcher */}
@@ -10101,18 +10162,19 @@ export default function App() {
           {/* Spacer */}
           <div style={{flex:"1 1 0",minWidth:0}} />
 
-          {/* PT/EN toggle — always visible */}
+          {/* PT/EN toggle — always visible. Never collapses. */}
           <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
 
-          {/* More button — CSS shows only at narrow (<860px container width).
-              Drawer contains secondary tabs + Switch View + utility. */}
+          {/* More button — always visible when any tab has overflowed; also
+              serves as a permanent escape hatch. Drawer contains overflowed
+              tabs + Switch View + utility. */}
           <div className="nav-more-btn" style={{flex:"0 0 auto",position:"relative"}}>
             {moreBtn()}
             {moreOpen && (
               <>
                 <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
                 <div className="pp-dropdown">
-                  {tabs.filter(t2=>SECONDARY_TABS.has(t2.id)).map(t2=>(
+                  {tabs.filter(t2=>overflowSet.has(t2.id)).map(t2=>(
                     <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}
                       onClick={()=>{setBannerDismissed(true);setTab(t2.id);setMoreOpen(false);}}>
                       {t2.label}

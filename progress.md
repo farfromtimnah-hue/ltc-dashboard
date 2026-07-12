@@ -2844,3 +2844,113 @@ was already defined in `STATUS_COLOR` (grey `#475a64`).
 
 ### Files changed
 - `src/App.jsx` lines ~8796 and ~8816 (two one-line filter changes, no structural changes)
+
+---
+
+DATE: 2026-07-12
+SESSION: Desktop nav overflow — full rebuild on IntersectionObserver (not a patch)
+
+### Context: two prior systems, both replaced
+1. Original Priority+ nav used manual `ResizeObserver` + a hidden mirror row + hardcoded
+   per-item pixel widths to decide what collapsed into More. Removed 2026-06-27 (commit
+   `1667221`) for a Safari hard-refresh timing bug.
+2. Its replacement used CSS `@container` queries (`@container nav-inner`) with two hardcoded
+   breakpoints (1100px / 860px) driving which tabs got `.tab-secondary` (collapsible) vs stayed
+   permanently visible. Patched this morning (commit `deb6ab7`) for a theorized WebKit
+   container-query caching bug on hard refresh.
+
+### Real root cause (found by reading the code, not guessing)
+Nicole reported the bug reproduces in fresh incognito Chrome too, not just Safari — ruling out
+a WebKit-only container-query timing race as the sole explanation. Reading the nav render block
+(`tabs` array + `tabBtn` + the nav JSX, ~App.jsx 9862-10093 pre-fix) found a structural gap:
+only 4 of up to 7 possible tabs (`attendance`, `gifting`, `reference`, `users`) were tagged
+`.tab-secondary`, the only class the container-query system knew how to hide into More. The
+other tabs (`analytics`, `people`, `health`, `scheduling`) had **no overflow handling at all**.
+The wrapping div around all tabs was `flex:"0 1 auto", minWidth:0, overflow:"hidden"` — when
+total tab width exceeded available space (long PT labels, `scheduling`/`users` present for
+some roles), flexbox silently clipped whichever primary tabs didn't fit via `overflow:hidden`.
+No thrown error, no failed prop type — correct-per-spec CSS producing the wrong UX. This
+explains "items vanish, no More button appears" independent of browser or cache state.
+(Checked `RefErrorBoundary` too — its `componentDidCatch(){}` is empty/silent, but it only
+wraps individual tab *content* panels, not the nav bar, so it isn't implicated here.)
+
+### Rebuild: IntersectionObserver + sentinel, not CSS breakpoints or width math
+Per explicit instruction, replaced the container-query system entirely (not patched again):
+- All tabs (not just the old "secondary" 4) render in the strip by default and are all
+  eligible to collapse into More, in right-to-left priority order.
+- A hidden "measure" row renders every tab at natural, never-clipped size (`tabBtn(t2,
+  {measuring:true})`), positioned via a ref-based left-offset sync to the visible strip's
+  real left edge (set imperatively inside the effect, not via React state, to avoid stale
+  refs at render time).
+- A real (non-absolute) 1px flex sentinel (`.nav-sentinel`) sits immediately after the visible
+  tab strip. Because the strip itself is `flex:"1 1 auto"` (sized by remaining layout space,
+  not by its own children), the sentinel's left edge always lands exactly at the true trailing
+  boundary — where switcher/aux/lang-toggle/More begin — regardless of how many tabs are
+  currently visible.
+- `IntersectionObserver` (root: nav-inner) watches the sentinel and every measured tab;
+  its callback re-derives `navOverflowIds` by comparing each measured tab's real
+  `getBoundingClientRect()` against the sentinel's position. A `ResizeObserver` on nav-inner
+  and a `document.fonts.ready` check trigger re-evaluation on resize, orientation change, and
+  after web fonts finish loading — no hardcoded delays or magic-number timeouts anywhere.
+- Logo/title (left) and the PT/EN language toggle (far right) never collapse. More button +
+  gear/logout/view-switcher (right) are always rendered. Mobile bottom dock
+  (`MobileDock`/`blanketDockItems`/`mlDockItems`, isMobile-gated, role-aware tab counts) is a
+  fully separate component tree and was not touched — investigation confirmed it does not
+  share the desktop nav's overflow code path.
+- Deleted: the `@container nav-inner` CSS block, `.tab-lbl`/`.nav-switcher-lbl`/`.tab-secondary`/
+  `.nav-title` display rules, `.nav-more-btn` container-query visibility rules, and the Safari
+  "nudge" `useEffect` (forced reflow on fonts.ready/resize/orientationchange). None of the old
+  ResizeObserver-measurement code remained to remove (already gone since `1667221`); confirmed
+  via `grep -c "@container"` on the built bundle = 0.
+- Kept: the `index.html` `<link>` web-font preload from this morning's commit — early font
+  loading is good practice independent of which overflow mechanism is used.
+
+### Verification
+- `npm run build` passes clean (only the pre-existing >500kB chunk warning).
+- Built bundle (`dist/assets/index-*.js`) contains `IntersectionObserver` and `nav-sentinel`;
+  contains zero occurrences of `@container` — old system fully removed, not left dead alongside
+  the new one.
+- No em/en dashes introduced in any user-facing string (checked full diff; the only em dashes
+  present are inside code comments).
+
+### Honesty about what this does and doesn't prove
+This is a **rebuild using a different technical approach** (IntersectionObserver + sentinel
+against real rendered geometry, replacing CSS container-query breakpoints), not a guarantee
+the underlying bug is fully resolved — the true root cause was never conclusively confirmed by
+a live browser repro in this session, only inferred from static code reading. The structural
+gap found (primary tabs with no collapse path, clipped by `overflow:hidden`) is a strong,
+concrete, browser-independent explanation that fits the Chrome-incognito repro the Safari-only
+timing theory couldn't, and this rebuild closes that gap directly (every tab is now
+observer-eligible for collapse). It does not rule out some other secondary browser-specific
+factor also being present.
+
+### Manual test to confirm the fix (required — not run in this session, no live browser access)
+On both a fresh load and a hard refresh, in both Chrome and Safari if possible:
+1. Load the dashboard logged in as a role with the most tabs (owner — up to 7 tabs incl.
+   `users`), at a range of desktop window widths from very wide down to ~860px and narrower.
+2. Confirm every tab is either visibly present in the strip OR reachable via the More button —
+   never silently missing with no way to reach it.
+3. Slowly resize the browser window (or use devtools responsive mode) across the point where
+   tabs start overflowing, and confirm tabs move into More exactly when they'd otherwise be
+   clipped, and back out of More the instant there's room again (no flicker, no stuck state).
+4. Hard refresh (cmd+shift+R / disable cache in devtools) at a narrow-ish width where overflow
+   should be active, several times in a row, in both browsers — confirm tabs never vanish
+   without a working More button on any single load.
+5. Test in a fresh Chrome Incognito window specifically (the repro Nicole confirmed), plus
+   Safari private browsing, plus iPad/mobile Safari at the bottom-dock breakpoint (should be
+   unaffected — verify it still shows the correct role-based tab count).
+6. Throttle network in devtools to slow 3G once to stress-test the web-font-load timing path
+   (fonts arriving late should not cause tabs to mis-collapse).
+
+### Deploy
+Deploys via GitHub Actions on push to `main`. **Wait for the green checkmark on the Actions run
+before testing live** — GitHub Pages' CDN can lag 10-20 minutes behind a successful deploy, so
+a hard refresh in the browser can still show a stale bundle even after Actions is green. A
+`curl -sI <live-url>` or checking response headers/asset hash against the latest
+`dist/assets/index-*.js` filename is more reliable than a browser hard refresh alone for
+confirming the new bundle is actually being served.
+
+### Files changed
+- `src/App.jsx` — nav overflow system rebuilt (~150 insertions, ~90 deletions net across the
+  CSS block, the state/refs near the top of `App()`, the `tabs`/`tabBtn` logic, and the nav
+  JSX render block). `index.html` unchanged (font-link fix from `deb6ab7` kept as-is).

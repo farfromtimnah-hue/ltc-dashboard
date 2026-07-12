@@ -581,7 +581,10 @@ const L = {
 
 // ─── CSS ─────────────────────────────────────────────────────────
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  /* Web fonts are loaded via a <link> in index.html <head> so they start
+     fetching at document-parse time, not after this style tag mounts.
+     Loading fonts late here raced Safari's container-query re-evaluation
+     on hard refresh, producing wrong nav widths and vanished nav items. */
 
   :root {
     --bg-0: #050a10;
@@ -752,7 +755,15 @@ const css = `
   }
   .drawer-panel { animation: drawerSlide 0.32s cubic-bezier(0.16,1,0.3,1); }
 
-  /* ── Nav container queries ───────────────────────────────────────── */
+  /* ── Nav container queries ───────────────────────────────────────────
+     Safety-first defaults: every nav item (tabs, title, More button) is
+     visible by default. Container queries only ever HIDE things once a
+     width tier is positively confirmed - nothing depends on a container
+     query successfully matching to become visible. This way, if Safari's
+     container-query engine fails to (re)evaluate on a hard refresh (a
+     known WebKit bug where results can be cached/stale across a late
+     layout/font-swap pass), the nav degrades to "everything shown,
+     possibly a bit crowded" instead of "items vanish with no fallback." */
   .nav-inner { container-type: inline-size; container-name: nav-inner; }
 
   /* Tab labels: hidden by default (icon-only is the safe first-paint state) */
@@ -765,16 +776,20 @@ const css = `
     .nav-switcher-lbl { display: inline; }
   }
 
-  /* Narrow (<860px): hide secondary tabs + title, show More button */
+  /* More button: visible by default (safe fallback). Hidden only once a
+     wide container is positively confirmed, so secondary tabs are still
+     reachable even if the narrow-hide query below never fires. */
+  .nav-more-btn { display: flex; }
+  @container nav-inner (min-width: 860px) {
+    .nav-more-btn { display: none !important; }
+  }
+
+  /* Narrow (<860px): hide secondary tabs + title once wide-enough is
+     positively confirmed NOT to match. Default (no query support, or
+     query not yet evaluated) leaves them visible - never invisible. */
   @container nav-inner (max-width: 859px) {
     .tab-secondary { display: none !important; }
     .nav-title { display: none !important; }
-  }
-
-  /* More button: hidden by default, visible only at narrow */
-  .nav-more-btn { display: none !important; }
-  @container nav-inner (max-width: 859px) {
-    .nav-more-btn { display: flex !important; }
   }
 
   /* ── View Switcher Modal ──────────────────────────────────────────── */
@@ -9666,6 +9681,41 @@ export default function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Nudge Safari to re-evaluate the nav's CSS container queries after the
+  // page's first layout pass. Safari can compute (and cache) container
+  // query results before web fonts swap in and before layout is fully
+  // settled on a hard refresh, leaving stale results in place indefinitely
+  // (no built-in re-check runs afterward). Forcing a reflow at each of
+  // these checkpoints - fonts ready, next paint, resize, orientation
+  // change - gives the container query engine a fresh layout to evaluate
+  // against. This is a nudge, not a measurement: the CSS above already
+  // defaults every nav item to visible, so this only helps the icon-only
+  // and secondary-tab tiers resolve to their correct (narrower) state
+  // sooner, it never affects whether items are reachable.
+  useEffect(() => {
+    const navInner = document.querySelector('.nav-inner');
+    if (!navInner) return;
+    const nudge = () => { void navInner.offsetWidth; };
+    let raf1 = null, raf2 = null;
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        raf1 = requestAnimationFrame(() => {
+          nudge();
+          raf2 = requestAnimationFrame(nudge);
+        });
+      });
+    }
+    window.addEventListener('resize', nudge);
+    window.addEventListener('orientationchange', nudge);
+    return () => {
+      if (raf1) cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      window.removeEventListener('resize', nudge);
+      window.removeEventListener('orientationchange', nudge);
+    };
+  }, [isMobile]);
+
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
   const t = L[lang];

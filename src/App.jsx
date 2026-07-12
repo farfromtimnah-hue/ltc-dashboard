@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { InviteSendButton, NeedsAttentionBadges, useNeedsAttention } from "./ScheduleInvite.jsx";
 
 /*
  * ──────────────────────────────────────────────────────────────────────────
@@ -1350,6 +1351,12 @@ function CarismaBadge({ levels, lang }) {
 function SettingsModal({ token, t, onClose, onSaved, lang }) {
   const [templatePT, setTemplatePT] = useState("");
   const [templateEN, setTemplateEN] = useState("");
+  // Scheduling invite/reminder templates (separate settings columns; the two
+  // fields above belong to the unrelated gifting-outreach flow and stay as-is).
+  const [schedInvitePT, setSchedInvitePT] = useState("");
+  const [schedInviteEN, setSchedInviteEN] = useState("");
+  const [schedReminderPT, setSchedReminderPT] = useState("");
+  const [schedReminderEN, setSchedReminderEN] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1359,6 +1366,10 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
       .then(d => {
         setTemplatePT(d.whatsapp_template_pt || DEFAULT_TEMPLATE_PT);
         setTemplateEN(d.whatsapp_template_en || DEFAULT_TEMPLATE_EN);
+        setSchedInvitePT(d.whatsapp_schedule_invite_pt || "");
+        setSchedInviteEN(d.whatsapp_schedule_invite_en || "");
+        setSchedReminderPT(d.whatsapp_reminder_pt || "");
+        setSchedReminderEN(d.whatsapp_reminder_en || "");
       })
       .catch(() => {
         setTemplatePT(DEFAULT_TEMPLATE_PT);
@@ -1372,6 +1383,18 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ whatsapp_template_pt: templatePT, whatsapp_template_en: templateEN })
+    });
+    // Scheduling templates save through their own owner-only endpoint that
+    // touches only the four schedule columns.
+    await fetch(`${API}/settings/schedule-templates`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        whatsapp_schedule_invite_pt: schedInvitePT || null,
+        whatsapp_schedule_invite_en: schedInviteEN || null,
+        whatsapp_reminder_pt: schedReminderPT || null,
+        whatsapp_reminder_en: schedReminderEN || null,
+      })
     });
     setSaving(false);
     setSaved(true);
@@ -1414,6 +1437,51 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {t.templateEN}</div>
             <textarea value={templateEN} onChange={e => setTemplateEN(e.target.value)} rows={5}
               style={{resize:"vertical",lineHeight:1.6}}/>
+          </div>
+
+          {/* ── Scheduling invite + reminder templates (schedule columns only) ── */}
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:24,display:"flex",flexDirection:"column",gap:24}}>
+            <div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#e6f1f0",marginBottom:4}}>
+                {lang === "PT" ? "Mensagens de Escala (WhatsApp)" : "Scheduling Messages (WhatsApp)"}
+              </div>
+              <div style={{fontSize:12,color:"#6b7a82",lineHeight:1.5}}>
+                {lang === "PT"
+                  ? "Convite e lembrete enviados manualmente pelo lider via WhatsApp."
+                  : "Invite and reminder sent manually by the leader via WhatsApp."}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10}}>
+              <span style={{fontSize:20,flexShrink:0}}>✨</span>
+              <div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>{t.availableVars}</div>
+                <div style={{fontSize:13,color:"#aebac0",display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {["{nome}","{ministerio}","{data}","{servico}","{link}"].map(v=>(
+                    <code key={v} style={{padding:"3px 8px",borderRadius:5,background:"rgba(94,234,212,0.08)",border:"1px solid rgba(94,234,212,0.15)",color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{v}</code>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Convite de Escala (PT)" : "Schedule Invite (PT)"}</div>
+              <textarea value={schedInvitePT} onChange={e => setSchedInvitePT(e.target.value)} rows={5}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Convite de Escala (EN)" : "Schedule Invite (EN)"}</div>
+              <textarea value={schedInviteEN} onChange={e => setSchedInviteEN(e.target.value)} rows={5}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Lembrete de Escala (PT)" : "Schedule Reminder (PT)"}</div>
+              <textarea value={schedReminderPT} onChange={e => setSchedReminderPT(e.target.value)} rows={5}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Lembrete de Escala (EN)" : "Schedule Reminder (EN)"}</div>
+              <textarea value={schedReminderEN} onChange={e => setSchedReminderEN(e.target.value)} rows={5}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
           </div>
         </div>
         <div style={{padding:"18px 32px",borderTop:"1px solid rgba(255,255,255,0.04)",background:"rgba(0,0,0,0.2)",display:"flex",justifyContent:"flex-end",gap:10,alignItems:"center",borderRadius:"0 0 16px 16px"}}>
@@ -7220,6 +7288,29 @@ function AgendaTab({ ministry, token, lang }) {
   var [conflictWarning, setConflictWarning] = React.useState(null);
   var [confirmPopup, setConfirmPopup] = React.useState(null); // { person, posName }
 
+  // person_id -> { language, whatsapp } from the ministry roster, so the
+  // invite button's language tag reflects real person data (accumulates
+  // across ministry switches; a person's language is global).
+  var [personInfo, setPersonInfo] = React.useState({});
+  var [naRefresh, setNaRefresh] = React.useState(0);
+  var naById = useNeedsAttention(token, naRefresh);
+
+  React.useEffect(function() {
+    if (!ministry || !token) return;
+    fetch(MH_API + '/ministry/' + encodeURIComponent(ministry) + '/roster', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { return r.json(); }).catch(function() { return []; })
+      .then(function(data) {
+        if (!Array.isArray(data)) return;
+        setPersonInfo(function(prev) {
+          var next = Object.assign({}, prev);
+          data.forEach(function(p) {
+            if (p && p.id !== null && p.id !== undefined) next[p.id] = { language: p.language, whatsapp: p.whatsapp };
+          });
+          return next;
+        });
+      });
+  }, [ministry, token]);
+
   var dateStr = fmtDate(selDate);
 
   React.useEffect(function() {
@@ -7493,7 +7584,7 @@ var isNotNeeded = notNeededSet.has(posName);
                       var personName = a.person_name || a.preferred_name || a.full_name || (lang === 'PT' ? 'Voluntário' : 'Volunteer');
                       var isOpen = chipMenu && chipMenu.id === a.id;
                       return (
-                        <div key={a.id} style={{ position: 'relative' }}>
+                        <div key={a.id} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <button onClick={function(e) { e.stopPropagation(); setChipMenu(isOpen ? null : { id: a.id, assignment: a, posName: posName }); }} style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
                             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
@@ -7502,6 +7593,16 @@ var isNotNeeded = notNeededSet.has(posName);
                             <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px ' + statusColor + '88' }} />
                             <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
                           </button>
+                          <NeedsAttentionBadges item={naById[a.id]} lang={lang} />
+                          <InviteSendButton
+                            assignmentId={a.id}
+                            status={a.status}
+                            inviteSentAt={a.invite_sent_at}
+                            person={a.person_id !== null && a.person_id !== undefined ? personInfo[a.person_id] : null}
+                            token={token}
+                            lang={lang}
+                            onSent={function() { loadSchedule(); setNaRefresh(function(n) { return n + 1; }); }}
+                          />
                           {isOpen && (
                             <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 200, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
                               {[['confirmed', tx2.confirmStatus, '#34d399'], ['pending', tx2.pendingStatus, '#f59e0b'], ['declined', tx2.declinedStatus, '#f87171'], ['wants_reschedule', tx2.reschedStatus, '#fb923c']].map(function(item) {
@@ -8026,6 +8127,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [pnnSavingArea, setPnnSavingArea] = useState(null);
   const [svcAttData, setSvcAttData] = useState([]);
+  const [naRefresh, setNaRefresh] = useState(0);
+  const naById = useNeedsAttention(token, naRefresh);
 
   const tx = {
     serving:       lang === "PT" ? "Servindo"        : "Serving",
@@ -8610,8 +8713,18 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                           <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif",display:"inline-flex",alignItems:"center",gap:4}}>
                             {asgnName}{hasNoName && <span style={{fontSize:9,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>🔒</span>}
                           </span>
+                          <NeedsAttentionBadges item={naById[asgn.assignment_id || asgn.id]} lang={lang} />
                           {!isPcSource && (
                             <>
+                              <InviteSendButton
+                                assignmentId={asgn.assignment_id || asgn.id}
+                                status={asgn.status}
+                                inviteSentAt={asgn.invite_sent_at}
+                                person={linkedPerson ? { language: linkedPerson.language, whatsapp: linkedPerson.whatsapp } : null}
+                                token={token}
+                                lang={lang}
+                                onSent={() => { refreshSchedule(); setNaRefresh(n => n + 1); }}
+                              />
                               <button onClick={()=>{ if (!isSaving) { setAssignPickerArea(area); setAssignPickerSearch(""); } }}
                                 style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:isSaving?0.4:1}}>
                                 {tx.reassign}

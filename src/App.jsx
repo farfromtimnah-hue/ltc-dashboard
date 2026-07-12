@@ -9770,10 +9770,20 @@ function AppInner() {
       // edge so both rows share the same coordinate space before comparing.
       measureRow.style.left = `${strip.getBoundingClientRect().left - containerRect.left}px`;
       // The sentinel is a real flex item positioned right where the always-
-      // visible switcher/aux/lang/More items begin claiming space, so its
-      // left edge IS the true trailing boundary available to tabs — no
-      // pixel math against a calculated container width needed.
-      const boundaryRight = sentinel.getBoundingClientRect().left;
+      // visible More/switcher/aux/lang items begin claiming space, so its
+      // left edge marks the true trailing boundary available to tabs — but
+      // the nav-inner container applies `gap` between EVERY flex child,
+      // including the tab strip and the sentinel itself. That gap sits
+      // between the strip's own clipping edge (where overflow:hidden
+      // actually cuts tabs off) and the sentinel's left edge, so comparing
+      // a tab's right edge directly against the sentinel's left edge lets a
+      // tab "fit" in up to one full gap's worth of space the strip doesn't
+      // actually have, rendering it visibly clipped instead of moving it
+      // into More. Subtracting the real computed gap corrects the boundary
+      // to the strip's true available edge. Read from computed style (not
+      // hardcoded) so this stays correct if the nav-inner gap value changes.
+      const containerGap = parseFloat(getComputedStyle(container).columnGap) || 0;
+      const boundaryRight = sentinel.getBoundingClientRect().left - containerGap;
       const overflowing = [];
       // Tab priority for collapsing is right-to-left (last tab collapses
       // first), matching the tab strip's left-to-right reading order.

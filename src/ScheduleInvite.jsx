@@ -74,6 +74,15 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
 
   function handleClick() {
     if (busy) return;
+
+    // Already have the link info from a previous tap (e.g. fetch resolved
+    // but the popup was blocked, or this is a resend of a known-loaded
+    // state): open synchronously in this same click, no await/.then first.
+    if (sentInfo) {
+      window.open(waUrl(sentInfo.message, sentInfo.whatsapp), "_blank", "noopener");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     fetch(`${API}/schedule/${assignmentId}/generate-invite-link`, {
@@ -90,8 +99,11 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
         const info = { message: (d && d.message) || "", whatsapp: (d && d.whatsapp) || null };
         setSentInfo(info);
         setNoNumber(!hasNumber(info.whatsapp));
-        window.open(waUrl(info.message, info.whatsapp), "_blank", "noopener");
         if (onSent) onSent();
+        // Safari blocks window.open() here: this .then() runs on a later
+        // tick than the original click's user-gesture, so no open call
+        // is made. The button now flips into "resend" state; the next tap
+        // hits the sentInfo branch above and opens synchronously instead.
       })
       .catch(e => {
         setBusy(false);

@@ -46,17 +46,13 @@ export function useNeedsAttention(token, refreshKey) {
 
 // Send-invite button for a schedule_assignments row. Hidden once the
 // volunteer has answered (confirmed / wants_reschedule) or was declined by a
-// leader. Shows the person's language tag (from real person data) before the
-// first tap, flips to a resend state after, and keeps a small re-open control
-// so the leader can re-open the same wa.me link if WhatsApp was closed
-// before sending.
+// leader. Single tap: generate the invite link, then open WhatsApp
+// immediately via a hidden anchor's click() (preserves the user-gesture
+// chain), before calling onSent - onSent can remount this component without
+// interrupting the already-triggered anchor click.
 export function InviteSendButton({ assignmentId, status, inviteSentAt, person, token, lang, onSent }) {
-  const isFreshMount = React.useRef(true);
-  console.log("[INVITE-DEBUG] component body run", { assignmentId, freshMount: isFreshMount.current });
-  isFreshMount.current = false;
-
+  const anchorRef = React.useRef(null);
   const [busy, setBusy] = React.useState(false);
-  const [sentInfo, setSentInfo] = React.useState(null);
   const [noNumber, setNoNumber] = React.useState(false);
   const [error, setError] = React.useState(null);
 
@@ -64,20 +60,19 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
   if (assignmentId === null || assignmentId === undefined) return null;
 
   const personLang = person && person.language === "EN" ? "EN" : "PT";
-  const alreadySent = !!inviteSentAt || !!sentInfo;
+  const alreadySent = !!inviteSentAt;
 
   const tx = {
     send:     lang === "PT" ? "Enviar convite" : "Send invite",
     resend:   lang === "PT" ? "Reenviar" : "Resend",
     sending:  "...",
-    reopen:   lang === "PT" ? "Abrir WhatsApp novamente" : "Open WhatsApp again",
     noNumber: lang === "PT" ? "Numero nao encontrado para esta pessoa" : "No number found for this person",
     noPerm:   lang === "PT" ? "Sem permissao" : "No permission",
     failed:   lang === "PT" ? "Erro ao gerar convite" : "Could not generate invite",
   };
 
   function handleClick() {
-    if (busy || sentInfo) return;
+    if (busy) return;
 
     setBusy(true);
     setError(null);
@@ -91,20 +86,14 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
         return r.json();
       })
       .then(d => {
-        console.log("[INVITE-DEBUG] r.json() resolved", d);
         setBusy(false);
         const info = { message: (d && d.message) || "", whatsapp: (d && d.whatsapp) || null };
-        console.log("[INVITE-DEBUG] before setSentInfo", info);
-        setSentInfo(info);
-        console.log("[INVITE-DEBUG] after setSentInfo");
         setNoNumber(!hasNumber(info.whatsapp));
-        console.log("[INVITE-DEBUG] before onSent, typeof onSent =", typeof onSent);
+        if (anchorRef.current) {
+          anchorRef.current.href = waUrl(info.message, info.whatsapp);
+          anchorRef.current.click();
+        }
         if (onSent) onSent();
-        console.log("[INVITE-DEBUG] after onSent returned");
-        // Safari blocks window.open() here: this .then() runs on a later
-        // tick than the original click's user-gesture, so no open call
-        // is made. The button now flips into "resend" state; the next tap
-        // hits the sentInfo branch above and opens synchronously instead.
       })
       .catch(e => {
         setBusy(false);
@@ -130,27 +119,11 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-      {sentInfo ? (
-        <a href={waUrl(sentInfo.message, sentInfo.whatsapp)} target="_blank" rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          style={{ ...mainBtnStyle, textDecoration: "none" }}>
-          {tx.resend}
-          {langTag}
-        </a>
-      ) : (
-        <button onClick={e => { e.stopPropagation(); handleClick(); }} aria-busy={busy} style={mainBtnStyle}>
-          {busy ? tx.sending : tx.send}
-          {langTag}
-        </button>
-      )}
-      {sentInfo && (
-        <a href={waUrl(sentInfo.message, sentInfo.whatsapp)} target="_blank" rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          title={tx.reopen}
-          style={{ background: "none", border: "1px solid rgba(94,234,212,0.2)", borderRadius: 5, width: 20, height: 20, color: "#5eead4", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, textDecoration: "none" }}>
-          ↗
-        </a>
-      )}
+      <a ref={anchorRef} href="#" target="_blank" rel="noopener noreferrer" style={{ display: "none" }} aria-hidden="true" tabIndex={-1} />
+      <button onClick={e => { e.stopPropagation(); handleClick(); }} aria-busy={busy} style={mainBtnStyle}>
+        {busy ? tx.sending : (alreadySent ? tx.resend : tx.send)}
+        {langTag}
+      </button>
       {noNumber && (
         <span style={{ fontSize: 9.5, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontStyle: "italic" }}>{tx.noNumber}</span>
       )}

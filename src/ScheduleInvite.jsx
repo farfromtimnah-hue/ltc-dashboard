@@ -51,6 +51,10 @@ export function useNeedsAttention(token, refreshKey) {
 // so the leader can re-open the same wa.me link if WhatsApp was closed
 // before sending.
 export function InviteSendButton({ assignmentId, status, inviteSentAt, person, token, lang, onSent }) {
+  const isFreshMount = React.useRef(true);
+  console.log("[INVITE-DEBUG] component body run", { assignmentId, freshMount: isFreshMount.current });
+  isFreshMount.current = false;
+
   const [busy, setBusy] = React.useState(false);
   const [sentInfo, setSentInfo] = React.useState(null);
   const [noNumber, setNoNumber] = React.useState(false);
@@ -87,11 +91,16 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
         return r.json();
       })
       .then(d => {
+        console.log("[INVITE-DEBUG] r.json() resolved", d);
         setBusy(false);
         const info = { message: (d && d.message) || "", whatsapp: (d && d.whatsapp) || null };
+        console.log("[INVITE-DEBUG] before setSentInfo", info);
         setSentInfo(info);
+        console.log("[INVITE-DEBUG] after setSentInfo");
         setNoNumber(!hasNumber(info.whatsapp));
+        console.log("[INVITE-DEBUG] before onSent, typeof onSent =", typeof onSent);
         if (onSent) onSent();
+        console.log("[INVITE-DEBUG] after onSent returned");
         // Safari blocks window.open() here: this .then() runs on a later
         // tick than the original click's user-gesture, so no open call
         // is made. The button now flips into "resend" state; the next tap

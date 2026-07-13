@@ -73,15 +73,7 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
   };
 
   function handleClick() {
-    if (busy) return;
-
-    // Already have the link info from a previous tap (e.g. fetch resolved
-    // but the popup was blocked, or this is a resend of a known-loaded
-    // state): open synchronously in this same click, no await/.then first.
-    if (sentInfo) {
-      window.open(waUrl(sentInfo.message, sentInfo.whatsapp), "_blank", "noopener");
-      return;
-    }
+    if (busy || sentInfo) return;
 
     setBusy(true);
     setError(null);
@@ -111,29 +103,44 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
       });
   }
 
+  const mainBtnStyle = {
+    display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999,
+    fontSize: 10.5, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap",
+    border: alreadySent ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(94,234,212,0.3)",
+    background: alreadySent ? "rgba(255,255,255,0.03)" : "rgba(94,234,212,0.08)",
+    color: alreadySent ? "#6b7a82" : "#5eead4",
+    cursor: busy ? "default" : "pointer", opacity: busy ? 0.5 : 1, transition: "all 0.15s",
+  };
+  const langTag = (
+    <span style={{
+      fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+      background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+      color: personLang === "EN" ? "#93c5fd" : "#86efac",
+    }}>{personLang}</span>
+  );
+
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-      <button onClick={e => { e.stopPropagation(); handleClick(); }} disabled={busy} style={{
-        display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999,
-        fontSize: 10.5, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap",
-        border: alreadySent ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(94,234,212,0.3)",
-        background: alreadySent ? "rgba(255,255,255,0.03)" : "rgba(94,234,212,0.08)",
-        color: alreadySent ? "#6b7a82" : "#5eead4",
-        cursor: busy ? "default" : "pointer", opacity: busy ? 0.5 : 1, transition: "all 0.15s",
-      }}>
-        {busy ? tx.sending : (alreadySent ? tx.resend : tx.send)}
-        <span style={{
-          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
-          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-          color: personLang === "EN" ? "#93c5fd" : "#86efac",
-        }}>{personLang}</span>
-      </button>
-      {sentInfo && (
-        <button onClick={e => { e.stopPropagation(); window.open(waUrl(sentInfo.message, sentInfo.whatsapp), "_blank", "noopener"); }}
-          title={tx.reopen}
-          style={{ background: "none", border: "1px solid rgba(94,234,212,0.2)", borderRadius: 5, width: 20, height: 20, color: "#5eead4", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
-          ↗
+      {sentInfo ? (
+        <a href={waUrl(sentInfo.message, sentInfo.whatsapp)} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ ...mainBtnStyle, textDecoration: "none" }}>
+          {tx.resend}
+          {langTag}
+        </a>
+      ) : (
+        <button onClick={e => { e.stopPropagation(); handleClick(); }} aria-busy={busy} style={mainBtnStyle}>
+          {busy ? tx.sending : tx.send}
+          {langTag}
         </button>
+      )}
+      {sentInfo && (
+        <a href={waUrl(sentInfo.message, sentInfo.whatsapp)} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          title={tx.reopen}
+          style={{ background: "none", border: "1px solid rgba(94,234,212,0.2)", borderRadius: 5, width: 20, height: 20, color: "#5eead4", cursor: "pointer", fontSize: 11, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, textDecoration: "none" }}>
+          ↗
+        </a>
       )}
       {noNumber && (
         <span style={{ fontSize: 9.5, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontStyle: "italic" }}>{tx.noNumber}</span>
@@ -182,15 +189,16 @@ export function NeedsAttentionBadges({ item, lang }) {
         <span title={tx.remindTip} style={{ fontSize: 12, color: "#f59e0b", cursor: "help", filter: "drop-shadow(0 0 3px rgba(245,158,11,0.6))" }}>🕐</span>
       ) : null}
       {hasReminder && item.reminder_message && (
-        <button onClick={e => { e.stopPropagation(); window.open(waUrl(item.reminder_message, item.whatsapp), "_blank", "noopener"); }}
+        <a href={waUrl(item.reminder_message, item.whatsapp)} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
           title={tx.remindTip}
           style={{
             padding: "2px 8px", borderRadius: 999, fontSize: 10, fontFamily: "'JetBrains Mono',monospace",
             border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.1)",
-            color: "#f59e0b", cursor: "pointer", whiteSpace: "nowrap",
+            color: "#f59e0b", cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", display: "inline-block",
           }}>
           {tx.remindBtn} {item.language === "EN" ? "EN" : "PT"}
-        </button>
+        </a>
       )}
     </span>
   );

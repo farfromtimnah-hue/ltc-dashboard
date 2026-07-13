@@ -9789,13 +9789,16 @@ function AppInner() {
   const [role, setRole] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [fbUser, setFbUser] = useState(null);
-  const [tab, setTab] = useState("analytics");
+  // Active tab / view-mode / group-leader selection are seeded from the URL
+  // query string (if present) so a refresh restores where the user was,
+  // instead of always dropping back to the hardcoded defaults below.
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || "analytics");
   const [refAnchor, setRefAnchor] = useState(null);
   const [lang, setLang] = useState("PT");
-  const [viewMode, setViewMode] = useState("my_view");
-  const [glGroup, setGlGroup] = useState("");
+  const [viewMode, setViewMode] = useState(() => new URLSearchParams(window.location.search).get('view') || "my_view");
+  const [glGroup, setGlGroup] = useState(() => new URLSearchParams(window.location.search).get('glGroup') || "");
   function handleGlGroupChange(val) { setGlGroup(val); }
-  const [glMinistry, setGlMinistry] = useState("");
+  const [glMinistry, setGlMinistry] = useState(() => new URLSearchParams(window.location.search).get('glMinistry') || "");
   const [welcomeBlessing] = useState(() => Math.floor(Math.random() * 3));
   const [welcomeVision] = useState(() => Math.floor(Math.random() * 4));
   // Banner shows only on the initial post-login screen; dismissed on first navigation.
@@ -9812,6 +9815,23 @@ function AppInner() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Mirror active tab/view-mode/group-leader selection into the URL query
+  // string so a page refresh restores them (see the useState initializers
+  // above). replaceState (not pushState) so switching tabs never clutters
+  // browser back/forward history.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    tab ? params.set('tab', tab) : params.delete('tab');
+    viewMode && viewMode !== 'my_view' ? params.set('view', viewMode) : params.delete('view');
+    glGroup ? params.set('glGroup', glGroup) : params.delete('glGroup');
+    glMinistry ? params.set('glMinistry', glMinistry) : params.delete('glMinistry');
+    const qs = params.toString();
+    const newUrl = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+    if (newUrl !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [tab, viewMode, glGroup, glMinistry]);
 
   // ── Desktop nav overflow (IntersectionObserver, not width math) ──────────
   // IDs of tabs currently pushed into the More drawer because they no longer

@@ -8126,6 +8126,10 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [deletingId, setDeletingId] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [pnnSavingArea, setPnnSavingArea] = useState(null);
+  const [pnnSavingPos, setPnnSavingPos] = useState(null);
+  const [guestModal, setGuestModal] = useState(null); // { ministry, position_name }
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [guestSaving, setGuestSaving] = useState(false);
   const [svcAttData, setSvcAttData] = useState([]);
   const [naRefresh, setNaRefresh] = useState(0);
   const naById = useNeedsAttention(token, naRefresh);
@@ -8168,6 +8172,10 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     svcAttVols:       lang === "PT" ? "Voluntarios" : "Volunteers",
     svcAttKids:       lang === "PT" ? "Kids" : "Kids",
     svcAttTotal:      lang === "PT" ? "Total" : "Total",
+    guestSpeaker:     lang === "PT" ? "Pregador Convidado" : "Guest Speaker",
+    guestNameLabel:   lang === "PT" ? "Nome do pregador convidado" : "Guest speaker's name",
+    guestRemove:      lang === "PT" ? "Remover convidado" : "Remove Guest",
+    confirmBtn:       lang === "PT" ? "Confirmar" : "Confirm",
   };
 
   useEffect(() => {
@@ -8365,6 +8373,65 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(() => { setPnnSavingArea(null); refreshSchedule(); })
       .catch(() => setPnnSavingArea(null));
+  }
+
+  // Position-level Not Needed — same endpoints as the area-level pair above,
+  // but scoped to a specific ministry + position_name from the positions array.
+  function doMarkPositionNotNeeded(ministry, positionName) {
+    if (!ministry || !positionName) return;
+    setPnnSavingPos(`${ministry}::${positionName}`);
+    fetch(`${API}/schedule/position-not-needed`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ministry,
+        position_name: positionName,
+        service_date: schedDate,
+        service_name: groupName,
+        marked_by: scheduledBy || "group_leader",
+      }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setPnnSavingPos(null); refreshSchedule(); })
+      .catch(() => setPnnSavingPos(null));
+  }
+
+  function doUnmarkPositionNotNeeded(ministry, positionName, pnnId) {
+    if (!pnnId) return;
+    setPnnSavingPos(`${ministry}::${positionName}`);
+    fetch(`${API}/schedule/position-not-needed/${pnnId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setPnnSavingPos(null); refreshSchedule(); })
+      .catch(() => setPnnSavingPos(null));
+  }
+
+  function doSetGuestSpeaker(ministry, positionName, guestName) {
+    if (!ministry || !positionName || !guestName) return;
+    setGuestSaving(true);
+    fetch(`${API}/schedule/guest-speaker`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ministry, position_name: positionName, service_date: schedDate, service_name: groupName, guest_name: guestName }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setGuestSaving(false); setGuestModal(null); setGuestNameInput(""); refreshSchedule(); })
+      .catch(() => setGuestSaving(false));
+  }
+
+  function doClearGuestSpeaker(ministry, positionName) {
+    if (!ministry || !positionName) return;
+    setGuestSaving(true);
+    fetch(`${API}/schedule/guest-speaker`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ministry, position_name: positionName, service_date: schedDate, service_name: groupName }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(() => { setGuestSaving(false); refreshSchedule(); })
+      .catch(() => setGuestSaving(false));
   }
 
   const groupRolesFor = (person) => {
@@ -8654,7 +8721,162 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         {!schedLoading && !schedError && schedData !== null && (schedData || []).length === 0 && (
           <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noScheduleData}</div>
         )}
-        {!schedLoading && !schedError && (schedData || []).map((area) => {
+        {!schedLoading && !schedError && (() => {
+
+          // One row per real position, for areas where the API returned a
+          // positions array (built from ministry_positions). Mirrors the
+          // position-row pattern used by the ministry leader scheduling views:
+          // name + "min X / ideal Y" caption, color-coded fill status.
+          const renderPositionRow = (area, pos) => {
+            const areaKey = area?.area_name || area?.name || "";
+            const isLocked = area?.is_locked_external === 1;
+            const posMinistry = pos?.ministry || areaKey;
+            const posName = pos?.position_name || "";
+            const posKey = `${posMinistry}::${posName}`;
+            // Ignore empty shell rows (no person, no unmatched name, not a
+            // guest) — e.g. a cleared guest-speaker assignment.
+            const activeAsgn = (pos?.assignments || []).filter(a =>
+              a && (Number(a.is_guest_speaker) === 1 || a.person_id !== null && a.person_id !== undefined || a.unmatched_name));
+            const guestAsgn = activeAsgn.find(a => Number(a.is_guest_speaker) === 1) || null;
+            const pnn = pos?.position_not_needed || null;
+            const pnnId = pnn && typeof pnn === "object" ? (pnn?.id || null) : null;
+            const isNotNeeded = !!pnn;
+            const minV = pos?.min_count || 0;
+            const idealV = pos?.ideal_count || 0;
+            const filled = activeAsgn.length;
+            const GUEST_COLOR = "#a78bfa";
+            const posColor = guestAsgn ? GUEST_COLOR : filled === 0 ? "#ef4444" : filled < minV ? "#ef4444" : filled < idealV ? "#eab308" : "#22c55e";
+            const isPosPnnSaving = pnnSavingPos === posKey;
+            const pickerTarget = { area_name: posMinistry, position_name: posName, display_label: posName };
+
+            return (
+              <div key={posKey} style={{
+                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",
+                borderBottom:"1px solid rgba(255,255,255,0.04)",
+                borderLeft:`4px solid ${isNotNeeded ? "#475a64" : posColor}`,paddingLeft:10,
+                opacity:isNotNeeded ? 0.45 : 1,
+              }}>
+                <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{posName}</div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64",marginTop:1}}>{`min ${minV} / ideal ${idealV}`}</div>
+                </div>
+
+                <div style={{flex:1,minWidth:0}}>
+                  {isNotNeeded ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <Chip label={tx.notNeeded} />
+                      <button onClick={()=>{ if (!isPosPnnSaving) doUnmarkPositionNotNeeded(posMinistry, posName, pnnId); }}
+                        style={{fontSize:11,color:"#5eead4",background:"none",border:"none",cursor:"pointer",padding:0,opacity:isPosPnnSaving?0.4:1}}>
+                        {tx.unmarkNotNeeded}
+                      </button>
+                    </div>
+                  ) : guestAsgn ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{posName}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:GUEST_COLOR,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.45)",borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>
+                        {guestAsgn.unmatched_name || tx.guestSpeaker}
+                      </span>
+                      <span style={{fontSize:10,color:GUEST_COLOR,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.08em",textTransform:"uppercase"}}>{tx.guestSpeaker}</span>
+                    </div>
+                  ) : activeAsgn.length > 0 ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      {activeAsgn.map(asgn => {
+                        const isPcSource = asgn.source === "planning_center";
+                        const linkedPerson = allPersons.find(x => x && x.id === asgn.person_id);
+                        const asgnName = asgn.person_name || (linkedPerson ? displayName(linkedPerson) : (asgn.unmatched_name || String(asgn.person_id || "")));
+                        const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
+                        const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
+                        return (
+                          <div key={asgn.assignment_id || asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                            {asgn.position_name && (
+                              <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
+                            )}
+                            <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif",display:"inline-flex",alignItems:"center",gap:4}}>
+                              {asgnName}{isPcSource && <span style={{fontSize:9,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>🔒</span>}
+                            </span>
+                            <NeedsAttentionBadges item={naById[asgn.assignment_id || asgn.id]} lang={lang} />
+                            {!isPcSource && (
+                              <>
+                                <InviteSendButton
+                                  assignmentId={asgn.assignment_id || asgn.id}
+                                  status={asgn.status}
+                                  inviteSentAt={asgn.invite_sent_at}
+                                  person={linkedPerson ? { language: linkedPerson.language, whatsapp: linkedPerson.whatsapp } : null}
+                                  token={token}
+                                  lang={lang}
+                                  onSent={() => { refreshSchedule(); setNaRefresh(n => n + 1); }}
+                                />
+                                <button onClick={()=>{ setAssignPickerArea(pickerTarget); setAssignPickerSearch(""); }}
+                                  style={{fontSize:11,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 8px",cursor:"pointer"}}>
+                                  {tx.reassign}
+                                </button>
+                                <button onClick={()=>{ if (!asgnDeleting) doDeleteAssignment(asgn.assignment_id || asgn.id); }}
+                                  style={{fontSize:11,color:"#e07070",background:"none",border:"1px solid rgba(220,100,100,0.2)",borderRadius:5,padding:"2px 8px",cursor:"pointer",opacity:asgnDeleting?0.4:1}}>
+                                  {tx.remove}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : isLocked ? (
+                    <span style={{fontSize:12,color:"#475a64",fontStyle:"italic"}}>{tx.pcLocked}</span>
+                  ) : (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <Chip label={tx.openSlot} />
+                      <button onClick={()=>{ setAssignPickerArea(pickerTarget); setAssignPickerSearch(""); }}
+                        style={{fontSize:12,color:"#5eead4",background:"rgba(94,234,212,0.06)",border:"1px solid rgba(94,234,212,0.2)",borderRadius:6,padding:"4px 12px",cursor:"pointer"}}>
+                        {tx.assign}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Row toggles: Not Needed + (Word only) Guest Speaker */}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                  {!isLocked && !isNotNeeded && !guestAsgn && (
+                    <button onClick={()=>{ if (!isPosPnnSaving) doMarkPositionNotNeeded(posMinistry, posName); }}
+                      style={{fontSize:10,color:"#475a64",background:"none",border:"none",cursor:"pointer",padding:"4px 0",opacity:isPosPnnSaving?0.4:1,whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                      {tx.markNotNeeded}
+                    </button>
+                  )}
+                  {!isLocked && !isNotNeeded && posName === "Word" && (
+                    guestAsgn ? (
+                      <button onClick={()=>{ if (!guestSaving) doClearGuestSpeaker(posMinistry, posName); }}
+                        style={{fontSize:10,color:"#a78bfa",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.45)",borderRadius:5,cursor:"pointer",padding:"3px 8px",opacity:guestSaving?0.4:1,whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                        {tx.guestRemove}
+                      </button>
+                    ) : (
+                      <button onClick={()=>{ setGuestNameInput(""); setGuestModal({ ministry: posMinistry, position_name: posName }); }}
+                        style={{fontSize:10,color:"#a78bfa",background:"none",border:"1px solid rgba(167,139,250,0.35)",borderRadius:5,cursor:"pointer",padding:"3px 8px",whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
+                        {tx.guestSpeaker}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          const renderPositionArea = (area) => {
+            const areaKey = area?.area_name || area?.name || "";
+            const positions = area.positions;
+            // A single-position area named after its position (e.g. area
+            // "Prayer" -> Service Leaders / Prayer) needs no separate header.
+            const skipHeader = positions.length === 1 && (positions[0]?.position_name || "") === areaKey;
+            return (
+              <div key={areaKey || String(area?.display_order)}>
+                {!skipHeader && (
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#e6f1f0",padding:"12px 0 2px"}}>{areaKey}</div>
+                )}
+                {positions.map(pos => renderPositionRow(area, pos))}
+              </div>
+            );
+          };
+
+          const renderArea = (area) => {
+          if (Array.isArray(area?.positions) && area.positions.length > 0) return renderPositionArea(area);
           const areaKey = area?.area_name || area?.name || "";
           const isLocked = area?.is_locked_external === 1;
           const assignments = area?.assignments || [];
@@ -8707,7 +8929,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                       const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
                       return (
                         <div key={asgn.assignment_id || asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
-                          {asgn.position_name && asgn.position_name !== areaKey && (
+                          {asgn.position_name && (
                             <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
                           )}
                           <span style={{fontSize:12,fontWeight:600,color:asgnColor,background:`${asgnColor}1f`,border:`1px solid ${asgnColor}66`,borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif",display:"inline-flex",alignItems:"center",gap:4}}>
@@ -8759,7 +8981,36 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
               )}
             </div>
           );
-        })}
+          };
+
+          // Areas whose positions belong to a differently-named ministry
+          // (positions_ministry !== area_name, e.g. Prayer/Offering/Word under
+          // Service Leaders) render in a separated sub-section labeled with
+          // that ministry name. Purely data-driven — no group-name checks.
+          const mainAreas = [];
+          const subSections = []; // [{ label, areas }]
+          (schedData || []).forEach(area => {
+            const pm = area?.positions_ministry;
+            if (pm && pm !== (area?.area_name || "")) {
+              let sec = subSections.find(s => s.label === pm);
+              if (!sec) { sec = { label: pm, areas: [] }; subSections.push(sec); }
+              sec.areas.push(area);
+            } else {
+              mainAreas.push(area);
+            }
+          });
+          return (
+            <>
+              {mainAreas.map(renderArea)}
+              {subSections.map(sec => (
+                <div key={sec.label} style={{marginTop:20,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#5eead4",fontWeight:500,marginBottom:4}}>{sec.label}</div>
+                  {sec.areas.map(renderArea)}
+                </div>
+              ))}
+            </>
+          );
+        })()}
       </div>
 
       {/* Assign picker modal */}
@@ -8772,7 +9023,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
               {tx.assign}
             </div>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:16,color:"#e6f1f0",marginBottom:16}}>
-              {assignPickerArea?.area_name || assignPickerArea?.name || ""}
+              {assignPickerArea?.display_label || assignPickerArea?.area_name || assignPickerArea?.name || ""}
             </div>
             <input
               autoFocus
@@ -8827,6 +9078,35 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                 {tx.confirmOverride}
               </button>
               <button onClick={()=>setConflictInfo(null)}
+                style={{flex:1,padding:"9px 0",borderRadius:8,background:"none",border:"1px solid rgba(255,255,255,0.08)",color:"#6b7a82",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em"}}>
+                {tx.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest speaker name modal */}
+      {guestModal !== null && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div className="glass modal-panel"
+            style={{width:"min(420px,92vw)",borderRadius:16,padding:28,boxShadow:"0 40px 80px -30px rgba(0,0,0,0.7),0 0 0 1px rgba(167,139,250,0.12) inset"}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10px",letterSpacing:"0.14em",textTransform:"uppercase",color:"#a78bfa",marginBottom:10}}>{tx.guestSpeaker}</div>
+            <div style={{fontSize:14,color:"#e6f1f0",marginBottom:14,lineHeight:1.6}}>{tx.guestNameLabel}</div>
+            <input
+              autoFocus
+              value={guestNameInput}
+              onChange={e=>setGuestNameInput(e.target.value || "")}
+              onKeyDown={e=>{ if (e.key === "Enter" && guestNameInput.trim() && !guestSaving) doSetGuestSpeaker(guestModal.ministry, guestModal.position_name, guestNameInput.trim()); }}
+              style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 12px",color:"#e6f1f0",fontSize:13,fontFamily:"'Space Grotesk',sans-serif",marginBottom:18,outline:"none"}}
+            />
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>{ if (guestNameInput.trim() && !guestSaving) doSetGuestSpeaker(guestModal.ministry, guestModal.position_name, guestNameInput.trim()); }}
+                disabled={!guestNameInput.trim() || guestSaving}
+                style={{flex:1,padding:"9px 0",borderRadius:8,background:"linear-gradient(180deg,rgba(167,139,250,0.2),rgba(167,139,250,0.08))",border:"1px solid rgba(167,139,250,0.45)",color:"#a78bfa",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em",opacity:(!guestNameInput.trim()||guestSaving)?0.5:1}}>
+                {tx.confirmBtn}
+              </button>
+              <button onClick={()=>{ setGuestModal(null); setGuestNameInput(""); }}
                 style={{flex:1,padding:"9px 0",borderRadius:8,background:"none",border:"1px solid rgba(255,255,255,0.08)",color:"#6b7a82",fontSize:12,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.1em"}}>
                 {tx.cancel}
               </button>

@@ -8176,6 +8176,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     guestNameLabel:   lang === "PT" ? "Nome do pregador convidado" : "Guest speaker's name",
     guestRemove:      lang === "PT" ? "Remover convidado" : "Remove Guest",
     confirmBtn:       lang === "PT" ? "Confirmar" : "Confirm",
+    unmatched:        lang === "PT" ? "Nao Correspondido" : "Unmatched",
   };
 
   useEffect(() => {
@@ -8378,7 +8379,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   // Position-level Not Needed — same endpoints as the area-level pair above,
   // but scoped to a specific ministry + position_name from the positions array.
   function doMarkPositionNotNeeded(ministry, positionName) {
-    if (!ministry || !positionName) return;
+    console.log('[doMarkPositionNotNeeded] called with', { ministry, positionName, schedDate, groupName });
+    if (!ministry || !positionName) { console.warn('[doMarkPositionNotNeeded] aborted: missing ministry or positionName', { ministry, positionName }); return; }
     setPnnSavingPos(`${ministry}::${positionName}`);
     fetch(`${API}/schedule/position-not-needed`, {
       method: "POST",
@@ -8391,9 +8393,9 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         marked_by: scheduledBy || "group_leader",
       }),
     })
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(() => { setPnnSavingPos(null); refreshSchedule(); })
-      .catch(() => setPnnSavingPos(null));
+      .then(r => { console.log('[doMarkPositionNotNeeded] response status', r.status); if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { console.log('[doMarkPositionNotNeeded] success', d); setPnnSavingPos(null); refreshSchedule(); })
+      .catch((e) => { console.error('[doMarkPositionNotNeeded] failed', e); setPnnSavingPos(null); });
   }
 
   function doUnmarkPositionNotNeeded(ministry, positionName, pnnId) {
@@ -8836,7 +8838,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                 {/* Row toggles: Not Needed + (Word only) Guest Speaker */}
                 <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
                   {!isLocked && !isNotNeeded && !guestAsgn && (
-                    <button onClick={()=>{ if (!isPosPnnSaving) doMarkPositionNotNeeded(posMinistry, posName); }}
+                    <button onClick={()=>{ console.log('[markNotNeeded click]', { posMinistry, posName, isPosPnnSaving, isLocked, isNotNeeded, guestAsgn }); if (!isPosPnnSaving) doMarkPositionNotNeeded(posMinistry, posName); }}
                       style={{fontSize:10,color:"#475a64",background:"none",border:"none",cursor:"pointer",padding:"4px 0",opacity:isPosPnnSaving?0.4:1,whiteSpace:"nowrap",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.05em"}}>
                       {tx.markNotNeeded}
                     </button>
@@ -8859,18 +8861,48 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             );
           };
 
+          // Any schedule_assignments row for this area whose position_name
+          // doesn't match one of the area's rendered position rows would
+          // otherwise be silently dropped (e.g. a new/unmapped Planning
+          // Center label). Surface it instead of hiding it.
+          const renderUnmatchedRow = (asgn) => {
+            const asgnName = asgn.person_name || (allPersons.find(x => x && x.id === asgn.person_id) ? displayName(allPersons.find(x => x && x.id === asgn.person_id)) : (asgn.unmatched_name || String(asgn.person_id || "")));
+            return (
+              <div key={`unmatched-${asgn.assignment_id || asgn.id}`} style={{
+                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",
+                borderBottom:"1px solid rgba(255,255,255,0.04)",
+                borderLeft:"4px dashed #f59e0b",paddingLeft:10,
+              }}>
+                <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#f59e0b",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{asgn.position_name || ""}</div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#f59e0b",marginTop:1,letterSpacing:"0.05em",textTransform:"uppercase"}}>{tx.unmatched}</div>
+                </div>
+                <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#f59e0b",background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.45)",borderRadius:6,padding:"2px 8px",fontFamily:"'Space Grotesk',sans-serif"}}>
+                    {asgnName}
+                  </span>
+                </div>
+              </div>
+            );
+          };
+
           const renderPositionArea = (area) => {
             const areaKey = area?.area_name || area?.name || "";
             const positions = area.positions;
             // A single-position area named after its position (e.g. area
             // "Prayer" -> Service Leaders / Prayer) needs no separate header.
             const skipHeader = positions.length === 1 && (positions[0]?.position_name || "") === areaKey;
+            const knownPositionNames = new Set(positions.map(p => `${p?.ministry || areaKey}::${p?.position_name || ""}`));
+            const unmatchedAssignments = (area?.assignments || []).filter(a =>
+              a && (a.person_id !== null && a.person_id !== undefined || a.unmatched_name) &&
+              !knownPositionNames.has(`${a.ministry || areaKey}::${a.position_name || ""}`));
             return (
               <div key={areaKey || String(area?.display_order)}>
                 {!skipHeader && (
                   <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#e6f1f0",padding:"12px 0 2px"}}>{areaKey}</div>
                 )}
                 {positions.map(pos => renderPositionRow(area, pos))}
+                {unmatchedAssignments.map(asgn => renderUnmatchedRow(asgn))}
               </div>
             );
           };

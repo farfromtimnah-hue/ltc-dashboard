@@ -4777,7 +4777,7 @@ function mhPosFilled(pos) {
 // Returns 'no_data' only when a position has no min, no ideal and nobody filled.
 function mhPosStatus(filled, min, ideal) {
   var f = filled || 0;
-  var hasMin = (min || 0) > 0;
+  var hasMin = min !== null && min !== undefined;
   var hasIdeal = (ideal || 0) > 0;
   if (!hasMin && !hasIdeal && f === 0) return 'no_data';
   if (hasMin && f >= min) return 'healthy';
@@ -4910,11 +4910,11 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, on
             )}
             {positions.map(function(pos, pi) {
               var filled = mhPosFilled(pos);
-              var minC = (pos && pos.min_count) || 0;
+              var minC = pos ? pos.min_count : null;
               var idealC = (pos && pos.ideal_count) || 0;
               var pc = mhStatusColor(mhPosStatus(filled, minC, idealC));
               // Never divide by 0 — denominator fallback: ideal -> min -> 1.
-              var denom = idealC > 0 ? idealC : (minC > 0 ? minC : 1);
+              var denom = idealC > 0 ? idealC : ((minC || 0) > 0 ? minC : 1);
               var pct = Math.min(filled / denom, 1);
               var posName = (lang === 'PT' ? (pos && pos.position_name_pt) : (pos && pos.position_name))
                 || (pos && pos.position_name) || (lang==='PT'?'Funcao':'Position');
@@ -8008,7 +8008,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                         var filledFromRoster = assignedPeople.length;
                         // Use filled from roster if > 0, otherwise fall back to mhPosFilled (form+system counts)
                         var filled = filledFromRoster > 0 ? filledFromRoster : mhPosFilled(pos);
-                        var minC = pos.min_count || 0;
+                        var minC = pos.min_count;
                         var idealC = pos.ideal_count || 0;
                         var st = mhPosStatus(filled, minC, idealC);
                         var dotColor = st==="healthy"?"#34d399":st==="needs_volunteers"?"#f59e0b":st==="critical"?"#f87171":"#475a64";
@@ -8742,7 +8742,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             const pnn = pos?.position_not_needed || null;
             const pnnId = pnn && typeof pnn === "object" ? (pnn?.id || null) : null;
             const isNotNeeded = !!pnn;
-            const minV = pos?.min_count || 0;
+            const minV = pos?.min_count;
             const idealV = pos?.ideal_count || 0;
             const filled = activeAsgn.length;
             const GUEST_COLOR = "#a78bfa";

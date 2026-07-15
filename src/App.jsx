@@ -8753,7 +8753,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
             return (
               <div key={posKey} style={{
-                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",
+                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",flexWrap:"wrap",
                 borderBottom:"1px solid rgba(255,255,255,0.04)",
                 borderLeft:`4px solid ${isNotNeeded ? "#475a64" : posColor}`,paddingLeft:10,
                 opacity:isNotNeeded ? 0.45 : 1,
@@ -8763,7 +8763,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                   <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64",marginTop:1}}>{`min ${minV} / ideal ${idealV}`}</div>
                 </div>
 
-                <div style={{flex:1,minWidth:0}}>
+                <div style={{flex:"1 1 200px",minWidth:0}}>
                   {isNotNeeded ? (
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <Chip label={tx.notNeeded} />
@@ -8869,7 +8869,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             const asgnName = asgn.person_name || (allPersons.find(x => x && x.id === asgn.person_id) ? displayName(allPersons.find(x => x && x.id === asgn.person_id)) : (asgn.unmatched_name || String(asgn.person_id || "")));
             return (
               <div key={`unmatched-${asgn.assignment_id || asgn.id}`} style={{
-                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",
+                display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",flexWrap:"wrap",
                 borderBottom:"1px solid rgba(255,255,255,0.04)",
                 borderLeft:"4px dashed #f59e0b",paddingLeft:10,
               }}>

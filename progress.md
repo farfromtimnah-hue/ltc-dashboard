@@ -53,10 +53,9 @@ More button now survives refresh — added requestAnimationFrame fallback measur
 DATE: 2026-06-24
 SESSION: GitHub Pages CDN cache fix
 
-GitHub Pages CDN cache fixed — `public/_headers` added. `index.html` set to
-`no-cache, no-store, must-revalidate` so the browser always fetches the latest
-JS hash on deploy. JS/CSS/SVG assets set to `immutable` (max-age=31536000) since
-Vite hashes their filenames on every build. `vite.config.js` verified correct
+Attempted GitHub Pages CDN cache fix via `public/_headers` (Cache-Control
+rules). Removed 2026-07-15: GitHub Pages does not support `_headers` at all,
+so the file never had any effect. `vite.config.js` verified correct
 (`base: '/ltc-dashboard/'`, `outDir` defaults to `dist`). No changes to config.
 Commit: 1e1f9aa. Date: 2026-06-24
 

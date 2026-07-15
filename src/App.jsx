@@ -4738,9 +4738,9 @@ const MH_MINISTRY_PT = {
 
 function mhStatusBadge(total, minCount, idealCount) {
   if (minCount === null || minCount === undefined) return { label:"No Data", color:"#666", bg:"rgba(102,102,102,0.12)" };
-  if (total < minCount) return { label:"Critical", color:"#E74C3C", bg:"rgba(231,76,60,0.12)" };
-  if (total < idealCount) return { label:"Needs Volunteers", color:"#F39C12", bg:"rgba(243,156,18,0.12)" };
-  return { label:"Healthy", color:"#27AE60", bg:"rgba(39,174,96,0.12)" };
+  if (total >= minCount) return { label:"Healthy", color:"#27AE60", bg:"rgba(39,174,96,0.12)" };
+  if (total > 0) return { label:"Needs Volunteers", color:"#F39C12", bg:"rgba(243,156,18,0.12)" };
+  return { label:"Critical", color:"#E74C3C", bg:"rgba(231,76,60,0.12)" };
 }
 
 function mhSortOrder(status) {
@@ -4771,18 +4771,17 @@ function mhPosFilled(pos) {
 }
 
 // Per-position status from raw counts. Thresholds (per spec):
-//   green  (healthy)          -> filled >= ideal
-//   amber  (needs_volunteers) -> filled >= min
-//   red    (critical)         -> filled < min
+//   green  (healthy)          -> filled >= min (ideal_count only gates room to add more, never staffing status)
+//   amber  (needs_volunteers) -> filled > 0 but below min (or no min on file)
+//   red    (critical)         -> filled === 0
 // Returns 'no_data' only when a position has no min, no ideal and nobody filled.
 function mhPosStatus(filled, min, ideal) {
   var f = filled || 0;
   var hasMin = (min || 0) > 0;
   var hasIdeal = (ideal || 0) > 0;
   if (!hasMin && !hasIdeal && f === 0) return 'no_data';
-  if (hasIdeal && f >= ideal) return 'healthy';
-  if (hasMin && f >= min) return 'needs_volunteers';
-  return 'critical';
+  if (hasMin && f >= min) return 'healthy';
+  return f > 0 ? 'needs_volunteers' : 'critical';
 }
 
 // Card-level status = the WORST position status on the card (NOT an average).
@@ -8747,7 +8746,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             const idealV = pos?.ideal_count || 0;
             const filled = activeAsgn.length;
             const GUEST_COLOR = "#a78bfa";
-            const posColor = guestAsgn ? GUEST_COLOR : filled === 0 ? "#ef4444" : filled < minV ? "#ef4444" : filled < idealV ? "#eab308" : "#22c55e";
+            const posColor = guestAsgn ? GUEST_COLOR : mhStatusColor(mhPosStatus(filled, minV, idealV));
             const isPosPnnSaving = pnnSavingPos === posKey;
             const pickerTarget = { area_name: posMinistry, position_name: posName, display_label: posName };
 

@@ -3096,7 +3096,7 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
               <img src={CARISMA_LOGO} alt="" style={{width:14,height:14,objectFit:"contain",verticalAlign:"middle"}} />
               {t.carismaLabel}
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {CARISMA_OPTIONS.map(function(opt){
                 var active = carismaOptionActive(opt.value);
                 var label = lang === "PT" ? opt.displayPT : opt.displayEN;
@@ -3181,7 +3181,7 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
           {/* Languages */}
           <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.langSpoken}</div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {LANGUAGES.map(l=>(
                 <button key={l} onClick={()=>toggleLang(l)} disabled={saving}
                   style={{padding:"8px 14px",borderRadius:8,
@@ -8887,7 +8887,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
           const renderPositionArea = (area) => {
             const areaKey = area?.area_name || area?.name || "";
-            const positions = area.positions;
+            const positions = area?.positions || [];
             // A single-position area named after its position (e.g. area
             // "Prayer" -> Service Leaders / Prayer) needs no separate header.
             const skipHeader = positions.length === 1 && (positions[0]?.position_name || "") === areaKey;

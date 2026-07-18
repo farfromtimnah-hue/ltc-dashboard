@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { InviteSendButton, NeedsAttentionBadges, useNeedsAttention } from "./ScheduleInvite.jsx";
+import VolunteerView, { VOLUNTEER_SECTIONS } from "./VolunteerView.jsx";
 import PullToRefresh from "react-simple-pull-to-refresh";
 
 /*
@@ -10165,6 +10166,9 @@ function AppInner() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // Grants fetched on login to drive view-switcher options (e.g. ministry_leader_view).
   const [myGrants, setMyGrants] = useState([]);
+  // Whether this login is linked to a status = 'complete' submission - gates
+  // the Volunteer View option in the view switcher (any role may hold it).
+  const [selfEligible, setSelfEligible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -10351,6 +10355,16 @@ function AppInner() {
               setMyGrants(list);
             }
           } catch(_) { setMyGrants([]); }
+          // Volunteer self-service eligibility (own submission complete).
+          try {
+            const meR = await fetch(`${API}/me`, { headers: { Authorization: `Bearer ${idToken}` } });
+            if (meR.ok) {
+              const meD = await meR.json();
+              setSelfEligible(!!(meD && meD.eligible));
+            } else {
+              setSelfEligible(false);
+            }
+          } catch(_) { setSelfEligible(false); }
         } catch(e) {
           setToken(null);
           setRole(null);
@@ -10476,44 +10490,36 @@ function AppInner() {
   }
 
   if (role === 'member_portal') {
+    // Volunteer self-service is the member portal's whole app. The dock's
+    // three main items map to the view's first sections; Resources and
+    // Family live in the More drawer.
     const mpDockItems = [
       { id:'my_schedule', label:lang==='PT'?'Agenda':'Schedule', Icon:IconCalendar,
-        action:()=>setTab('my_schedule') },
+        action:()=>{ setTab('my_schedule'); setDockMoreOpen(false); } },
       { id:'availability', label:lang==='PT'?'Disp.':'Avail.', Icon:IconClock,
-        action:()=>setTab('availability') },
+        action:()=>{ setTab('availability'); setDockMoreOpen(false); } },
       { id:'my_profile', label:lang==='PT'?'Perfil':'Profile', Icon:IconUser,
-        action:()=>setTab('my_profile') },
+        action:()=>{ setTab('my_profile'); setDockMoreOpen(false); } },
+      { id:'more', label:lang==='PT'?'Mais':'More', Icon:IconGrid,
+        action:()=>setDockMoreOpen(o=>!o) },
     ];
     const mpMoreItems = [
+      { id:'resources', label:lang==='PT'?'Recursos':'Resources', Icon:IconStar,
+        action:()=>setTab('resources') },
+      { id:'family', label:lang==='PT'?'Familia':'Family', Icon:IconUsers,
+        action:()=>setTab('family') },
       { id:'logout', label:lang==='PT'?'Sair':'Sign Out', Icon:IconUser, action:()=>signOut(auth) },
     ];
-    const mpActiveTab = ['my_schedule','availability','my_profile'].includes(tab) ? tab : 'my_schedule';
-    const placeholder = (title) => (
-      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-        minHeight:'60vh',padding:32}}>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",
-          textTransform:"uppercase",color:"#5eead4",marginBottom:12}}>{title}</div>
-        <div className="glass" style={{padding:'32px 28px',borderRadius:16,maxWidth:320,width:'100%',textAlign:'center'}}>
-          <div style={{fontSize:28,marginBottom:12}}>🚧</div>
-          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,color:"#e6f1f0",fontWeight:600,marginBottom:8}}>
-            Em breve
-          </div>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#475a64",letterSpacing:'0.06em'}}>
-            {lang==='PT'?'Esta funcionalidade esta sendo desenvolvida.':'This feature is coming soon.'}
-          </div>
-        </div>
-      </div>
-    );
+    const mpSectionIds = VOLUNTEER_SECTIONS.map(s => s.id);
+    const mpActiveTab = mpSectionIds.includes(tab) ? tab : 'my_schedule';
     return (
       <div style={{minHeight:'100vh',background:'#050a10',overflowY:'auto',
         paddingBottom:'calc(56px + env(safe-area-inset-bottom, 16px))'}}>
         <style>{css}</style>
-        {mpActiveTab === 'my_schedule' && placeholder(lang==='PT'?'Minha Agenda':'My Schedule')}
-        {mpActiveTab === 'availability' && placeholder(lang==='PT'?'Disponibilidade':'Availability')}
-        {mpActiveTab === 'my_profile' && placeholder(lang==='PT'?'Meu Perfil':'My Profile')}
+        <VolunteerView token={token} lang={lang} activeSection={mpActiveTab} onSectionChange={setTab} />
         <MobileDock items={mpDockItems} moreItems={mpMoreItems}
           moreOpen={dockMoreOpen} onMoreToggle={()=>setDockMoreOpen(o=>!o)}
-          onMoreClose={()=>setDockMoreOpen(false)} activeId={mpActiveTab} />
+          onMoreClose={()=>setDockMoreOpen(false)} activeId={['resources','family'].includes(mpActiveTab)?'more':mpActiveTab} />
       </div>
     );
   }
@@ -10525,7 +10531,7 @@ function AppInner() {
   const hasMinistryLeaderGrant = (myGrants || []).some(g => (g.grant_type || g.grantType || g.type) === 'ministry_leader');
   const hasBlanketMLAccess = role === 'owner' || role === 'senior_pastor' || role === 'pastor';
   const hasAnyMLAccess = hasBlanketMLAccess || hasMinistryLeaderGrant;
-  const hasSwitcher = hasAnyMLAccess;
+  const hasSwitcher = hasAnyMLAccess || selfEligible;
 
   // Apply a view mode change by value (used by ViewSwitcherModal and dock items)
   const applyViewChange = (v) => {
@@ -10639,6 +10645,7 @@ function AppInner() {
     ['cafe_view', lang==="PT"?"Vista Cafe":"Cafe View"],
     ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
     ...(hasAnyMLAccess ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
+    ...(selfEligible ? [['volunteer_view', lang==="PT"?"Minha Area de Voluntario":"My Volunteer Area"]] : []),
   ];
   // View switcher button (desktop nav + More drawer)
   const viewSwitcherCurrentLabel = () => {
@@ -10809,7 +10816,12 @@ function AppInner() {
             <MinistryLeaderView lang={lang} grants={myGrants} hasBlanketAccess={hasBlanketMLAccess} activeMinistryOverride={glMinistry} token={token} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && ["analytics","attendance","people","gifting","health"].includes(tab) && (
+        {viewMode === 'volunteer_view' && (
+          <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>
+            <VolunteerView token={token} lang={lang} />
+          </RefErrorBoundary>
+        )}
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && viewMode !== 'volunteer_view' && ["analytics","attendance","people","gifting","health"].includes(tab) && (
           <PullToRefresh
             isPullable={isMobile}
             onRefresh={handlePullRefresh}
@@ -10829,17 +10841,17 @@ function AppInner() {
             </div>
           </PullToRefresh>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "reference" && (
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && viewMode !== 'volunteer_view' && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
             <ReferenceTab t={t} lang={lang} anchor={refAnchor} onAnchorConsumed={function(){setRefAnchor(null);}} onBack={function(){setTab("people");}} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "scheduling" && ['owner','senior_pastor','pastor'].includes(role) && (
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && viewMode !== 'volunteer_view' && tab === "scheduling" && ['owner','senior_pastor','pastor'].includes(role) && (
           <RefErrorBoundary lang={lang} onBack={() => setTab('analytics')}>
             <PastorSchedulingTab token={token} lang={lang} />
           </RefErrorBoundary>
         )}
-        {tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
+        {viewMode !== 'volunteer_view' && tab === "users" && effectiveRole === "owner" && <UserManagementTab token={token} t={t} lang={lang} />}
       </div>
       </div>
 

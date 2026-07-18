@@ -55,6 +55,12 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
   const [busy, setBusy] = React.useState(false);
   const [noNumber, setNoNumber] = React.useState(false);
   const [error, setError] = React.useState(null);
+  // Delegate routing (July 2026): when the Worker routed the actionable
+  // invite to a delegate, it also returns an informational notice for the
+  // principal. One user gesture can only open one WhatsApp window, so the
+  // notice becomes a second explicit button the leader taps right after.
+  const [notice, setNotice] = React.useState(null);
+  const [routedName, setRoutedName] = React.useState(null);
 
   if (status === "confirmed" || status === "wants_reschedule" || status === "declined") return null;
   if (assignmentId === null || assignmentId === undefined) return null;
@@ -69,6 +75,8 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
     noNumber: lang === "PT" ? "Numero nao encontrado para esta pessoa" : "No number found for this person",
     noPerm:   lang === "PT" ? "Sem permissao" : "No permission",
     failed:   lang === "PT" ? "Erro ao gerar convite" : "Could not generate invite",
+    notice:   lang === "PT" ? "Enviar aviso" : "Send notice",
+    viaDelegate: lang === "PT" ? "via" : "via",
   };
 
   function handleClick() {
@@ -89,6 +97,8 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
         setBusy(false);
         const info = { message: (d && d.message) || "", whatsapp: (d && d.whatsapp) || null };
         setNoNumber(!hasNumber(info.whatsapp));
+        setNotice(d && d.notice && d.notice.message && hasNumber(d.notice.whatsapp) ? d.notice : null);
+        setRoutedName(d && d.routed_to === "delegate" ? (d.delegate_name || null) : null);
         if (anchorRef.current) {
           anchorRef.current.href = waUrl(info.message, info.whatsapp);
           anchorRef.current.click();
@@ -124,6 +134,22 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
         {busy ? tx.sending : (alreadySent ? tx.resend : tx.send)}
         {langTag}
       </button>
+      {routedName && (
+        <span style={{ fontSize: 9, color: "#93c5fd", fontFamily: "'JetBrains Mono',monospace" }}>
+          {tx.viaDelegate} {routedName}
+        </span>
+      )}
+      {notice && (
+        <a href={waUrl(notice.message, notice.whatsapp)} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{
+            padding: "2px 8px", borderRadius: 999, fontSize: 10, fontFamily: "'JetBrains Mono',monospace",
+            border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.1)",
+            color: "#f59e0b", cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", display: "inline-block",
+          }}>
+          {tx.notice} {notice.language === "EN" ? "EN" : "PT"}
+        </a>
+      )}
       {noNumber && (
         <span style={{ fontSize: 9.5, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontStyle: "italic" }}>{tx.noNumber}</span>
       )}

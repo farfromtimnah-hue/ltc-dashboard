@@ -10516,7 +10516,7 @@ function AppInner() {
       <div style={{minHeight:'100vh',background:'#050a10',overflowY:'auto',
         paddingBottom:'calc(56px + env(safe-area-inset-bottom, 16px))'}}>
         <style>{css}</style>
-        <VolunteerView token={token} lang={lang} activeSection={mpActiveTab} onSectionChange={setTab} />
+        <VolunteerView token={token} lang={lang} activeSection={mpActiveTab} onSectionChange={setTab} role={role} selfEligible={selfEligible} />
         <MobileDock items={mpDockItems} moreItems={mpMoreItems}
           moreOpen={dockMoreOpen} onMoreToggle={()=>setDockMoreOpen(o=>!o)}
           onMoreClose={()=>setDockMoreOpen(false)} activeId={['resources','family'].includes(mpActiveTab)?'more':mpActiveTab} />
@@ -10645,7 +10645,7 @@ function AppInner() {
     ['cafe_view', lang==="PT"?"Vista Cafe":"Cafe View"],
     ['group_leader', lang==="PT"?"Visao do Lider":"Group Leader View"],
     ...(hasAnyMLAccess ? [['ministry_leader_view', lang==="PT"?"Visao do Lider de Ministerio":"Ministry Leader View"]] : []),
-    ...(selfEligible ? [['volunteer_view', lang==="PT"?"Minha Area de Voluntario":"My Volunteer Area"]] : []),
+    ...((selfEligible || role === 'owner') ? [['volunteer_view', lang==="PT"?"Minha Area de Voluntario":"My Volunteer Area"]] : []),
   ];
   // View switcher button (desktop nav + More drawer)
   const viewSwitcherCurrentLabel = () => {
@@ -10818,7 +10818,7 @@ function AppInner() {
         )}
         {viewMode === 'volunteer_view' && (
           <RefErrorBoundary lang={lang} onBack={function(){setViewMode('my_view');}}>
-            <VolunteerView token={token} lang={lang} />
+            <VolunteerView token={token} lang={lang} role={role} selfEligible={selfEligible} />
           </RefErrorBoundary>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && viewMode !== 'volunteer_view' && ["analytics","attendance","people","gifting","health"].includes(tab) && (

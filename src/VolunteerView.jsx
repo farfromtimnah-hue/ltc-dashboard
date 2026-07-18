@@ -24,6 +24,16 @@ function jsonHeaders(token) {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
+// Owner-only preview-as support: appends ?previewAs=<id> (or &previewAs=<id>
+// if the URL already has a query string) to any /my/* (or /me, or
+// /recursos?mine=1) request. previewAs is null for every non-owner caller
+// and for owner's own real linked-submission session, so the URL is
+// byte-for-byte unchanged from today in those cases.
+function withPreview(url, previewAs) {
+  if (!previewAs) return url;
+  return url + (url.includes("?") ? "&" : "?") + `previewAs=${encodeURIComponent(previewAs)}`;
+}
+
 // ── Shared UI bits ───────────────────────────────────────────────────────────
 
 function SectionHeading({ children }) {
@@ -105,17 +115,17 @@ function statusChip(status, lang) {
 
 // ── My Schedule ──────────────────────────────────────────────────────────────
 
-function MySchedule({ token, lang }) {
+function MySchedule({ token, lang, previewAs }) {
   const [rows, setRows] = React.useState(null);
   const [error, setError] = React.useState(false);
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/my/schedule`, { headers: authHeaders(token) })
+    fetch(withPreview(`${API}/my/schedule`, previewAs), { headers: authHeaders(token) })
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => { if (!cancelled) setRows(Array.isArray(d) ? d.filter(a => a && a.status !== "declined") : []); })
       .catch(() => { if (!cancelled) { setRows([]); setError(true); } });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, previewAs]);
 
   return (
     <div>
@@ -152,7 +162,7 @@ function MySchedule({ token, lang }) {
 
 // ── My Availability (block-out dates + family-wide apply) ────────────────────
 
-function MyAvailability({ token, lang, me }) {
+function MyAvailability({ token, lang, me, previewAs }) {
   const [rows, setRows] = React.useState(null);
   const [refresh, setRefresh] = React.useState(0);
   const [start, setStart] = React.useState("");
@@ -168,18 +178,18 @@ function MyAvailability({ token, lang, me }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/my/unavailability`, { headers: authHeaders(token) })
+    fetch(withPreview(`${API}/my/unavailability`, previewAs), { headers: authHeaders(token) })
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
       .catch(() => { if (!cancelled) setRows([]); });
     return () => { cancelled = true; };
-  }, [token, refresh]);
+  }, [token, previewAs, refresh]);
 
   function save(applyToFamily) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    fetch(`${API}/my/unavailability`, {
+    fetch(withPreview(`${API}/my/unavailability`, previewAs), {
       method: "POST",
       headers: jsonHeaders(token),
       body: JSON.stringify({ start_date: start, end_date: end || start, reason: reason || null, apply_to_family: !!applyToFamily }),
@@ -199,7 +209,7 @@ function MyAvailability({ token, lang, me }) {
   }
 
   function remove(id) {
-    fetch(`${API}/my/unavailability/${id}`, { method: "DELETE", headers: authHeaders(token) })
+    fetch(withPreview(`${API}/my/unavailability/${id}`, previewAs), { method: "DELETE", headers: authHeaders(token) })
       .then(() => setRefresh(k => k + 1))
       .catch(() => {});
   }
@@ -281,7 +291,7 @@ function MyAvailability({ token, lang, me }) {
 
 // ── My Profile (contact fields only) ─────────────────────────────────────────
 
-function MyProfile({ token, lang, me, onSaved }) {
+function MyProfile({ token, lang, me, onSaved, previewAs }) {
   const [name, setName] = React.useState((me && me.name) || "");
   const [preferred, setPreferred] = React.useState((me && me.preferred_name) || "");
   const [whatsapp, setWhatsapp] = React.useState((me && me.whatsapp) || "");
@@ -293,7 +303,7 @@ function MyProfile({ token, lang, me, onSaved }) {
   function save() {
     if (busy) return;
     setBusy(true); setSaved(false); setError(false);
-    fetch(`${API}/my/profile`, {
+    fetch(withPreview(`${API}/my/profile`, previewAs), {
       method: "PUT",
       headers: jsonHeaders(token),
       body: JSON.stringify({ name, preferred_name: preferred, whatsapp, email }),
@@ -339,16 +349,16 @@ function MyProfile({ token, lang, me, onSaved }) {
 
 // ── My Resources ─────────────────────────────────────────────────────────────
 
-function MyResources({ token, lang }) {
+function MyResources({ token, lang, previewAs }) {
   const [rows, setRows] = React.useState(null);
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/recursos?mine=1`, { headers: authHeaders(token) })
+    fetch(withPreview(`${API}/recursos?mine=1`, previewAs), { headers: authHeaders(token) })
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
       .catch(() => { if (!cancelled) setRows([]); });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, previewAs]);
 
   const byMinistry = {};
   (rows || []).forEach(r => {
@@ -509,7 +519,7 @@ function KidsForm({ token, lang, child, onDone, onCancel }) {
 
 // ── Family and Delegates ─────────────────────────────────────────────────────
 
-function FamilyDelegates({ token, lang, me, onChanged }) {
+function FamilyDelegates({ token, lang, me, onChanged, previewAs }) {
   const [spouseSearch, setSpouseSearch] = React.useState("");
   const [spouseResults, setSpouseResults] = React.useState([]);
   const [addingSpouse, setAddingSpouse] = React.useState(false);
@@ -529,20 +539,20 @@ function FamilyDelegates({ token, lang, me, onChanged }) {
     if (!addingSpouse || spouseSearch.trim().length < 2) { setSpouseResults([]); return; }
     let cancelled = false;
     const tid = setTimeout(() => {
-      fetch(`${API}/my/delegate-search?q=${encodeURIComponent(spouseSearch.trim())}`, { headers: authHeaders(token) })
+      fetch(withPreview(`${API}/my/delegate-search?q=${encodeURIComponent(spouseSearch.trim())}`, previewAs), { headers: authHeaders(token) })
         .then(r => (r.ok ? r.json() : Promise.reject()))
         .then(d => { if (!cancelled) setSpouseResults(Array.isArray(d) ? d : []); })
         .catch(() => { if (!cancelled) setSpouseResults([]); });
     }, 300);
     return () => { cancelled = true; clearTimeout(tid); };
-  }, [spouseSearch, addingSpouse, token]);
+  }, [spouseSearch, addingSpouse, token, previewAs]);
 
   function addSpouse(person, direction) {
     // direction 'they_manage_me' -> delegate_id = them; 'i_manage_them' -> principal_id = them
     if (busy || !person) return;
     setBusy(true); setError(null);
     const body = direction === "they_manage_me" ? { delegate_id: person.id } : { principal_id: person.id };
-    fetch(`${API}/my/delegates`, { method: "POST", headers: jsonHeaders(token), body: JSON.stringify(body) })
+    fetch(withPreview(`${API}/my/delegates`, previewAs), { method: "POST", headers: jsonHeaders(token), body: JSON.stringify(body) })
       .then(r => (r.ok ? r.json() : r.json().then(d => Promise.reject(d && d.error))))
       .then(() => { setBusy(false); setAddingSpouse(false); setSpouseSearch(""); setSpouseResults([]); if (onChanged) onChanged(); })
       .catch(msg => { setBusy(false); setError(typeof msg === "string" && msg ? msg : (lang === "PT" ? "Erro ao adicionar" : "Could not add")); });
@@ -551,7 +561,7 @@ function FamilyDelegates({ token, lang, me, onChanged }) {
   function addChild() {
     if (busy || !childName.trim()) return;
     setBusy(true); setError(null);
-    fetch(`${API}/my/children`, {
+    fetch(withPreview(`${API}/my/children`, previewAs), {
       method: "POST", headers: jsonHeaders(token),
       body: JSON.stringify({ name: childName.trim(), date_of_birth: childDob || null, language: childLang, email: childEmail.trim() || null }),
     })
@@ -567,7 +577,7 @@ function FamilyDelegates({ token, lang, me, onChanged }) {
   }
 
   function toggleMcsa(rel) {
-    fetch(`${API}/my/delegates/${rel.id}`, {
+    fetch(withPreview(`${API}/my/delegates/${rel.id}`, previewAs), {
       method: "PUT", headers: jsonHeaders(token),
       body: JSON.stringify({ minor_can_self_accept: rel.minor_can_self_accept === 1 ? 0 : 1 }),
     })
@@ -577,7 +587,7 @@ function FamilyDelegates({ token, lang, me, onChanged }) {
   }
 
   function removeSpouse(rel) {
-    fetch(`${API}/my/delegates/${rel.id}`, { method: "DELETE", headers: authHeaders(token) })
+    fetch(withPreview(`${API}/my/delegates/${rel.id}`, previewAs), { method: "DELETE", headers: authHeaders(token) })
       .then(() => { if (onChanged) onChanged(); })
       .catch(() => {});
   }
@@ -742,7 +752,83 @@ export const VOLUNTEER_SECTIONS = [
   { id: "family", pt: "Familia", en: "Family" },
 ];
 
-export default function VolunteerView({ token, lang, activeSection, onSectionChange }) {
+// ── Owner preview-as picker (July 2026) ──────────────────────────────────────
+// Owner-only. Shown instead of the normal view when the owner's own login
+// has no real linked submission, so Nicole can test this view as a real
+// completed volunteer. Lists come from GET /people/eligible-for-preview
+// (owner-only, lightweight - id/name/preferred_name/ministries only).
+function PreviewPicker({ token, lang, onPick }) {
+  const [people, setPeople] = React.useState(null);
+  const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch(`${API}/people/eligible-for-preview`, { headers: authHeaders(token) })
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(d => { if (!cancelled) setPeople(Array.isArray(d) ? d : []); })
+      .catch(() => { if (!cancelled) setPeople([]); });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = (people || []).filter(p => {
+    if (!q) return true;
+    const nm = `${p.name || ""} ${p.preferred_name || ""}`.toLowerCase();
+    return nm.includes(q);
+  });
+
+  return (
+    <div style={{ padding: "48px 24px" }}>
+      <div className="glass" style={{ maxWidth: 460, margin: "0 auto", borderRadius: 16, padding: "24px 22px" }}>
+        <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: "0.18em", textTransform: "uppercase", color: "#5eead4", marginBottom: 6 }}>
+          {lang === "PT" ? "Visualizar como" : "Preview as"}
+        </div>
+        <div style={{ fontFamily: grotesk, fontSize: 13.5, color: "#aebac0", marginBottom: 16, lineHeight: 1.5 }}>
+          {lang === "PT"
+            ? "Seu login nao esta ligado a uma avaliacao. Escolha uma pessoa com avaliacao concluida para testar esta area como ela."
+            : "Your login is not linked to an assessment. Pick a person with a completed assessment to test this area as them."}
+        </div>
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }}
+          placeholder={lang === "PT" ? "Buscar pelo nome..." : "Search by name..."} />
+        {people === null && <EmptyNote>...</EmptyNote>}
+        {people !== null && filtered.length === 0 && (
+          <EmptyNote>{lang === "PT" ? "Ninguem encontrado." : "No one found."}</EmptyNote>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+          {filtered.map(p => (
+            <button key={p.id} onClick={() => onPick(p)} style={{ ...ghostBtn, textAlign: "left", width: "100%", boxSizing: "border-box" }}>
+              <div style={{ fontFamily: grotesk, fontSize: 13.5, color: "#e6f1f0" }}>{p.preferred_name || p.name || ""}</div>
+              {(p.ministries || []).length > 0 && (
+                <div style={{ fontFamily: mono, fontSize: 10, color: "#6b7a82", marginTop: 2 }}>{(p.ministries || []).join(", ")}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Unmistakable banner shown whenever owner is viewing this as someone else -
+// must never be confused with a volunteer's own honest view of their own data.
+function PreviewBanner({ lang, name, onClear }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
+      padding: "10px 16px", borderRadius: 12, marginBottom: 18,
+      background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)",
+    }}>
+      <div style={{ fontFamily: mono, fontSize: 11.5, letterSpacing: "0.04em", color: "#f59e0b" }}>
+        {lang === "PT" ? `Visualizando como: ${name || ""}` : `Previewing as: ${name || ""}`}
+      </div>
+      <button onClick={onClear} style={{ ...ghostBtn, padding: "5px 12px", fontSize: 10.5 }}>
+        {lang === "PT" ? "Trocar pessoa" : "Change person"}
+      </button>
+    </div>
+  );
+}
+
+export default function VolunteerView({ token, lang, activeSection, onSectionChange, role, selfEligible }) {
   const [me, setMe] = React.useState(null);
   const [meState, setMeState] = React.useState("loading"); // loading | ok | none
   const [meRefresh, setMeRefresh] = React.useState(0);
@@ -750,9 +836,35 @@ export default function VolunteerView({ token, lang, activeSection, onSectionCha
   const section = activeSection || ownSection;
   const setSection = onSectionChange || setOwnSection;
 
+  // Owner preview-as state, seeded from the URL (?previewAs=<id>) so a page
+  // refresh mid-test-session restores the picked person, matching this
+  // project's existing tab/view/glGroup/glMinistry URL-state convention.
+  // Only ever meaningful for owner; every other role ignores it entirely.
+  const isOwnerPreviewCandidate = role === "owner" && !selfEligible;
+  const [previewAs, setPreviewAs] = React.useState(() =>
+    isOwnerPreviewCandidate ? (new URLSearchParams(window.location.search).get("previewAs") || "") : ""
+  );
+  const [previewName, setPreviewName] = React.useState(() =>
+    new URLSearchParams(window.location.search).get("previewAsName") || ""
+  );
+
+  React.useEffect(() => {
+    if (!isOwnerPreviewCandidate) return;
+    const params = new URLSearchParams(window.location.search);
+    previewAs ? params.set("previewAs", previewAs) : params.delete("previewAs");
+    previewAs && previewName ? params.set("previewAsName", previewName) : params.delete("previewAsName");
+    const qs = params.toString();
+    const newUrl = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+    if (newUrl !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [isOwnerPreviewCandidate, previewAs, previewName]);
+
+  const effectivePreviewAs = isOwnerPreviewCandidate ? previewAs : "";
+
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/me`, { headers: authHeaders(token) })
+    fetch(withPreview(`${API}/me`, effectivePreviewAs), { headers: authHeaders(token) })
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => {
         if (cancelled) return;
@@ -761,7 +873,14 @@ export default function VolunteerView({ token, lang, activeSection, onSectionCha
       })
       .catch(() => { if (!cancelled) setMeState("none"); });
     return () => { cancelled = true; };
-  }, [token, meRefresh]);
+  }, [token, effectivePreviewAs, meRefresh]);
+
+  if (isOwnerPreviewCandidate && !previewAs) {
+    return (
+      <PreviewPicker token={token} lang={lang}
+        onPick={p => { setPreviewAs(String(p.id)); setPreviewName(p.preferred_name || p.name || ""); }} />
+    );
+  }
 
   if (meState === "loading") {
     return <div style={{ padding: 32 }}><EmptyNote>...</EmptyNote></div>;
@@ -769,6 +888,11 @@ export default function VolunteerView({ token, lang, activeSection, onSectionCha
   if (meState === "none") {
     return (
       <div style={{ padding: "48px 24px", textAlign: "center" }}>
+        {isOwnerPreviewCandidate && previewAs && (
+          <div style={{ maxWidth: 380, margin: "0 auto 16px" }}>
+            <PreviewBanner lang={lang} name={previewName} onClear={() => { setPreviewAs(""); setPreviewName(""); }} />
+          </div>
+        )}
         <div className="glass" style={{ display: "inline-block", padding: "28px 26px", borderRadius: 16, maxWidth: 380 }}>
           <div style={{ fontFamily: grotesk, fontSize: 15, color: "#e6f1f0", fontWeight: 600, marginBottom: 8 }}>
             {lang === "PT" ? "Perfil de voluntario nao encontrado" : "No volunteer profile found"}
@@ -785,6 +909,10 @@ export default function VolunteerView({ token, lang, activeSection, onSectionCha
 
   return (
     <div style={{ padding: "20px 20px 40px", maxWidth: 720, margin: "0 auto" }}>
+      {isOwnerPreviewCandidate && previewAs && (
+        <PreviewBanner lang={lang} name={previewName || (me && (me.preferred_name || me.name))}
+          onClear={() => { setPreviewAs(""); setPreviewName(""); }} />
+      )}
       {!activeSection && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
           {VOLUNTEER_SECTIONS.map(s => (
@@ -798,11 +926,11 @@ export default function VolunteerView({ token, lang, activeSection, onSectionCha
           ))}
         </div>
       )}
-      {section === "my_schedule" && <MySchedule token={token} lang={lang} />}
-      {section === "availability" && <MyAvailability token={token} lang={lang} me={me} />}
-      {section === "my_profile" && <MyProfile token={token} lang={lang} me={me} onSaved={() => setMeRefresh(k => k + 1)} />}
-      {section === "resources" && <MyResources token={token} lang={lang} />}
-      {section === "family" && <FamilyDelegates token={token} lang={lang} me={me} onChanged={() => setMeRefresh(k => k + 1)} />}
+      {section === "my_schedule" && <MySchedule token={token} lang={lang} previewAs={effectivePreviewAs} />}
+      {section === "availability" && <MyAvailability token={token} lang={lang} me={me} previewAs={effectivePreviewAs} />}
+      {section === "my_profile" && <MyProfile token={token} lang={lang} me={me} onSaved={() => setMeRefresh(k => k + 1)} previewAs={effectivePreviewAs} />}
+      {section === "resources" && <MyResources token={token} lang={lang} previewAs={effectivePreviewAs} />}
+      {section === "family" && <FamilyDelegates token={token} lang={lang} me={me} onChanged={() => setMeRefresh(k => k + 1)} previewAs={effectivePreviewAs} />}
     </div>
   );
 }

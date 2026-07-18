@@ -774,6 +774,26 @@ const css = `
   @media (min-width: 640px) {
     .vsm-overlay { align-items: center; }
   }
+  /* ── Analytics KPI grid ── 2 columns on narrow phones so the 52px value + label fit, 4 on wider screens */
+  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (min-width: 640px) {
+    .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  /* ── Analytics giftings + languages row ── stacked on narrow phones so nothing pushes off-screen, side-by-side on wider screens */
+  .analytics-two-col { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 800px) {
+    .analytics-two-col { grid-template-columns: 1.4fr 1fr; }
+  }
+  /* ── Analytics funnel row (stage list + conversion donut) ── stacked on phones, side-by-side on wider screens */
+  .analytics-funnel-row { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; }
+  @media (min-width: 700px) {
+    .analytics-funnel-row { grid-template-columns: 1fr 1fr; gap: 40px; }
+  }
+  /* ── Analytics distribution row (leadership/emotional/strength donuts) ── stacked on phones, 3-up on wide screens */
+  .analytics-distribution-row { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 900px) {
+    .analytics-distribution-row { grid-template-columns: 1fr 1fr 1fr; }
+  }
   .vsm-sheet {
     background: #0d1c26; border: 1px solid rgba(94,234,212,0.12);
     border-bottom: none; border-radius: 16px 16px 0 0;
@@ -2061,7 +2081,7 @@ function AnalyticsTab({ token, t, lang }) {
     <div style={{padding:"32px 28px",display:"flex",flexDirection:"column",gap:20}}>
 
       {/* ── KPI row ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+      <div className="kpi-grid">
         {[
           {label:t.totalSub,        value:data.total,       accent:"#5eead4", spark:sparkWeekly},
           {label:t.placedMin,       value:placedCount,      accent:"#34d399", spark:[0,0,1,1,0,1,placedCount]},
@@ -2106,7 +2126,7 @@ function AnalyticsTab({ token, t, lang }) {
             {t.funnelDesc}
           </p>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
+        <div className="analytics-funnel-row">
           {/* Left: numbered stage rows */}
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
             {stageFunnel.map(({stage,count},i) => {
@@ -2169,7 +2189,7 @@ function AnalyticsTab({ token, t, lang }) {
       </div>
 
       {/* ── Two-col: Giftings donut + Languages ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:20}}>
+      <div className="analytics-two-col">
 
         {/* Donut + legend */}
         <div className="glass" style={{padding:28,borderRadius:12}}>
@@ -2319,7 +2339,7 @@ function AnalyticsTab({ token, t, lang }) {
       </div>
 
       {/* ── Leadership + Emotional + Natural Strength Distribution ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20}}>
+      <div className="analytics-distribution-row">
         {/* Leadership Tendencies */}
         <div className="glass" style={{padding:28,borderRadius:12}}>
           <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,

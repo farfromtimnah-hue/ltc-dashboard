@@ -796,6 +796,11 @@ const css = `
   @media (min-width: 900px) {
     .analytics-distribution-row { grid-template-columns: 1fr 1fr 1fr; }
   }
+  /* ── Donut + legend layout (giftings, leadership, emotional, strength cards) ── stacked on phones so the legend never overflows the fixed-width donut column, side-by-side on wider screens */
+  .donut-legend-row { display: grid; grid-template-columns: 1fr; gap: 20px; justify-items: center; }
+  @media (min-width: 480px) {
+    .donut-legend-row { grid-template-columns: auto 1fr; justify-items: stretch; }
+  }
   .vsm-sheet {
     background: #0d1c26; border: 1px solid rgba(94,234,212,0.12);
     border-bottom: none; border-radius: 16px 16px 0 0;
@@ -2224,7 +2229,7 @@ function AnalyticsTab({ token, t, lang, refreshKey }) {
           <p style={{margin:"0 0 22px",fontSize:12,color:"#6b7a82"}}>
             {t.donutDesc}
           </p>
-          <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:28,alignItems:"center"}}>
+          <div className="donut-legend-row">
             <Donut
               size={180} strokeWidth={18}
               centerValue={String(data.total||0)}
@@ -2373,7 +2378,7 @@ function AnalyticsTab({ token, t, lang, refreshKey }) {
           {(data.byLeadership||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+            <div className="donut-legend-row">
               <Donut
                 size={180} strokeWidth={18}
                 centerValue={String((data.byLeadership||[]).reduce((s,r)=>s+r.count,0))}
@@ -2407,7 +2412,7 @@ function AnalyticsTab({ token, t, lang, refreshKey }) {
           {(data.byEmotional||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+            <div className="donut-legend-row">
               <Donut
                 size={180} strokeWidth={18}
                 centerValue={String((data.byEmotional||[]).reduce((s,r)=>s+r.count,0))}
@@ -2441,7 +2446,7 @@ function AnalyticsTab({ token, t, lang, refreshKey }) {
           {(data.byNatural||[]).length === 0 ? (
             <div style={{fontSize:13,color:"#475a64",fontFamily:"'JetBrains Mono',monospace"}}>{t.noDistData}</div>
           ) : (
-            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:24,alignItems:"center"}}>
+            <div className="donut-legend-row">
               <Donut
                 size={180} strokeWidth={18}
                 centerValue={String((data.byNatural||[]).reduce((s,r)=>s+r.count,0))}

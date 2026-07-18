@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from './firebase.js';
 import { PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { InviteSendButton, NeedsAttentionBadges, useNeedsAttention } from "./ScheduleInvite.jsx";
+import PullToRefresh from "react-simple-pull-to-refresh";
 
 /*
  * ──────────────────────────────────────────────────────────────────────────
@@ -666,6 +667,7 @@ const css = `
     border-color: var(--border-strong) !important;
     box-shadow: 0 0 0 1px rgba(94,234,212,0.22), 0 12px 40px -10px rgba(94,234,212,0.28) !important;
   }
+  @keyframes ptr-spin { to { transform: rotate(360deg); } }
 
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-track{background:transparent;}
@@ -1812,6 +1814,28 @@ const SERVICE_CHIP_COLORS = {
   'English Service':{ bg:'rgba(52,211,153,0.08)', border:'rgba(52,211,153,0.22)', color:'#a7eccc' },
 };
 
+// Pull-to-refresh indicator shown above tab content while pulling/refreshing
+// on mobile. Matches the app's dark glass aesthetic (see .glass CSS class)
+// and teal accent tokens (#2ABFBF / #5eead4) instead of the library defaults.
+function pullToRefreshIndicator(lang, spinning) {
+  const label = spinning
+    ? (lang === 'PT' ? 'Atualizando...' : 'Refreshing...')
+    : (lang === 'PT' ? 'Solte para atualizar' : 'Release to refresh');
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'14px 0'}}>
+      <span style={{
+        width:14, height:14, borderRadius:'50%',
+        border:'2px solid rgba(94,234,212,0.25)', borderTopColor:'#5eead4',
+        animation: spinning ? 'ptr-spin 0.7s linear infinite' : 'none',
+      }} />
+      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,letterSpacing:'0.08em',
+        textTransform:'uppercase',color:'#5eead4'}}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function ServiceChip({ service }) {
   const c = SERVICE_CHIP_COLORS[service] || { bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.1)', color:'#aebac0' };
   return (
@@ -1828,7 +1852,7 @@ function volPctColor(pct) {
   return '#f87171';
 }
 
-function ServiceAttendanceTab({ t, lang, token }) {
+function ServiceAttendanceTab({ t, lang, token, refreshKey }) {
   const [selectedService, setSelectedService] = useState('Sunday 10AM');
   const [attendanceData, setAttendanceData] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(true);
@@ -1851,7 +1875,7 @@ function ServiceAttendanceTab({ t, lang, token }) {
       }
     }
     if (token) fetchAll();
-  }, [token]);
+  }, [token, refreshKey]);
 
   // Section 2 metrics
   const latestSunday10 = attendanceData.find(d => d.service_name === 'Sunday 10AM');
@@ -2048,13 +2072,13 @@ function ServiceAttendanceTab({ t, lang, token }) {
   );
 }
 
-function AnalyticsTab({ token, t, lang }) {
+function AnalyticsTab({ token, t, lang, refreshKey }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
     fetch(`${API}/analytics?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(setData).catch(() => {});
-  }, [token]);
+  }, [token, refreshKey]);
 
   if (!data) return <div style={{padding:40,color:"#475a64",fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>{t ? t.loading : "Loading..."}</div>;
 
@@ -3862,7 +3886,7 @@ async function executeSplit(people, token, reload, setDone, setSaving, ratio, se
   setDone("Done! " + englishSpeakers.length + " English -> Pra Alice. " + aliceCount + " PT -> Pra Alice. " + rafaList.length + " PT -> Pr Rafa.");
 }
 
-function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser, viewMode }) {
+function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser, viewMode, refreshKey }) {
   const [people, setPeople] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("All");
@@ -3911,7 +3935,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
       .then(r => r.json()).then(d => setPeople(Array.isArray(d) ? d : [])).catch(() => {});
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   // Stage-view roles (set via the top-nav view switcher) drive which discipleship
   // tab opens by default and which pills are visible. Maps view role -> default tab view key.
@@ -4489,7 +4513,7 @@ function PeopleTab({ token, role, t, lang, templatePT, templateEN, onNavigate, f
 }
 
 // ─── GIFTING FILTER TAB ───────────────────────────────────────────
-function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser }) {
+function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate, fbUser, refreshKey }) {
   const [selectedGifting, setSelectedGifting] = useState(null);
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -4503,7 +4527,7 @@ function GiftingTab({ token, role, t, lang, templatePT, templateEN, onNavigate, 
       .catch(() => setLoading(false));
   }, [token]);
 
-  useEffect(() => { if (selectedGifting) load(selectedGifting); }, [selectedGifting, load]);
+  useEffect(() => { if (selectedGifting) load(selectedGifting); }, [selectedGifting, load, refreshKey]);
 
   return (
     <div style={{padding:"24px 28px",display:"flex",flexDirection:"column",gap:24}}>
@@ -5042,7 +5066,7 @@ function MinistryModal({ card, lang, role, token, fbUser, posAlerts, onClose, on
   );
 }
 
-function MinistryHealthTab({ token, role, t, lang, fbUser, onNavigateToML, userGrants }) {
+function MinistryHealthTab({ token, role, t, lang, fbUser, onNavigateToML, userGrants, refreshKey }) {
   var [mhList, setMhList] = useState([]);
   var [loading, setLoading] = useState(true);
   var [modalMinistry, setModalMinistry] = useState(null);
@@ -5087,7 +5111,7 @@ function MinistryHealthTab({ token, role, t, lang, fbUser, onNavigateToML, userG
     }
   }
 
-  useEffect(function() { loadMH(); }, []);
+  useEffect(function() { loadMH(); }, [refreshKey]);
 
   function parseCSV(text) {
     var lines = text.trim().split('\n');
@@ -10141,6 +10165,16 @@ function AppInner() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [dockMoreOpen, setDockMoreOpen] = useState(false);
   const [showViewSwitcher, setShowViewSwitcher] = useState(false);
+  // Bumped by pull-to-refresh on mobile; passed to each tab so it can
+  // re-run its own mount-time data fetch. Shared across tabs since only
+  // one tab is ever visible at a time.
+  const [tabRefreshKey, setTabRefreshKey] = useState(0);
+  function handlePullRefresh() {
+    return new Promise(resolve => {
+      setTabRefreshKey(k => k + 1);
+      setTimeout(resolve, 500);
+    });
+  }
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', onResize);
@@ -10770,14 +10804,25 @@ function AppInner() {
             <MinistryLeaderView lang={lang} grants={myGrants} hasBlanketAccess={hasBlanketMLAccess} activeMinistryOverride={glMinistry} token={token} />
           </RefErrorBoundary>
         )}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "attendance" && <ServiceAttendanceTab token={token} t={t} lang={lang} />}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} />}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} />}
-        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "health" && (
-          <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
-            <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} onNavigateToML={handleNavigateToML} userGrants={myGrants} />
-          </RefErrorBoundary>
+        {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && ["analytics","attendance","people","gifting","health"].includes(tab) && (
+          <PullToRefresh
+            isPullable={isMobile}
+            onRefresh={handlePullRefresh}
+            pullingContent={pullToRefreshIndicator(lang, false)}
+            refreshingContent={pullToRefreshIndicator(lang, true)}
+          >
+            <div>
+              {tab === "analytics" && <AnalyticsTab token={token} t={t} lang={lang} refreshKey={tabRefreshKey} />}
+              {tab === "attendance" && <ServiceAttendanceTab token={token} t={t} lang={lang} refreshKey={tabRefreshKey} />}
+              {tab === "people" && <PeopleTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} viewMode={viewMode} refreshKey={tabRefreshKey} />}
+              {tab === "gifting" && <GiftingTab token={token} role={role} t={t} lang={lang} templatePT={templatePT} templateEN={templateEN} onNavigate={handleNavigate} fbUser={fbUser} refreshKey={tabRefreshKey} />}
+              {tab === "health" && (
+                <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>
+                  <MinistryHealthTab token={token} role={effectiveRole} t={t} lang={lang} fbUser={fbUser} onNavigateToML={handleNavigateToML} userGrants={myGrants} refreshKey={tabRefreshKey} />
+                </RefErrorBoundary>
+              )}
+            </div>
+          </PullToRefresh>
         )}
         {!(viewMode === 'group_leader' && glGroup) && viewMode !== 'ministry_leader_view' && tab === "reference" && (
           <RefErrorBoundary lang={lang} onBack={function(){setTab("people");}}>

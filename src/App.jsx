@@ -8087,7 +8087,7 @@ function MinistryLeaderView({ lang, grants, hasBlanketAccess, activeMinistryOver
                             {assignedPeople.length > 0 && (
                               <div style={{display:"flex",flexWrap:"wrap",gap:6,paddingLeft:20}}>
                                 {assignedPeople.map(function(p){
-                                  var pcName = p.preferred_name || p.full_name || posNoName;
+                                  var pcName = p.preferred_name || p.full_name || p.name || posNoName;
                                   return (
                                     <span key={p.id} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 10px 3px 3px",background:"rgba(94,234,212,0.07)",borderRadius:999,border:"1px solid rgba(94,234,212,0.15)"}}>
                                       {p.photo_url ? (

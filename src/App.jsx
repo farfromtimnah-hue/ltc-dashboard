@@ -10224,6 +10224,8 @@ function AppInner() {
   const navMeasureRowRef = useRef(null);
   const navMeasureRefs = useRef(new Map());
   const navSentinelRef = useRef(null);
+  const navRefRetryRef = useRef(0);
+  const [navRefRetryTick, setNavRefRetryTick] = useState(0);
 
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -10267,11 +10269,29 @@ function AppInner() {
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
     const measureRow = navMeasureRowRef.current;
+    // Confirmed live in production 2026-07-18 (via a document.title marker,
+    // since console.log from inside this effect was unreliable to observe
+    // through remote debugging tooling): on the render where tabIdsKey
+    // changes to its final value (role resolving from just "analytics" to
+    // the full tab list), this effect can run before React has attached
+    // the refs for that same render's DOM — all four refs read null here
+    // even though tabIdsKey/isMobile already show their final values. The
+    // previous code silently returned in that case, and nothing else ever
+    // re-triggers this effect (a plain window resize does NOT re-run it;
+    // only tabIdsKey/isMobile changing again does, which normal usage
+    // rarely does), leaving nav overflow permanently unset for the rest of
+    // the session — tabs clip/vanish at the edge instead of collapsing
+    // into More. Retrying on the next animation frame, capped, catches
+    // this one-render lag without masking a genuine missing-DOM case.
     if (!container || !sentinel || !strip || !measureRow) {
-      // TEMP DIAGNOSTIC 2026-07-18 — remove after confirming mechanism live.
-      document.title = 'NAVDEBUG-BAILED:' + JSON.stringify({ c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow, tabIdsKey, isMobile });
+      if (navRefRetryRef.current < 20) {
+        navRefRetryRef.current += 1;
+        const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
+        return () => cancelAnimationFrame(retryId);
+      }
       return;
     }
+    navRefRetryRef.current = 0;
 
     const ids = tabs.map(t2 => t2.id);
 
@@ -10337,7 +10357,7 @@ function AppInner() {
       io.disconnect();
       ro.disconnect();
     };
-  }, [tabIdsKey, isMobile]);
+  }, [tabIdsKey, isMobile, navRefRetryTick]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {

@@ -10292,11 +10292,14 @@ function AppInner() {
     //     (0,1,2...) straight through a tabIdsKey change with no reset.
     //     Fixed by resetting the retry budget whenever tabIdsKey itself
     //     changes, tracked via navRefRetryKeyRef.
+    window.__navDebugLog = window.__navDebugLog || [];
+    window.__navDebugLog.push({ at: performance.now(), tabIdsKey, keyChanged: navRefRetryKeyRef.current !== tabIdsKey, retryBefore: navRefRetryRef.current });
     if (navRefRetryKeyRef.current !== tabIdsKey) {
       navRefRetryKeyRef.current = tabIdsKey;
       navRefRetryRef.current = 0;
     }
     if (!container || !sentinel || !strip || !measureRow) {
+      window.__navDebugLog.push({ at: performance.now(), event: 'bail', retry: navRefRetryRef.current, c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow });
       if (navRefRetryRef.current < 20) {
         navRefRetryRef.current += 1;
         const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
@@ -10304,6 +10307,7 @@ function AppInner() {
       }
       return;
     }
+    window.__navDebugLog.push({ at: performance.now(), event: 'success', retry: navRefRetryRef.current });
     navRefRetryRef.current = 0;
 
     const ids = tabs.map(t2 => t2.id);

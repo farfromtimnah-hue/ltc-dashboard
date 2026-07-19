@@ -10120,6 +10120,25 @@ function AppInner() {
   const [selfEligible, setSelfEligible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Dismiss the More dropdown on outside click / Escape via DOCUMENT-level
+  // listeners, not a fixed inset:0 backdrop div: .nav has backdrop-filter,
+  // which makes it the containing block for position:fixed descendants, so
+  // a backdrop rendered inside the nav only ever covered the 52px nav bar
+  // itself (confirmed live 2026-07-19) — clicks on page content never hit it.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (e) => {
+      if (e.target && e.target.closest && e.target.closest('.nav-more-btn')) return;
+      setMoreOpen(false);
+    };
+    const onKeyDown = (e) => { if (e.key === 'Escape') setMoreOpen(false); };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [moreOpen]);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [dockMoreOpen, setDockMoreOpen] = useState(false);
   const [showViewSwitcher, setShowViewSwitcher] = useState(false);
@@ -10752,7 +10771,6 @@ function AppInner() {
             {moreBtn()}
             {moreOpen && (
               <>
-                <div onClick={()=>setMoreOpen(false)} style={{position:"fixed",inset:0,zIndex:199}} />
                 <div className="pp-dropdown">
                   {tabs.filter(t2=>overflowSet.has(t2.id)).map(t2=>(
                     <button key={t2.id} className={"pp-item"+(tab===t2.id?" pp-active":"")}

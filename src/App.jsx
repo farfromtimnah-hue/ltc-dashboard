@@ -10226,6 +10226,7 @@ function AppInner() {
   const navMeasureRefs = useRef(new Map());
   const navSentinelRef = useRef(null);
   const navRefRetryRef = useRef(0);
+  const navRefRetryKeyRef = useRef(undefined);
   const [navRefRetryTick, setNavRefRetryTick] = useState(0);
 
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
@@ -10265,25 +10266,37 @@ function AppInner() {
   // (document.fonts.ready), since a font swap can change each tab's natural
   // width without firing a resize event.
   useEffect(() => {
-    window.__navDebugLog = window.__navDebugLog || [];
-    window.__navDebugLog.push({ at: performance.now(), event: 'effect-entered', isMobile, tabIdsKey });
-    if (isMobile) { window.__navDebugLog.push({ at: performance.now(), event: 'bailed-isMobile' }); setNavOverflowIds([]); return; }
+    if (isMobile) { setNavOverflowIds([]); return; }
     const container = navInnerRef.current;
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
     const measureRow = navMeasureRowRef.current;
-    // Two distinct bugs confirmed live in production 2026-07-18, both
-    // needed fixing together:
-    // (1) On the render where tabIdsKey resolves from the placeholder
-    //     single-tab set to the real role-based tab list, this effect can
-    //     run before React has attached these refs for that same render —
-    //     confirmed via a live document.title marker showing all four refs
-    //     null even though tabIdsKey/isMobile already held their final,
-    //     correct values. Nothing else re-triggers this effect afterward
-    //     (a plain resize does not; only tabIdsKey/isMobile changing again
-    //     does), so retrying via a capped rAF-driven state tick is needed.
+    // Three confirmed bugs, all needed fixing together (confirmed live in
+    // production 2026-07-18 via a structured event log, not guesswork):
+    // (1) tabIdsKey resolves through MULTIPLE intermediate values before
+    //     settling — confirmed via a real session log showing it pass
+    //     through at least one narrower placeholder set (role resolving in
+    //     stages) before reaching the final role-based tab list. Each
+    //     change tears this effect down and re-runs it.
+    // (2) On any of those renders, this effect can run before React has
+    //     attached these refs for that same render — confirmed via a live
+    //     log showing all four refs null across every check.
+    // (3) The critical bug: the retry counter (navRefRetryRef) is a plain
+    //     ref that persists for the WHOLE component lifetime, so retries
+    //     spent responding to an early, intermediate tabIdsKey value were
+    //     never given back — by the time tabIdsKey reached its real, final
+    //     value and refs were genuinely ready to attach, the 20-retry
+    //     budget was already exhausted from the earlier transition, so the
+    //     effect gave up permanently before ever succeeding. Confirmed via
+    //     a real session log showing the retry count climbing continuously
+    //     (0,1,2...) straight through a tabIdsKey change with no reset.
+    //     Fixed by resetting the retry budget whenever tabIdsKey itself
+    //     changes, tracked via navRefRetryKeyRef.
+    if (navRefRetryKeyRef.current !== tabIdsKey) {
+      navRefRetryKeyRef.current = tabIdsKey;
+      navRefRetryRef.current = 0;
+    }
     if (!container || !sentinel || !strip || !measureRow) {
-      window.__navDebugLog.push({ at: performance.now(), event: 'bailed-null-refs', retryCount: navRefRetryRef.current, c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow });
       if (navRefRetryRef.current < 20) {
         navRefRetryRef.current += 1;
         const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
@@ -10291,14 +10304,13 @@ function AppInner() {
       }
       return;
     }
-    window.__navDebugLog.push({ at: performance.now(), event: 'refs-ok-proceeding', retryCount: navRefRetryRef.current });
     navRefRetryRef.current = 0;
 
     const ids = tabs.map(t2 => t2.id);
 
     const recompute = () => {
       const containerRect = container.getBoundingClientRect();
-      // (2) The measure row's left offset MUST be tracked as React state
+      // (4) The measure row's left offset MUST be tracked as React state
       //     (navMeasureLeft) and rendered declaratively, not written via
       //     measureRow.style.left directly — confirmed live that an
       //     imperative write here was correct for an instant but then
@@ -10306,12 +10318,7 @@ function AppInner() {
       //     React still owns that inline style object as the source of
       //     truth on the next commit. The effect and the JSX were fighting
       //     over the same DOM property; JSX always wins on re-render.
-      const navDebugComputedLeft = strip.getBoundingClientRect().left - containerRect.left;
-      // TEMP DIAGNOSTIC 2026-07-18 — decisive proof this exact line runs,
-      // with the exact value it computes. Remove once confirmed.
-      window.__navDebugLastCompute = { at: performance.now(), computedLeft: navDebugComputedLeft, containerLeft: containerRect.left, stripLeft: strip.getBoundingClientRect().left };
-      document.title = 'NAVCALC:' + navDebugComputedLeft.toFixed(1);
-      setNavMeasureLeft(navDebugComputedLeft);
+      setNavMeasureLeft(strip.getBoundingClientRect().left - containerRect.left);
       // The sentinel is a real flex item positioned right where the always-
       // visible More/switcher/aux/lang items begin claiming space, so its
       // left edge marks the true trailing boundary available to tabs — but

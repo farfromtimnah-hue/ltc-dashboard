@@ -10219,14 +10219,11 @@ function AppInner() {
   // hardcoded delay and re-resolves itself after web fonts finish loading,
   // on resize, and on orientation change without any manual re-trigger.
   const [navOverflowIds, setNavOverflowIds] = useState([]);
-  const [navMeasureLeft, setNavMeasureLeft] = useState(0);
   const navInnerRef = useRef(null);
   const navStripRef = useRef(null);
   const navMeasureRowRef = useRef(null);
   const navMeasureRefs = useRef(new Map());
   const navSentinelRef = useRef(null);
-  const navRefRetryRef = useRef(0);
-  const [navRefRetryTick, setNavRefRetryTick] = useState(0);
 
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -10270,39 +10267,19 @@ function AppInner() {
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
     const measureRow = navMeasureRowRef.current;
-    // Two distinct bugs confirmed live in production 2026-07-18, both
-    // needed fixing together:
-    // (1) On the render where tabIdsKey resolves from the placeholder
-    //     single-tab set to the real role-based tab list, this effect can
-    //     run before React has attached these refs for that same render —
-    //     confirmed via a live document.title marker showing all four refs
-    //     null even though tabIdsKey/isMobile already held their final,
-    //     correct values. Nothing else re-triggers this effect afterward
-    //     (a plain resize does not; only tabIdsKey/isMobile changing again
-    //     does), so retrying via a capped rAF-driven state tick is needed.
     if (!container || !sentinel || !strip || !measureRow) {
-      if (navRefRetryRef.current < 20) {
-        navRefRetryRef.current += 1;
-        const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
-        return () => cancelAnimationFrame(retryId);
-      }
+      // TEMP DIAGNOSTIC 2026-07-18 — remove after confirming mechanism live.
+      document.title = 'NAVDEBUG-BAILED:' + JSON.stringify({ c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow, tabIdsKey, isMobile });
       return;
     }
-    navRefRetryRef.current = 0;
 
     const ids = tabs.map(t2 => t2.id);
 
     const recompute = () => {
       const containerRect = container.getBoundingClientRect();
-      // (2) The measure row's left offset MUST be tracked as React state
-      //     (navMeasureLeft) and rendered declaratively, not written via
-      //     measureRow.style.left directly — confirmed live that an
-      //     imperative write here was correct for an instant but then
-      //     silently reset back to the JSX's own hardcoded left:0, since
-      //     React still owns that inline style object as the source of
-      //     truth on the next commit. The effect and the JSX were fighting
-      //     over the same DOM property; JSX always wins on re-render.
-      setNavMeasureLeft(strip.getBoundingClientRect().left - containerRect.left);
+      // Keep the hidden measure row anchored to the visible strip's real left
+      // edge so both rows share the same coordinate space before comparing.
+      measureRow.style.left = `${strip.getBoundingClientRect().left - containerRect.left}px`;
       // The sentinel is a real flex item positioned right where the always-
       // visible More/switcher/aux/lang items begin claiming space, so its
       // left edge marks the true trailing boundary available to tabs — but
@@ -10360,7 +10337,7 @@ function AppInner() {
       io.disconnect();
       ro.disconnect();
     };
-  }, [tabIdsKey, isMobile, navRefRetryTick]);
+  }, [tabIdsKey, isMobile]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -10749,19 +10726,12 @@ function AppInner() {
           <div ref={navSentinelRef} className="nav-sentinel" />
 
           {/* Hidden measure row: every tab at natural size, never clipped or
-              shrunk. Its left offset is tracked in navMeasureLeft state (see
-              the overflow effect) to match the visible strip's real left
-              edge each time layout is recomputed, so the two rows always
-              share the same coordinate space — no width math beyond reading
-              that offset, no magic numbers or timeouts. This MUST be state
-              rendered declaratively, not an imperative element.style.left
-              write: confirmed live 2026-07-18 that writing measureRow.style
-              .left directly got silently reset back to a hardcoded JSX
-              left value on a later React re-render, since React still owns
-              this style object as the source of truth — the effect and the
-              JSX were fighting over the same DOM property, and JSX always
-              wins on the next commit. */}
-          <div ref={navMeasureRowRef} aria-hidden="true" style={{position:"absolute",top:0,left:navMeasureLeft,
+              shrunk. Its left offset is set imperatively (see the overflow
+              effect) to match the visible strip's real left edge each time
+              layout is recomputed, so the two rows always share the same
+              coordinate space — no width math beyond reading that offset,
+              no magic numbers or timeouts. */}
+          <div ref={navMeasureRowRef} aria-hidden="true" style={{position:"absolute",top:0,left:0,
             display:"flex",alignItems:"center",gap:6,visibility:"hidden",pointerEvents:"none",height:52}}>
             {tabs.map(t2=>tabBtn(t2,{measuring:true}))}
           </div>

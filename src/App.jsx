@@ -9466,7 +9466,11 @@ function ViewSwitcherModal({
   );
 }
 
-// ─── PASTOR SCHEDULING COMMAND CENTER ────────────────────────────────────────
+// ─── PASTOR TRIAGE VIEW (READ-ONLY) ──────────────────────────────────────────
+// senior_pastor / pastor (and owner, on this tab) audit scheduling health
+// here. This view NEVER writes to schedule_assignments or any /schedule/*
+// write endpoint — that's a standing architecture rule. Write-capable
+// scheduling lives only in MinistryLeaderView and GroupLeaderView.
 function PastorSchedulingTab({ token, lang }) {
   const SERVICES = ['Culto Manha','Culto Tarde','Legacy','Rocket','Shine','Hero','Link','English Service','Culto Hope','Culto Fé'];
   const SUNDAY_SERVICES = ['Culto Manha','Culto Tarde'];
@@ -9497,43 +9501,40 @@ function PastorSchedulingTab({ token, lang }) {
   const [loading, setLoading] = React.useState(false);
   const [collapsedCards, setCollapsedCards] = React.useState({});
   const [triageExpanded, setTriageExpanded] = React.useState(false);
-  const [pickerPos, setPickerPos] = React.useState(null);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
-  const [allPeople, setAllPeople] = React.useState([]);
-  const [peopleSearch, setPeopleSearch] = React.useState('');
-  const [peopleLoading, setPeopleLoading] = React.useState(false);
-  const [chipMenu, setChipMenu] = React.useState(null);
-  const [overflowMenu, setOverflowMenu] = React.useState(null);
+  const [auditFor, setAuditFor] = React.useState(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
-
-  function loadPastorView() { setRefreshKey(k => k+1); }
 
   const dateStr = fmtDate(selDate);
   const isSundayService = SUNDAY_SERVICES.includes(selService);
+  const p = lang === 'PT';
 
   const tx = {
-    add: lang==='PT' ? '+ Adicionar' : '+ Add',
+    readOnly: p ? 'Somente leitura' : 'Read-only',
     viaPC: 'Via Planning Center',
-    notNeeded: lang==='PT' ? 'Não necessário' : 'Not needed',
-    unfilledLabel: lang==='PT' ? 'Posições sem voluntário' : 'Unfilled positions',
-    conflictsLabel: lang==='PT' ? 'Conflitos' : 'Conflicts',
-    unfilled: lang==='PT' ? 'sem preencher' : 'unfilled',
-    conflict1: lang==='PT' ? 'conflito de escala' : 'scheduling conflict',
-    conflictN: lang==='PT' ? 'conflitos de escala' : 'scheduling conflicts',
-    loading: lang==='PT' ? 'Carregando...' : 'Loading...',
-    search: lang==='PT' ? 'Buscar voluntário...' : 'Search volunteer...',
-    addVolunteer: lang==='PT' ? 'Adicionar voluntário' : 'Add volunteer',
-    noVolunteers: lang==='PT' ? 'Nenhum voluntário encontrado' : 'No volunteers found',
-    noPositions: lang==='PT' ? 'Nenhuma posição cadastrada.' : 'No positions on file.',
-    noVolsSlot: lang==='PT' ? 'Nenhum voluntário' : 'No volunteers',
-    alsoIn: lang==='PT' ? 'Também em' : 'Also in',
-    markNotNeeded: lang==='PT' ? 'Não necessário esta semana' : 'Mark as not needed',
-    undo: lang==='PT' ? 'desfazer' : 'undo',
-    confirmStatus: lang==='PT' ? 'Confirmar' : 'Confirm',
-    pendingStatus: lang==='PT' ? 'Pendente' : 'Mark pending',
-    declinedStatus: lang==='PT' ? 'Recusado' : 'Mark declined',
-    reschedStatus: lang==='PT' ? 'Reagendar' : 'Wants reschedule',
-    remove: lang==='PT' ? 'Remover' : 'Remove',
+    notNeeded: p ? 'Não necessário' : 'Not needed',
+    unfilledLabel: p ? 'Posições sem voluntário' : 'Unfilled positions',
+    conflictsLabel: p ? 'Conflitos' : 'Conflicts',
+    unfilled: p ? 'sem preencher' : 'unfilled',
+    conflict1: p ? 'conflito de escala' : 'scheduling conflict',
+    conflictN: p ? 'conflitos de escala' : 'scheduling conflicts',
+    loading: p ? 'Carregando...' : 'Loading...',
+    noPositions: p ? 'Nenhuma posição cadastrada.' : 'No positions on file.',
+    noVolsSlot: p ? 'Nenhum voluntário' : 'No volunteers',
+    alsoIn: p ? 'Também em' : 'Also in',
+    confirmedL: p ? 'confirmados' : 'confirmed',
+    pendingL: p ? 'pendentes' : 'pending',
+    openL: p ? 'em aberto' : 'open',
+    auditTitle: p ? 'Histórico' : 'Audit trail',
+    noAudit: p ? 'Nenhum evento registrado ainda.' : 'No audit events recorded yet.',
+    scheduledBy: p ? 'Agendado por' : 'Scheduled by',
+    close: p ? 'Fechar' : 'Close',
+  };
+  const STATUS_LABEL = {
+    confirmed: p ? 'Confirmado' : 'Confirmed',
+    pending: p ? 'Pendente' : 'Pending',
+    declined: p ? 'Recusado' : 'Declined',
+    wants_reschedule: p ? 'Quer remarcar' : 'Wants reschedule',
+    not_contacted: p ? 'Não contatado' : 'Not contacted',
   };
 
   function loadPositionsForMinistries(ministries) {
@@ -9562,14 +9563,14 @@ function PastorSchedulingTab({ token, lang }) {
         const ministriesRaw = data?.ministries || [];
         const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
         setAssignments(asgn);
-        const nn = Array.isArray(data?.not_needed) ? data.not_needed : [];
+        const overrides = Array.isArray(data?.position_overrides) ? data.position_overrides : [];
         const nnMap = {};
-        nn.forEach(item => {
+        overrides.forEach(item => {
           if (!item) return;
-          const m = item.ministry || ''; const p = item.position_name || '';
-          if (!m || !p) return;
+          const m = item.ministry || ''; const pn = item.position_name || '';
+          if (!m || !pn) return;
           if (!nnMap[m]) nnMap[m] = new Set();
-          nnMap[m].add(p);
+          nnMap[m].add(pn);
         });
         setNotNeededMap(nnMap);
         setLoading(false);
@@ -9623,6 +9624,15 @@ function PastorSchedulingTab({ token, lang }) {
     return result;
   }, [assignments]);
 
+  function countsForPosition(pos, posAsgn, isNotNeeded) {
+    const confirmed = posAsgn.filter(a => a?.status === 'confirmed').length;
+    const pending = posAsgn.filter(a => a?.status === 'pending' || a?.status === 'not_contacted').length;
+    const minV = pos?.min_volunteers || pos?.min_count || 0;
+    const active = confirmed + pending;
+    const open = isNotNeeded ? 0 : (minV > 0 ? Math.max(0, minV - active) : (active === 0 ? 1 : 0));
+    return { confirmed, pending, open };
+  }
+
   const triageAlerts = React.useMemo(() => {
     const unfilled = [];
     visibleMinistries.forEach(ministry => {
@@ -9641,6 +9651,29 @@ function PastorSchedulingTab({ token, lang }) {
   }, [visibleMinistries, positionsMap, assignmentsByMinistry, notNeededMap, conflictPersonMap]);
 
   const hasTriage = triageAlerts.unfilled.length > 0 || triageAlerts.conflicts.length > 0;
+
+  // Overall counts across every visible ministry, for the summary strip.
+  const overallCounts = React.useMemo(() => {
+    let confirmed = 0, pending = 0, open = 0;
+    visibleMinistries.forEach(ministry => {
+      const positions = positionsMap[ministry] || [];
+      const ministryAsgn = assignmentsByMinistry[ministry] || [];
+      const notNeeded = notNeededMap[ministry] || new Set();
+      const asgnByPos = {};
+      ministryAsgn.forEach(a => {
+        const pn = a?.position_name || '';
+        if (!asgnByPos[pn]) asgnByPos[pn] = [];
+        asgnByPos[pn].push(a);
+      });
+      positions.forEach(pos => {
+        const posName = pos?.position_name || pos?.name || '';
+        if (!posName) return;
+        const c = countsForPosition(pos, asgnByPos[posName] || [], notNeeded.has(posName));
+        confirmed += c.confirmed; pending += c.pending; open += c.open;
+      });
+    });
+    return { confirmed, pending, open };
+  }, [visibleMinistries, positionsMap, assignmentsByMinistry, notNeededMap]);
 
   function ministryDot(ministry) {
     const positions = positionsMap[ministry] || [];
@@ -9671,77 +9704,42 @@ function PastorSchedulingTab({ token, lang }) {
     });
   }
 
-  function loadPeople() {
-    if (peopleLoading || allPeople.length > 0) return;
-    setPeopleLoading(true);
-    fetch(API+'/people', { headers: { Authorization: 'Bearer '+token } })
-      .then(r => r.json()).catch(() => [])
-      .then(data => { setAllPeople(Array.isArray(data) ? data : []); setPeopleLoading(false); });
-  }
-  function openPicker(ministry, pos) {
-    setPickerPos({ ministry, positionName: pos?.position_name || pos?.name || '' });
-    setPeopleSearch(''); setPickerOpen(true); loadPeople();
-  }
-  function closePicker() { setPickerOpen(false); setPickerPos(null); setPeopleSearch(''); }
-
-  function assignPerson(person) {
-    if (!pickerPos || !person) return;
-    fetch(API+'/schedule/assignment', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ministry: pickerPos.ministry, position_name: pickerPos.positionName, person_id: person.id, service_date: dateStr, service_name: selService, status: 'pending' })
-    }).then(() => { closePicker(); loadPastorView(); });
-  }
-  function removeAssignment(id) {
-    if (!id) return;
-    fetch(API+'/schedule/assignment/'+id, { method: 'DELETE', headers: { Authorization: 'Bearer '+token } })
-      .then(() => { setChipMenu(null); loadPastorView(); });
-  }
-  function updateStatus(id, status) {
-    if (!id) return;
-    fetch(API+'/schedule/assignment/'+id, {
-      method: 'PUT',
-      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    }).then(() => { setChipMenu(null); loadPastorView(); });
-  }
-  function doMarkNotNeeded(ministry, positionName) {
-    if (!ministry || !positionName) return;
-    fetch(API+'/schedule/position-not-needed', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ministry, position_name: positionName, service_date: dateStr, service_name: selService })
-    }).then(() => {
-      setNotNeededMap(prev => {
-        const s = new Set(prev[ministry] || []);
-        s.add(positionName);
-        return { ...prev, [ministry]: s };
-      });
-      setOverflowMenu(null);
-    });
-  }
-  function doUnmarkNotNeeded(ministry, positionName) {
-    if (!ministry || !positionName) return;
-    fetch(API+'/schedule/position-not-needed', {
-      method: 'DELETE',
-      headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ministry, position_name: positionName, service_date: dateStr, service_name: selService })
-    }).then(() => {
-      setNotNeededMap(prev => {
-        const s = new Set(prev[ministry] || []);
-        s.delete(positionName);
-        return { ...prev, [ministry]: s };
-      });
-    });
+  function countPill(c) {
+    return (
+      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', whiteSpace: 'nowrap' }}>
+        <span style={{ color: '#34d399' }}>{c.confirmed} ✓</span>
+        {' · '}
+        <span style={{ color: '#f59e0b' }}>{c.pending} ⏳</span>
+        {' · '}
+        <span style={{ color: c.open > 0 ? '#f87171' : '#475a64' }}>{c.open} ○</span>
+      </span>
+    );
   }
 
-  const filteredPeople = React.useMemo(() => {
-    const q = (peopleSearch || '').toLowerCase().trim();
-    if (!q) return allPeople || [];
-    return (allPeople || []).filter(p => ((p?.preferred_name||'')+(p?.full_name||'')+(p?.name||'')).toLowerCase().includes(q));
-  }, [allPeople, peopleSearch]);
+  // Render one read-only volunteer chip; clicking opens the audit drill-in.
+  function renderChip(a, ministry, posBg, posColor) {
+    if (!a) return null;
+    const isPC = a.source === 'planning_center';
+    const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
+    const personName = a.person_name || a.preferred_name || a.unmatched_name || (p ? 'Voluntário' : 'Volunteer');
+    const pid = String(a.person_id || '');
+    const hasConflict = pid && conflictPersonMap[pid];
+    const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
+    const chipKey = a.id || (ministry+(a.position_name||'')+personName);
+    return (
+      <button key={chipKey} onClick={() => setAuditFor(a)} title={isPC ? tx.viaPC : tx.auditTitle} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
+        background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999, cursor: 'pointer',
+      }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
+        <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: isPC ? '#6b7a82' : '#e6f1f0' }}>{personName}</span>
+        {isPC && <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>}
+        {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
+      </button>
+    );
+  }
 
-  // Render a ministry card
+  // Render a ministry card — pure display, no scheduling controls.
   function renderMinistryCard(ministry) {
     const isCollapsed = !collapsedCards[ministry];
     const positions = positionsMap[ministry] || [];
@@ -9758,8 +9756,16 @@ function PastorSchedulingTab({ token, lang }) {
       asgnByPos[pn].push(a);
     });
 
-    const knownPosNames = new Set(positions.map(p => p?.position_name || p?.name || '').filter(Boolean));
+    const knownPosNames = new Set(positions.map(pp => pp?.position_name || pp?.name || '').filter(Boolean));
     const unmatchedPosNames = [...new Set(ministryAsgn.map(a => a?.position_name || '').filter(pn => pn && !knownPosNames.has(pn)))];
+
+    let mConfirmed = 0, mPending = 0, mOpen = 0;
+    positions.forEach(pos => {
+      const posName = pos?.position_name || pos?.name || '';
+      if (!posName) return;
+      const c = countsForPosition(pos, asgnByPos[posName] || [], notNeeded.has(posName));
+      mConfirmed += c.confirmed; mPending += c.pending; mOpen += c.open;
+    });
 
     return (
       <div key={ministry} className="glass" style={{ borderRadius: 12, overflow: 'hidden' }}>
@@ -9769,11 +9775,14 @@ function PastorSchedulingTab({ token, lang }) {
           padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer',
           borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.06)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             {dot && <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0, boxShadow: '0 0 6px '+dot+'88' }} />}
             <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 14, color: '#e6f1f0' }}>{ministry}</span>
           </div>
-          <span style={{ fontSize: 10, color: '#475a64' }}>{isCollapsed ? '▼' : '▲'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            {positions.length > 0 && countPill({ confirmed: mConfirmed, pending: mPending, open: mOpen })}
+            <span style={{ fontSize: 10, color: '#475a64' }}>{isCollapsed ? '▼' : '▲'}</span>
+          </div>
         </button>
 
         {/* Card body */}
@@ -9792,100 +9801,28 @@ function PastorSchedulingTab({ token, lang }) {
               const isNotNeeded = notNeeded.has(posName);
               const minV = pos.min_volunteers || pos.min_count || 0;
               const idealV = pos.ideal_volunteers || pos.ideal_count || 0;
-              const omKey = ministry+'::'+posName;
-
+              const c = countsForPosition(pos, posAsgn, isNotNeeded);
 
               return (
-                <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
+                <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${isNotNeeded ? '#475a64' : posColor}`, paddingLeft: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{posName}</div>
                       <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', marginTop: 1 }}>{'min '+minV+' / ideal '+idealV}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      {!isNotNeeded && (
-                        <button onClick={e => { e.stopPropagation(); openPicker(ministry, pos); }} style={{
-                          padding: '3px 10px', borderRadius: 999, fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
-                          border: '1px solid rgba(94,234,212,0.25)', background: 'rgba(94,234,212,0.07)',
-                          color: '#5eead4', cursor: 'pointer', whiteSpace: 'nowrap',
-                        }}>{tx.add}</button>
-                      )}
-                      <div style={{ position: 'relative' }}>
-                        <button onClick={e => { e.stopPropagation(); setOverflowMenu(overflowMenu === omKey ? null : omKey); }} style={{
-                          background: 'none', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
-                          width: 24, height: 24, color: '#6b7a82', cursor: 'pointer', fontSize: 14,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>⋯</button>
-                        {overflowMenu === omKey && (
-                          <div style={{ position: 'absolute', right: 0, top: 28, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 300, minWidth: 220, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                            {!isNotNeeded
-                              ? <button onClick={() => doMarkNotNeeded(ministry, posName)} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.markNotNeeded}</button>
-                              : <button onClick={() => doUnmarkNotNeeded(ministry, posName)} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.undo}</button>
-                            }
-                          </div>
-                        )}
-                      </div>
+                    <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                      {!isNotNeeded && countPill(c)}
                     </div>
                   </div>
 
                   {isNotNeeded ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx.notNeeded}</span>
-                      <button onClick={() => doUnmarkNotNeeded(ministry, posName)} style={{ fontSize: 11, color: '#5eead4', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: "'JetBrains Mono',monospace", padding: 0 }}>{tx.undo}</button>
-                    </div>
+                    <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx.notNeeded}</span>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {posAsgn.length === 0 && (
                         <span style={{ fontSize: 11, color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontStyle: 'italic' }}>{tx.noVolsSlot}</span>
                       )}
-                      {posAsgn.map(a => {
-                        if (!a) return null;
-                        const isPC = a.source === 'planning_center';
-                        const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
-                        const personName = a.person_name || a.preferred_name || a.unmatched_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
-                        const pid = String(a.person_id || '');
-                        const hasConflict = pid && conflictPersonMap[pid];
-                        const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
-                        const chipKey = a.id || (ministry+posName+personName);
-                        const isChipOpen = chipMenu?.id === a.id;
-
-                        if (isPC) {
-                          return (
-                            <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999 }}>
-                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
-                              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#6b7a82' }}>{personName}</span>
-                              <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>
-                              {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b', cursor: 'default' }}>⚠</span>}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={chipKey} style={{ position: 'relative' }}>
-                            <button onClick={e => { e.stopPropagation(); setChipMenu(isChipOpen ? null : { id: a.id, assignment: a }); }} style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
-                              background: posBg, border: `1px solid ${posColor}40`,
-                              borderRadius: 999, cursor: 'pointer',
-                            }}>
-                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
-                              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
-                              {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
-                            </button>
-                            {isChipOpen && (
-                              <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 400, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                                {[['confirmed',tx.confirmStatus,'#34d399'],['pending',tx.pendingStatus,'#f59e0b'],['declined',tx.declinedStatus,'#f87171'],['wants_reschedule',tx.reschedStatus,'#fb923c']].map(item => (
-                                  <button key={item[0]} onClick={() => updateStatus(a.id, item[0])} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
-                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: item[2], flexShrink: 0 }} />
-                                    {item[1]}
-                                  </button>
-                                ))}
-                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                                <button onClick={() => removeAssignment(a.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#f87171', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.remove}</button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {posAsgn.map(a => renderChip(a, ministry, posBg, posColor))}
                     </div>
                   )}
                 </div>
@@ -9901,51 +9838,7 @@ function PastorSchedulingTab({ token, lang }) {
                 <div key={'_u_'+posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
                   <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', marginBottom: 8 }}>{posName}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {posAsgn.map(a => {
-                      if (!a) return null;
-                      const isPC = a.source === 'planning_center';
-                      const statusColor = STATUS_COLOR[a.status] || STATUS_COLOR.not_contacted;
-                      const personName = a.person_name || a.preferred_name || a.unmatched_name || (lang==='PT' ? 'Voluntário' : 'Volunteer');
-                      const pid = String(a.person_id || '');
-                      const hasConflict = pid && conflictPersonMap[pid];
-                      const conflictMins = hasConflict ? (conflictPersonMap[pid]?.ministries||[]).filter(m => m !== ministry) : [];
-                      const chipKey = a.id || (ministry+posName+personName);
-                      const isChipOpen = chipMenu?.id === a.id;
-                      if (isPC) {
-                        return (
-                          <div key={chipKey} title={tx.viaPC} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px', background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
-                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#6b7a82' }}>{personName}</span>
-                            <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>
-                            {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b', cursor: 'default' }}>⚠</span>}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={chipKey} style={{ position: 'relative' }}>
-                          <button onClick={e => { e.stopPropagation(); setChipMenu(isChipOpen ? null : { id: a.id, assignment: a }); }} style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 8px',
-                            background: posBg, border: `1px solid ${posColor}40`, borderRadius: 999, cursor: 'pointer',
-                          }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
-                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{personName}</span>
-                            {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
-                          </button>
-                          {isChipOpen && (
-                            <div style={{ position: 'absolute', left: 0, top: 32, background: '#1a2a2f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 0', zIndex: 400, minWidth: 186, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                              {[['confirmed',tx.confirmStatus,'#34d399'],['pending',tx.pendingStatus,'#f59e0b'],['declined',tx.declinedStatus,'#f87171'],['wants_reschedule',tx.reschedStatus,'#fb923c']].map(item => (
-                                <button key={item[0]} onClick={() => updateStatus(a.id, item[0])} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
-                                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: item[2], flexShrink: 0 }} />
-                                  {item[1]}
-                                </button>
-                              ))}
-                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                              <button onClick={() => removeAssignment(a.id)} style={{ display: 'block', width: '100%', padding: '7px 14px', background: 'none', border: 'none', color: '#f87171', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{tx.remove}</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {posAsgn.map(a => renderChip(a, ministry, posBg, posColor))}
                   </div>
                 </div>
               );
@@ -9956,6 +9849,8 @@ function PastorSchedulingTab({ token, lang }) {
     );
   }
 
+  const auditPerson = auditFor ? (auditFor.person_name || auditFor.preferred_name || auditFor.unmatched_name || (p ? 'Voluntário' : 'Volunteer')) : '';
+
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1200 }}>
       {/* SERVICE SELECTOR */}
@@ -9965,7 +9860,7 @@ function PastorSchedulingTab({ token, lang }) {
           <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: '#e6f1f0', minWidth: 130, textAlign: 'center', fontWeight: 600 }}>{fmtDisplay(selDate)}</span>
           <button onClick={nextDate} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, width: 30, height: 30, color: '#5eead4', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1 }}>
           {SERVICES.map(svc => {
             const active = selService === svc;
             return (
@@ -9987,7 +9882,26 @@ function PastorSchedulingTab({ token, lang }) {
             );
           })}
         </div>
+        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6b7a82', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '3px 10px', flexShrink: 0 }}>
+          👁 {tx.readOnly}
+        </span>
       </div>
+
+      {/* OVERALL SUMMARY STRIP */}
+      {!loading && (
+        <div className="glass" style={{ borderRadius: 12, padding: '12px 20px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+          {[
+            [overallCounts.confirmed, tx.confirmedL, '#34d399'],
+            [overallCounts.pending, tx.pendingL, '#f59e0b'],
+            [overallCounts.open, tx.openL, overallCounts.open > 0 ? '#f87171' : '#475a64'],
+          ].map(([n, label, color]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 700, color }}>{n}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7a82' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* TRIAGE BAR */}
       {hasTriage && (
@@ -10041,58 +9955,44 @@ function PastorSchedulingTab({ token, lang }) {
         </div>
       )}
 
-      {/* VOLUNTEER PICKER MODAL */}
-      {pickerOpen && (
+      {/* AUDIT TRAIL DRILL-IN (read-only) */}
+      {auditFor && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => { if (e.target === e.currentTarget) closePicker(); }}>
-          <div className="glass" style={{ borderRadius: 16, padding: '20px 0 0', width: '90%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <div>
-                <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{tx.addVolunteer}</div>
-                {pickerPos && <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5eead4', marginTop: 2 }}>{pickerPos.positionName||''} — {pickerPos.ministry||''}</div>}
+          onClick={e => { if (e.target === e.currentTarget) setAuditFor(null); }}>
+          <div className="glass" style={{ borderRadius: 16, width: '90%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{auditPerson}</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5eead4', marginTop: 2 }}>{(auditFor.ministry||'')+' — '+(auditFor.position_name||'')}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_COLOR[auditFor.status] || STATUS_COLOR.not_contacted }} />
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#e6f1f0' }}>{STATUS_LABEL[auditFor.status] || auditFor.status || '—'}</span>
+                  </span>
+                  {auditFor.source === 'planning_center' ? (
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82' }}>🔒 {tx.viaPC}</span>
+                  ) : (auditFor.scheduled_by ? (
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82' }}>{tx.scheduledBy+': '+auditFor.scheduled_by+(auditFor.scheduled_at ? ' · '+auditFor.scheduled_at : '')}</span>
+                  ) : null)}
+                </div>
               </div>
-              <button onClick={closePicker} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button onClick={() => setAuditFor(null)} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 18, flexShrink: 0 }}>✕</button>
             </div>
-            <div style={{ padding: '12px 20px', flexShrink: 0 }}>
-              <input type="text" placeholder={tx.search} value={peopleSearch}
-                onChange={e => setPeopleSearch(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e6f1f0', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
-                autoFocus />
-            </div>
-            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 20px' }}>
-              {peopleLoading ? (
-                <div style={{ color: '#5eead4', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx.loading}</div>
-              ) : filteredPeople.length === 0 ? (
-                <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '30px 0', textAlign: 'center' }}>{tx.noVolunteers}</div>
-              ) : filteredPeople.slice(0, 80).map(person => {
-                if (!person) return null;
-                const pName = person.preferred_name || person.full_name || person.name || '';
-                const topGift = person.gifting_1 ? (lang==='PT' ? (GIFTING_PT[person.gifting_1]||person.gifting_1) : person.gifting_1) : null;
-                const pMins = parseJSON(person.current_ministries);
-                return (
-                  <button key={person.id} onClick={() => assignPerson(person)} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left' }}>
-                    {person.photo_url
-                      ? <img src={person.photo_url} alt={pName} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(94,234,212,0.2)' }} />
-                      : <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,rgba(94,234,212,0.18),rgba(94,234,212,0.04))', border: '1px solid rgba(94,234,212,0.15)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#5eead4', fontFamily: "'Space Grotesk',sans-serif" }}>{(pName[0]||'?').toUpperCase()}</div>
-                    }
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pName}</div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                        {topGift && <span style={{ fontSize: 10, color: '#5eead4', fontFamily: "'JetBrains Mono',monospace" }}>{topGift}</span>}
-                        {(pMins||[]).slice(0,2).map(m => <span key={m} style={{ fontSize: 10, color: '#6b7a82', fontFamily: "'JetBrains Mono',monospace" }}>{lang==='PT'?(MINISTRY_PT[m]||m):m}</span>)}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '14px 20px 20px' }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>{tx.auditTitle}</div>
+              {(auditFor.audit_log || []).length === 0 ? (
+                <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontStyle: 'italic' }}>{tx.noAudit}</div>
+              ) : (
+                (auditFor.audit_log || []).map(ev => (
+                  <div key={ev.id} style={{ display: 'flex', gap: 12, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', flexShrink: 0, whiteSpace: 'nowrap' }}>{ev.ts}</span>
+                    <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{ev.event_text}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
-      )}
-
-      {/* Click-away backdrop for dropdown menus */}
-      {(chipMenu || overflowMenu) && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }} onClick={() => { setChipMenu(null); setOverflowMenu(null); }} />
       )}
     </div>
   );

@@ -9530,6 +9530,8 @@ function PastorSchedulingTab({ token, lang }) {
   const [collapsedCards, setCollapsedCards] = React.useState({});
   const [triageExpanded, setTriageExpanded] = React.useState(false);
   const [auditFor, setAuditFor] = React.useState(null);
+  const [posHistoryFor, setPosHistoryFor] = React.useState(null);
+  const [positionAudit, setPositionAudit] = React.useState([]);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const pcoSyncedRef = React.useRef({});
 
@@ -9557,6 +9559,14 @@ function PastorSchedulingTab({ token, lang }) {
     noAudit: p ? 'Nenhum evento registrado ainda.' : 'No audit events recorded yet.',
     scheduledBy: p ? 'Agendado por' : 'Scheduled by',
     close: p ? 'Fechar' : 'Close',
+    posHistoryTitle: p ? 'Histórico da posição' : 'Position history',
+    posHistoryHint: p ? 'Ver histórico da posição' : 'View position history',
+    currentL: p ? 'Atual' : 'Current',
+    previousL: p ? 'Anterior' : 'Previous',
+    pendingFor: p ? 'pendente há' : 'pending for',
+    noResponse48: p ? 'sem resposta há 48h+' : 'no response in 48h+',
+    staleL: p ? 'parado' : 'stale',
+    noHolders: p ? 'Ninguém já ocupou esta posição nesta data.' : 'No one has held this position for this date yet.',
   };
   const STATUS_LABEL = {
     confirmed: p ? 'Confirmado' : 'Confirmed',
@@ -9609,6 +9619,12 @@ function PastorSchedulingTab({ token, lang }) {
           nnMap[m].add(pn);
         });
         setNotNeededMap(nnMap);
+        // Position-level audit events (survive assignment deletion/replacement).
+        // Rows carry their own service_name; keep only the selected service,
+        // but never drop legacy rows that have none.
+        const posAudit = (Array.isArray(data?.position_audit) ? data.position_audit : [])
+          .filter(ev => ev && (!ev.service_name || svcNames.includes(ev.service_name)));
+        setPositionAudit(posAudit);
         setLoading(false);
       });
     if (isSundayService) loadPositionsForMinistries(ALL_MINISTRIES);
@@ -9676,10 +9692,11 @@ function PastorSchedulingTab({ token, lang }) {
   function countsForPosition(pos, posAsgn, isNotNeeded) {
     const confirmed = posAsgn.filter(a => a?.status === 'confirmed').length;
     const pending = posAsgn.filter(a => a?.status === 'pending' || a?.status === 'not_contacted').length;
+    const stale = posAsgn.filter(a => a?.stale).length;
     const minV = pos?.min_volunteers || pos?.min_count || 0;
     const active = confirmed + pending;
     const open = isNotNeeded ? 0 : (minV > 0 ? Math.max(0, minV - active) : (active === 0 ? 1 : 0));
-    return { confirmed, pending, open };
+    return { confirmed, pending, open, stale };
   }
 
   const triageAlerts = React.useMemo(() => {
@@ -9761,6 +9778,7 @@ function PastorSchedulingTab({ token, lang }) {
         <span style={{ color: '#f59e0b' }}>{c.pending} ⏳</span>
         {' · '}
         <span style={{ color: c.open > 0 ? '#f87171' : '#475a64' }}>{c.open} ○</span>
+        {(c.stale || 0) > 0 && <span title={tx.noResponse48} style={{ color: '#f87171' }}>{' · '+c.stale+' ⚠'}</span>}
       </span>
     );
   }
@@ -9783,6 +9801,7 @@ function PastorSchedulingTab({ token, lang }) {
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: '0 0 5px '+statusColor+'88' }} />
         <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: isPC ? '#6b7a82' : '#e6f1f0' }}>{personName}</span>
         {isPC && <span style={{ fontSize: 9, color: '#475a64', fontFamily: "'JetBrains Mono',monospace" }}>🔒</span>}
+        {a.stale && <span title={tx.noResponse48} style={{ fontSize: 10, color: '#f87171' }}>⚠</span>}
         {hasConflict && <span title={tx.alsoIn+': '+conflictMins.join(', ')} style={{ fontSize: 10, color: '#f59e0b' }}>⚠</span>}
       </button>
     );
@@ -9808,12 +9827,12 @@ function PastorSchedulingTab({ token, lang }) {
     const knownPosNames = new Set(positions.map(pp => pp?.position_name || pp?.name || '').filter(Boolean));
     const unmatchedPosNames = [...new Set(ministryAsgn.map(a => a?.position_name || '').filter(pn => pn && !knownPosNames.has(pn)))];
 
-    let mConfirmed = 0, mPending = 0, mOpen = 0;
+    let mConfirmed = 0, mPending = 0, mOpen = 0, mStale = 0;
     positions.forEach(pos => {
       const posName = pos?.position_name || pos?.name || '';
       if (!posName) return;
       const c = countsForPosition(pos, asgnByPos[posName] || [], notNeeded.has(posName));
-      mConfirmed += c.confirmed; mPending += c.pending; mOpen += c.open;
+      mConfirmed += c.confirmed; mPending += c.pending; mOpen += c.open; mStale += c.stale;
     });
 
     return (
@@ -9829,7 +9848,7 @@ function PastorSchedulingTab({ token, lang }) {
             <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 14, color: '#e6f1f0' }}>{ministry}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-            {positions.length > 0 && countPill({ confirmed: mConfirmed, pending: mPending, open: mOpen })}
+            {positions.length > 0 && countPill({ confirmed: mConfirmed, pending: mPending, open: mOpen, stale: mStale })}
             <span style={{ fontSize: 10, color: '#475a64' }}>{isCollapsed ? '▼' : '▲'}</span>
           </div>
         </button>
@@ -9855,10 +9874,10 @@ function PastorSchedulingTab({ token, lang }) {
               return (
                 <div key={posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${isNotNeeded ? '#475a64' : posColor}`, paddingLeft: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{posName}</div>
+                    <button onClick={() => setPosHistoryFor({ ministry, posName })} title={tx.posHistoryHint} style={{ minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{posName} <span style={{ fontSize: 10, color: '#475a64' }}>🕐</span></div>
                       <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', marginTop: 1 }}>{'min '+minV+' / ideal '+idealV}</div>
-                    </div>
+                    </button>
                     <div style={{ flexShrink: 0, paddingTop: 2 }}>
                       {!isNotNeeded && countPill(c)}
                     </div>
@@ -9885,7 +9904,7 @@ function PastorSchedulingTab({ token, lang }) {
               const posBg   = posStatus === 'confirmed' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)';
               return (
                 <div key={'_u_'+posName} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '10px 14px', borderLeft: `4px solid ${posColor}`, paddingLeft: 10 }}>
-                  <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', marginBottom: 8 }}>{posName}</div>
+                  <button onClick={() => setPosHistoryFor({ ministry, posName })} title={tx.posHistoryHint} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0', marginBottom: 8, display: 'block' }}>{posName} <span style={{ fontSize: 10, color: '#475a64' }}>🕐</span></button>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {posAsgn.map(a => renderChip(a, ministry, posBg, posColor))}
                   </div>
@@ -9899,6 +9918,41 @@ function PastorSchedulingTab({ token, lang }) {
   }
 
   const auditPerson = auditFor ? (auditFor.person_name || auditFor.preferred_name || auditFor.unmatched_name || (p ? 'Voluntário' : 'Volunteer')) : '';
+
+  // Position timeline: every assignment (tenure) the clicked position has ever
+  // had for this date, rebuilt from position-level audit events — each
+  // assignment_id is one person's tenure, including tenures whose assignment
+  // row was deleted when the volunteer was replaced. Most recent first.
+  const posHistoryTenures = React.useMemo(() => {
+    if (!posHistoryFor) return [];
+    const events = (positionAudit||[]).filter(ev =>
+      ev.ministry === posHistoryFor.ministry && ev.position_name === posHistoryFor.posName);
+    const byId = {};
+    const tenures = [];
+    events.forEach(ev => {
+      const key = String(ev.assignment_id);
+      if (!byId[key]) { byId[key] = { assignment_id: ev.assignment_id, person_name: null, events: [] }; tenures.push(byId[key]); }
+      if (ev.person_name && !byId[key].person_name) byId[key].person_name = ev.person_name;
+      byId[key].events.push(ev);
+    });
+    const currentAsgn = (assignments||[]).filter(a =>
+      a?.ministry === posHistoryFor.ministry && a?.position_name === posHistoryFor.posName);
+    currentAsgn.forEach(a => {
+      const key = String(a.id);
+      if (!byId[key]) { byId[key] = { assignment_id: a.id, person_name: null, events: [] }; tenures.push(byId[key]); }
+      byId[key].current = true;
+      byId[key].asgn = a;
+      if (!byId[key].person_name) byId[key].person_name = a.person_name || a.person_preferred_name || a.unmatched_name || null;
+    });
+    tenures.forEach(t => {
+      t.lastTs = t.events.length > 0 ? t.events[t.events.length - 1].ts : '';
+    });
+    tenures.sort((a, b) => {
+      if (!!a.current !== !!b.current) return a.current ? -1 : 1;
+      return a.lastTs < b.lastTs ? 1 : a.lastTs > b.lastTs ? -1 : (b.assignment_id||0) - (a.assignment_id||0);
+    });
+    return tenures;
+  }, [posHistoryFor, positionAudit, assignments]);
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1200 }}>
@@ -10038,6 +10092,68 @@ function PastorSchedulingTab({ token, lang }) {
                     <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#e6f1f0' }}>{ev.event_text}</span>
                   </div>
                 ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POSITION HISTORY DRILL-IN (read-only) — full replacement chain for
+          one position on the selected date, deleted tenures included. */}
+      {posHistoryFor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setPosHistoryFor(null); }}>
+          <div className="glass" style={{ borderRadius: 16, width: '90%', maxWidth: 620, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: '#e6f1f0' }}>{posHistoryFor.posName}</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5eead4', marginTop: 2 }}>{posHistoryFor.ministry+' — '+fmtDisplay(selDate)+' · '+selService}</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6b7a82', textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 8 }}>{tx.posHistoryTitle}</div>
+              </div>
+              <button onClick={() => setPosHistoryFor(null)} style={{ background: 'none', border: 'none', color: '#6b7a82', cursor: 'pointer', fontSize: 18, flexShrink: 0 }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '14px 20px 20px' }}>
+              {posHistoryTenures.length === 0 ? (
+                <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontStyle: 'italic' }}>{tx.noHolders}</div>
+              ) : (
+                posHistoryTenures.map(t => {
+                  const tName = t.person_name || (p ? 'Voluntário' : 'Volunteer');
+                  const tStatus = t.current ? (t.asgn?.status || 'not_contacted') : null;
+                  const tStale = t.current && t.asgn?.stale;
+                  const tHours = t.current && t.asgn?.hours_since_invite != null ? t.asgn.hours_since_invite : null;
+                  const tColor = t.current ? (STATUS_COLOR[tStatus] || STATUS_COLOR.not_contacted) : '#475a64';
+                  return (
+                    <div key={t.assignment_id} style={{ marginBottom: 14, borderLeft: `3px solid ${tStale ? '#f87171' : tColor}`, paddingLeft: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: t.current ? '#5eead4' : '#475a64', border: '1px solid '+(t.current ? 'rgba(94,234,212,0.35)' : 'rgba(255,255,255,0.1)'), borderRadius: 999, padding: '1px 8px' }}>
+                          {t.current ? tx.currentL : tx.previousL}
+                        </span>
+                        <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 600, color: '#e6f1f0' }}>{tName}</span>
+                        {t.current && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: tColor }} />
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#e6f1f0' }}>{STATUS_LABEL[tStatus] || tStatus}</span>
+                          </span>
+                        )}
+                        {t.current && tHours !== null && (tStatus === 'pending' || tStatus === 'not_contacted') && (
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: tStale ? '#f87171' : '#f59e0b' }}>
+                            {tx.pendingFor+' '+tHours+'h'}{tStale ? ' — '+tx.noResponse48+' ⚠' : ''}
+                          </span>
+                        )}
+                      </div>
+                      {t.events.length === 0 ? (
+                        <div style={{ color: '#475a64', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontStyle: 'italic' }}>{tx.noAudit}</div>
+                      ) : (
+                        t.events.slice().reverse().map(ev => (
+                          <div key={ev.id} style={{ display: 'flex', gap: 12, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#475a64', flexShrink: 0, whiteSpace: 'nowrap' }}>{ev.ts}</span>
+                            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, color: '#a8b8bf' }}>{ev.event_text}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

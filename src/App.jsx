@@ -8807,8 +8807,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                 borderLeft:`4px solid ${isNotNeeded ? "#475a64" : posColor}`,paddingLeft:10,
                 opacity:isNotNeeded ? 0.45 : 1,
               }}>
-                <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
-                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{posName}</div>
+                <div style={{flex:"1 1 148px",maxWidth:280,minWidth:0,paddingTop:2}}>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",overflowWrap:"break-word"}}>{posName}</div>
                   <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#475a64",marginTop:1}}>{`min ${minV} / ideal ${idealV}`}</div>
                 </div>
 
@@ -8922,8 +8922,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                 borderBottom:"1px solid rgba(255,255,255,0.04)",
                 borderLeft:"4px dashed #f59e0b",paddingLeft:10,
               }}>
-                <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
-                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#f59e0b",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{asgn.position_name || ""}</div>
+                <div style={{flex:"1 1 148px",maxWidth:280,minWidth:0,paddingTop:2}}>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#f59e0b",overflowWrap:"break-word"}}>{asgn.position_name || ""}</div>
                   <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"#f59e0b",marginTop:1,letterSpacing:"0.05em",textTransform:"uppercase"}}>{tx.unmatched}</div>
                 </div>
                 <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -8981,8 +8981,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
               opacity:isNotNeeded ? 0.45 : 1,
             }}>
               {/* Area name */}
-              <div style={{flex:"0 0 148px",minWidth:0,paddingTop:2}}>
-                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{areaKey}</div>
+              <div style={{flex:"1 1 148px",maxWidth:280,minWidth:0,paddingTop:2}}>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:isNotNeeded?"#475a64":"#e6f1f0",overflowWrap:"break-word"}}>{areaKey}</div>
               </div>
 
               {/* Assignment content */}

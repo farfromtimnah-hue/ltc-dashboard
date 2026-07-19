@@ -9476,6 +9476,25 @@ function PastorSchedulingTab({ token, lang }) {
   const SUNDAY_SERVICES = ['Culto Manha','Culto Tarde'];
   const ALL_MINISTRIES = ["Worship Team","Sound","Lighting","Projection","Streaming","Photo & Video","Social Media","Service Experience","Consolidation","Translation","Lagoinha Kids","Intercession","Volunteer Coffee","Hospitality - Welcome","Parking","Setup & Teardown","WE CARE","GC Leader"];
   const STATUS_COLOR = { confirmed:'#34d399', pending:'#f59e0b', declined:'#f87171', wants_reschedule:'#fb923c', not_contacted:'#475a64' };
+  // Manual Sunday assignments are stored as Culto Manha/Tarde while the
+  // Planning Center sync writes Sunday 10AM / Sunday 6:30PM EN — both name
+  // sets describe the same physical service, so accept either on read.
+  const SERVICE_NAME_ALIASES = {
+    'Culto Manha': ['Culto Manha','Sunday 10AM'],
+    'Culto Tarde': ['Culto Tarde','Sunday 6:30PM EN','Sunday 6:30PM'],
+  };
+  // Same PCO service-type ids GroupLeaderView uses for its on-demand sync,
+  // so this view reads the same fresh Planning Center data.
+  const PCO_SERVICE_TYPE_IDS = {
+    'Culto Manha': '1162648',
+    'Culto Tarde': '1213946',
+    'English Service': '1707498',
+    'Culto Fé': '1162055',
+    'Rocket': '1242401',
+    'Culto Hope': '1259513',
+    'Legacy': '1401015',
+    'Link': '1635885',
+  };
 
   function nextSundayDate() {
     var d = new Date(); var day = d.getDay();
@@ -9503,6 +9522,7 @@ function PastorSchedulingTab({ token, lang }) {
   const [triageExpanded, setTriageExpanded] = React.useState(false);
   const [auditFor, setAuditFor] = React.useState(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const pcoSyncedRef = React.useRef({});
 
   const dateStr = fmtDate(selDate);
   const isSundayService = SUNDAY_SERVICES.includes(selService);
@@ -9560,10 +9580,17 @@ function PastorSchedulingTab({ token, lang }) {
     }).then(r => r.json()).catch(() => ({}))
       .then(data => {
         if (cancelled) return;
+        // pastor-view returns every service on the date — keep only the
+        // selected service (plus its PC-sync alias names for Sundays),
+        // otherwise e.g. English Service shows Legacy's Saturday roster too.
+        const svcNames = SERVICE_NAME_ALIASES[selService] || [selService];
         const ministriesRaw = data?.ministries || [];
-        const asgn = ministriesRaw.flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })));
+        const asgn = ministriesRaw
+          .flatMap(m => (m.assignments || []).map(a => ({ ministry: m.ministry, ...a })))
+          .filter(a => svcNames.includes(a?.service_name));
         setAssignments(asgn);
-        const overrides = Array.isArray(data?.position_overrides) ? data.position_overrides : [];
+        const overrides = (Array.isArray(data?.position_overrides) ? data.position_overrides : [])
+          .filter(o => svcNames.includes(o?.service_name));
         const nnMap = {};
         overrides.forEach(item => {
           if (!item) return;
@@ -9576,6 +9603,19 @@ function PastorSchedulingTab({ token, lang }) {
         setLoading(false);
       });
     if (isSundayService) loadPositionsForMinistries(ALL_MINISTRIES);
+    // Refresh Planning Center data the same way GroupLeaderView does, so
+    // both views read the identical synced roster for a given service+date.
+    const serviceTypeId = PCO_SERVICE_TYPE_IDS[selService];
+    const syncKey = selService+':'+dateStr;
+    if (serviceTypeId && !pcoSyncedRef.current[syncKey]) {
+      pcoSyncedRef.current[syncKey] = true;
+      fetch(API+'/schedule/planning-center/sync', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer '+token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_type_id: serviceTypeId, service_date: dateStr }),
+      }).catch(() => {});
+      setTimeout(() => { if (!cancelled) setRefreshKey(k => k + 1); }, 4000);
+    }
     return () => { cancelled = true; };
   }, [dateStr, selService, token, refreshKey]);
 

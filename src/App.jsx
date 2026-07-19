@@ -10265,7 +10265,9 @@ function AppInner() {
   // (document.fonts.ready), since a font swap can change each tab's natural
   // width without firing a resize event.
   useEffect(() => {
-    if (isMobile) { setNavOverflowIds([]); return; }
+    window.__navDebugLog = window.__navDebugLog || [];
+    window.__navDebugLog.push({ at: performance.now(), event: 'effect-entered', isMobile, tabIdsKey });
+    if (isMobile) { window.__navDebugLog.push({ at: performance.now(), event: 'bailed-isMobile' }); setNavOverflowIds([]); return; }
     const container = navInnerRef.current;
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
@@ -10281,6 +10283,7 @@ function AppInner() {
     //     (a plain resize does not; only tabIdsKey/isMobile changing again
     //     does), so retrying via a capped rAF-driven state tick is needed.
     if (!container || !sentinel || !strip || !measureRow) {
+      window.__navDebugLog.push({ at: performance.now(), event: 'bailed-null-refs', retryCount: navRefRetryRef.current, c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow });
       if (navRefRetryRef.current < 20) {
         navRefRetryRef.current += 1;
         const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
@@ -10288,6 +10291,7 @@ function AppInner() {
       }
       return;
     }
+    window.__navDebugLog.push({ at: performance.now(), event: 'refs-ok-proceeding', retryCount: navRefRetryRef.current });
     navRefRetryRef.current = 0;
 
     const ids = tabs.map(t2 => t2.id);

@@ -10256,6 +10256,17 @@ function AppInner() {
       // hardcoded) so this stays correct if the nav-inner gap value changes.
       const containerGap = parseFloat(getComputedStyle(container).columnGap) || 0;
       const boundaryRight = sentinel.getBoundingClientRect().left - containerGap;
+      // Compare in RELATIVE coordinates — each measured tab's extent from the
+      // measure row's own left edge, against the space between the visible
+      // strip's left edge and the trailing boundary. Confirmed live 2026-07-19:
+      // comparing absolute rects instead silently passed every tab whenever
+      // navMeasureLeft was stale (recompute ran before the logo <img> loaded,
+      // shifting the real strip ~133px right of the measure row; nothing
+      // re-fired, so "Schedule" measured as fitting while actually rendering
+      // clipped to "S"). Relative math is immune to that misalignment.
+      const measRowLeft = measureRow.getBoundingClientRect().left;
+      const stripLeft = strip.getBoundingClientRect().left;
+      const availWidth = boundaryRight - stripLeft;
       const overflowing = [];
       // Tab priority for collapsing is right-to-left (last tab collapses
       // first), matching the tab strip's left-to-right reading order.
@@ -10264,7 +10275,7 @@ function AppInner() {
         const el = navMeasureRefs.current.get(id);
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        const fits = r.right <= boundaryRight && r.left >= containerRect.left;
+        const fits = (r.right - measRowLeft) <= availWidth;
         if (!fits) overflowing.push(id);
       }
       setNavOverflowIds(prev => {
@@ -10280,11 +10291,20 @@ function AppInner() {
     io.observe(sentinel);
     navMeasureRefs.current.forEach(el => io.observe(el));
 
-    // ResizeObserver on the container itself catches window resize and
-    // orientation change (both change container width) without a hardcoded
-    // delay or timeout.
+    // ResizeObserver on the container catches window resize and orientation
+    // change. Observing the STRIP and MEASURE ROW as well is load-bearing
+    // (confirmed live 2026-07-19): the strip's box also changes when a
+    // sibling resizes with the container width unchanged — the logo <img>
+    // finishing its load, or the view-switcher pill relabeling to a wider
+    // "GL: <group>" on entering Group Leader View — and the measure row's
+    // box changes when tab labels change width without the tab SET changing
+    // (PT/EN toggle). None of those fire the container observer or cross an
+    // IntersectionObserver threshold, which left stale overflow decisions
+    // rendering a clipped "S" instead of SCHEDULE.
     const ro = new ResizeObserver(() => recompute());
     ro.observe(container);
+    ro.observe(strip);
+    ro.observe(measureRow);
 
     let cancelled = false;
     if (document.fonts && document.fonts.ready) {

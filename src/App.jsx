@@ -10302,7 +10302,12 @@ function AppInner() {
       //     React still owns that inline style object as the source of
       //     truth on the next commit. The effect and the JSX were fighting
       //     over the same DOM property; JSX always wins on re-render.
-      setNavMeasureLeft(strip.getBoundingClientRect().left - containerRect.left);
+      const navDebugComputedLeft = strip.getBoundingClientRect().left - containerRect.left;
+      // TEMP DIAGNOSTIC 2026-07-18 — decisive proof this exact line runs,
+      // with the exact value it computes. Remove once confirmed.
+      window.__navDebugLastCompute = { at: performance.now(), computedLeft: navDebugComputedLeft, containerLeft: containerRect.left, stripLeft: strip.getBoundingClientRect().left };
+      document.title = 'NAVCALC:' + navDebugComputedLeft.toFixed(1);
+      setNavMeasureLeft(navDebugComputedLeft);
       // The sentinel is a real flex item positioned right where the always-
       // visible More/switcher/aux/lang items begin claiming space, so its
       // left edge marks the true trailing boundary available to tabs — but

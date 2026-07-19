@@ -759,6 +759,15 @@ const css = `
   }
   .drawer-panel { animation: drawerSlide 0.32s cubic-bezier(0.16,1,0.3,1); }
 
+  /* ── Leader person sheet (MinistryLeaderView team-member detail) ──────
+     Fixed 380px side sheet on desktop; at phone widths it must cover the
+     full viewport like the People tab's person drawer does — a partial
+     sliver of the page peeking through on a phone reads as broken. */
+  .leader-person-sheet { width: 380px; max-width: 100vw; }
+  @media (max-width: 480px) {
+    .leader-person-sheet { width: 100vw; }
+  }
+
   /* ── Nav overflow (IntersectionObserver-driven) ───────────────────────
      Every tab renders in the strip by default (no CSS-only hide/show
      tiers, no container-query breakpoints). A JS IntersectionObserver
@@ -6592,7 +6601,7 @@ function LeaderPersonModal({ person, ministryName, ministryPositions, token, lan
 
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:5000,display:'flex',alignItems:'flex-start',justifyContent:'flex-end',paddingTop:0}}>
-      <div onClick={function(e){e.stopPropagation();}} style={{width:380,maxWidth:'95vw',height:'100vh',overflowY:'auto',background:'#08121a',borderLeft:'1px solid rgba(94,234,212,0.18)',boxShadow:'-8px 0 40px rgba(0,0,0,0.5)'}}>
+      <div onClick={function(e){e.stopPropagation();}} className="leader-person-sheet" style={{height:'100vh',overflowY:'auto',background:'#08121a',borderLeft:'1px solid rgba(94,234,212,0.18)',boxShadow:'-8px 0 40px rgba(0,0,0,0.5)'}}>
         {/* Header */}
         <div style={{padding:'20px 20px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',gap:14,background:'linear-gradient(180deg,rgba(94,234,212,0.06),transparent)',flexShrink:0}}>
           {(person && person.photo_url) ? (

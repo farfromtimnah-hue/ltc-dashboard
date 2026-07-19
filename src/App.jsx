@@ -10858,7 +10858,7 @@ function AppInner() {
           {/* Sentinel: a real (non-absolute) zero-width flex item immediately
               after the tab strip. Because the tab strip above is flex:1 (sized
               by layout, not by its own content), the sentinel always lands
-              exactly where the fixed-size switcher/aux/lang/More items begin —
+              exactly where the fixed-size More/switcher/aux/lang items begin —
               the true trailing edge available to tabs — independent of how
               many tabs are currently visible. The IntersectionObserver compares
               each measured tab's position against this element's rendered
@@ -10883,21 +10883,13 @@ function AppInner() {
             {tabs.map(t2=>tabBtn(t2,{measuring:true}))}
           </div>
 
-          {/* View switcher button — only when hasSwitcher */}
-          {hasSwitcher && viewSwitcherBtn()}
-
-          {/* Gear + logout — always visible at desktop widths */}
-          {auxNav()}
-
-          {/* Spacer */}
-          <div style={{flex:"1 1 0",minWidth:0}} />
-
-          {/* PT/EN toggle — always visible. Never collapses. */}
-          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
-
-          {/* More button — always visible when any tab has overflowed; also
-              serves as a permanent escape hatch. Drawer contains overflowed
-              tabs + Switch View + utility. */}
+          {/* More button — first fixed-size item after the sentinel, so it
+              sits visually adjacent to the tab strip it collapses. Always
+              visible when any tab has overflowed; also serves as a permanent
+              escape hatch. Drawer contains overflowed tabs + Switch View +
+              utility. Position within the fixed cluster doesn't affect the
+              overflow math: the sentinel marks where fixed-size items begin
+              claiming space regardless of their order. */}
           <div className="nav-more-btn" style={{flex:"0 0 auto",position:"relative"}}>
             {moreBtn()}
             {moreOpen && (
@@ -10921,6 +10913,18 @@ function AppInner() {
               </>
             )}
           </div>
+
+          {/* View switcher button — only when hasSwitcher */}
+          {hasSwitcher && viewSwitcherBtn()}
+
+          {/* Gear + logout — always visible at desktop widths */}
+          {auxNav()}
+
+          {/* Spacer */}
+          <div style={{flex:"1 1 0",minWidth:0}} />
+
+          {/* PT/EN toggle — always visible. Never collapses. */}
+          <div style={{flex:"0 0 auto"}}>{langToggle()}</div>
 
         </div>
       </div>}

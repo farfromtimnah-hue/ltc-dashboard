@@ -10267,7 +10267,11 @@ function AppInner() {
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
     const measureRow = navMeasureRowRef.current;
-    if (!container || !sentinel || !strip || !measureRow) return;
+    if (!container || !sentinel || !strip || !measureRow) {
+      // TEMP DIAGNOSTIC 2026-07-18 — remove after confirming mechanism live.
+      document.title = 'NAVDEBUG-BAILED:' + JSON.stringify({ c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow, tabIdsKey, isMobile });
+      return;
+    }
 
     const ids = tabs.map(t2 => t2.id);
 

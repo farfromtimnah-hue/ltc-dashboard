@@ -10225,9 +10225,6 @@ function AppInner() {
   const navMeasureRowRef = useRef(null);
   const navMeasureRefs = useRef(new Map());
   const navSentinelRef = useRef(null);
-  const navRefRetryRef = useRef(0);
-  const navRefRetryKeyRef = useRef(undefined);
-  const [navRefRetryTick, setNavRefRetryTick] = useState(0);
 
   const [templatePT, setTemplatePT] = useState(DEFAULT_TEMPLATE_PT);
   const [templateEN, setTemplateEN] = useState(DEFAULT_TEMPLATE_EN);
@@ -10271,57 +10268,38 @@ function AppInner() {
     const sentinel = navSentinelRef.current;
     const strip = navStripRef.current;
     const measureRow = navMeasureRowRef.current;
-    // Three confirmed bugs, all needed fixing together (confirmed live in
-    // production 2026-07-18 via a structured event log, not guesswork):
-    // (1) tabIdsKey resolves through MULTIPLE intermediate values before
-    //     settling — confirmed via a real session log showing it pass
-    //     through at least one narrower placeholder set (role resolving in
-    //     stages) before reaching the final role-based tab list. Each
-    //     change tears this effect down and re-runs it.
-    // (2) On any of those renders, this effect can run before React has
-    //     attached these refs for that same render — confirmed via a live
-    //     log showing all four refs null across every check.
-    // (3) The critical bug: the retry counter (navRefRetryRef) is a plain
-    //     ref that persists for the WHOLE component lifetime, so retries
-    //     spent responding to an early, intermediate tabIdsKey value were
-    //     never given back — by the time tabIdsKey reached its real, final
-    //     value and refs were genuinely ready to attach, the 20-retry
-    //     budget was already exhausted from the earlier transition, so the
-    //     effect gave up permanently before ever succeeding. Confirmed via
-    //     a real session log showing the retry count climbing continuously
-    //     (0,1,2...) straight through a tabIdsKey change with no reset.
-    //     Fixed by resetting the retry budget whenever tabIdsKey itself
-    //     changes, tracked via navRefRetryKeyRef.
-    window.__navDebugLog = window.__navDebugLog || [];
-    window.__navDebugLog.push({ at: performance.now(), tabIdsKey, keyChanged: navRefRetryKeyRef.current !== tabIdsKey, retryBefore: navRefRetryRef.current });
-    if (navRefRetryKeyRef.current !== tabIdsKey) {
-      navRefRetryKeyRef.current = tabIdsKey;
-      navRefRetryRef.current = 0;
-    }
-    if (!container || !sentinel || !strip || !measureRow) {
-      window.__navDebugLog.push({ at: performance.now(), event: 'bail', retry: navRefRetryRef.current, c: !!container, s: !!sentinel, st: !!strip, m: !!measureRow });
-      if (navRefRetryRef.current < 20) {
-        navRefRetryRef.current += 1;
-        const retryId = requestAnimationFrame(() => setNavRefRetryTick(n => n + 1));
-        return () => cancelAnimationFrame(retryId);
-      }
-      return;
-    }
-    window.__navDebugLog.push({ at: performance.now(), event: 'success', retry: navRefRetryRef.current });
-    navRefRetryRef.current = 0;
+    // Real root cause, confirmed live in production 2026-07-18 via a
+    // structured event log (not guesswork — a retry-count/budget theory
+    // was tried first and also failed live, which is what led to finding
+    // this): AppInner's own early returns for !authReady and !token (see
+    // below, near the login screen) mean the real nav DOM — the elements
+    // these refs point to — doesn't exist at all until Firebase auth
+    // resolves and a token is available, which is real async network time
+    // that can exceed a few hundred milliseconds on a live network. This
+    // effect's OLD dependency array ([tabIdsKey, isMobile]) never included
+    // authReady/token, so on the loading-screen render (before either
+    // resolves) the refs are correctly null, and nothing in the dependency
+    // array ever changes again once tabIdsKey/isMobile settle early — the
+    // effect has no reason to re-run once auth actually finishes resolving
+    // moments later. A capped retry-loop was tried as a fix and failed
+    // live for the same reason: no fixed retry budget reliably survives
+    // unpredictable real network auth latency. The correct fix is for this
+    // effect to depend on authReady/token directly, so it naturally
+    // re-runs at the exact moment the real nav DOM actually mounts.
+    if (!container || !sentinel || !strip || !measureRow) return;
 
     const ids = tabs.map(t2 => t2.id);
 
     const recompute = () => {
       const containerRect = container.getBoundingClientRect();
-      // (4) The measure row's left offset MUST be tracked as React state
-      //     (navMeasureLeft) and rendered declaratively, not written via
-      //     measureRow.style.left directly — confirmed live that an
-      //     imperative write here was correct for an instant but then
-      //     silently reset back to the JSX's own hardcoded left:0, since
-      //     React still owns that inline style object as the source of
-      //     truth on the next commit. The effect and the JSX were fighting
-      //     over the same DOM property; JSX always wins on re-render.
+      // The measure row's left offset MUST be tracked as React state
+      // (navMeasureLeft) and rendered declaratively, not written via
+      // measureRow.style.left directly — confirmed live that an imperative
+      // write here was correct for an instant but then silently reset back
+      // to the JSX's own hardcoded left:0, since React still owns that
+      // inline style object as the source of truth on the next commit.
+      // The effect and the JSX were fighting over the same DOM property;
+      // JSX always wins on re-render.
       setNavMeasureLeft(strip.getBoundingClientRect().left - containerRect.left);
       // The sentinel is a real flex item positioned right where the always-
       // visible More/switcher/aux/lang items begin claiming space, so its
@@ -10380,7 +10358,7 @@ function AppInner() {
       io.disconnect();
       ro.disconnect();
     };
-  }, [tabIdsKey, isMobile, navRefRetryTick]);
+  }, [tabIdsKey, isMobile, authReady, token]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {

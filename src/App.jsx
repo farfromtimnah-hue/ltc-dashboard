@@ -1385,6 +1385,42 @@ function CarismaBadge({ levels, lang }) {
 }
 
 // ─── SETTINGS MODAL ───────────────────────────────────────────────
+// WAHA (automated-send) template constants — MUST mirror worker.js
+// (WAHA_LOCKED_SUFFIX / WAHA_DEFAULT_BODY / WAHA_DEFAULT_REPLY). The locked
+// suffix is appended by the worker at send time and is deliberately NOT
+// editable here: it carries the YES / DIFFERENT-DAY reply-parsing contract
+// the webhook depends on (and the no-decline-option rule).
+const WAHA_LOCKED_SUFFIX = {
+  invite: {
+    en: 'Please reply YES to confirm, or DIFFERENT DAY if another day works better. We just need to hear from you either way. Thank you for serving!',
+    pt: 'Por favor, responda SIM para confirmar, ou OUTRO DIA se outro dia funcionar melhor. So precisamos saber de voce, de um jeito ou de outro. Agradecemos por voce servir!'
+  },
+  reminder: {
+    en: 'We have not heard from you yet — please reply YES to confirm, or DIFFERENT DAY if another day works better. We need to finalize the schedule, so your response is valued!',
+    pt: 'Ainda nao recebemos sua resposta — responda SIM para confirmar, ou OUTRO DIA se outro dia for melhor. Precisamos fechar a escala, entao sua resposta e muito valorizada!'
+  }
+};
+const WAHA_DEFAULT_BODY = {
+  invite: {
+    en: 'Hi {nome}! We are counting on you to serve with the {ministerio} ministry as {posicao} at the {servico} service on {data}.',
+    pt: 'Oi {nome}! Estamos contando com voce para servir no ministerio {ministerio} na posicao {posicao} no culto {servico} no dia {data}.'
+  },
+  reminder: {
+    en: 'Hi {nome}! Just following up on your schedule for {ministerio} as {posicao} at the {servico} service on {data}.',
+    pt: 'Oi {nome}! Passando para lembrar da sua escala em {ministerio} na posicao {posicao} no culto {servico} no dia {data}.'
+  }
+};
+const WAHA_DEFAULT_REPLY = {
+  confirmed: {
+    en: 'Wonderful! Your spot is confirmed and we are so glad to have you serving with us. Thank you, {nome}!',
+    pt: 'Que maravilha! Sua vaga esta confirmada e estamos muito felizes em ter voce servindo com a gente. Obrigado, {nome}!'
+  },
+  reschedule: {
+    en: 'Perfect! Your leader will know you are glad to serve and just need a different date. Someone will follow up with you soon. Thank you, {nome}!',
+    pt: 'Perfeito! Seu lider vai saber que voce quer servir, so precisa de outra data. Em breve alguem entra em contato. Obrigado, {nome}!'
+  }
+};
+
 function SettingsModal({ token, t, onClose, onSaved, lang }) {
   const [templatePT, setTemplatePT] = useState("");
   const [templateEN, setTemplateEN] = useState("");
@@ -1394,6 +1430,16 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
   const [schedInviteEN, setSchedInviteEN] = useState("");
   const [schedReminderPT, setSchedReminderPT] = useState("");
   const [schedReminderEN, setSchedReminderEN] = useState("");
+  // WAHA (automated primary channel) templates — editable bodies only; the
+  // locked reply-instruction suffix is shown greyed-out below each box.
+  const [wahaInvitePT, setWahaInvitePT] = useState("");
+  const [wahaInviteEN, setWahaInviteEN] = useState("");
+  const [wahaReminderPT, setWahaReminderPT] = useState("");
+  const [wahaReminderEN, setWahaReminderEN] = useState("");
+  const [wahaConfirmedPT, setWahaConfirmedPT] = useState("");
+  const [wahaConfirmedEN, setWahaConfirmedEN] = useState("");
+  const [wahaReschedulePT, setWahaReschedulePT] = useState("");
+  const [wahaRescheduleEN, setWahaRescheduleEN] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1407,6 +1453,16 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
         setSchedInviteEN(d.whatsapp_schedule_invite_en || "");
         setSchedReminderPT(d.whatsapp_reminder_pt || "");
         setSchedReminderEN(d.whatsapp_reminder_en || "");
+        // Pre-migration (columns missing) or never customized: show the
+        // worker's built-in defaults, which are what actually gets sent.
+        setWahaInvitePT(d.whatsapp_waha_invite_pt || WAHA_DEFAULT_BODY.invite.pt);
+        setWahaInviteEN(d.whatsapp_waha_invite_en || WAHA_DEFAULT_BODY.invite.en);
+        setWahaReminderPT(d.whatsapp_waha_reminder_pt || WAHA_DEFAULT_BODY.reminder.pt);
+        setWahaReminderEN(d.whatsapp_waha_reminder_en || WAHA_DEFAULT_BODY.reminder.en);
+        setWahaConfirmedPT(d.whatsapp_waha_confirmed_reply_pt || WAHA_DEFAULT_REPLY.confirmed.pt);
+        setWahaConfirmedEN(d.whatsapp_waha_confirmed_reply_en || WAHA_DEFAULT_REPLY.confirmed.en);
+        setWahaReschedulePT(d.whatsapp_waha_reschedule_reply_pt || WAHA_DEFAULT_REPLY.reschedule.pt);
+        setWahaRescheduleEN(d.whatsapp_waha_reschedule_reply_en || WAHA_DEFAULT_REPLY.reschedule.en);
       })
       .catch(() => {
         setTemplatePT(DEFAULT_TEMPLATE_PT);
@@ -1433,11 +1489,41 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
         whatsapp_reminder_en: schedReminderEN || null,
       })
     });
+    // WAHA templates have their own endpoint so a pre-migration database
+    // (columns missing -> 500 here) never breaks the two saves above.
+    await fetch(`${API}/settings/waha-templates`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        whatsapp_waha_invite_pt: wahaInvitePT || null,
+        whatsapp_waha_invite_en: wahaInviteEN || null,
+        whatsapp_waha_reminder_pt: wahaReminderPT || null,
+        whatsapp_waha_reminder_en: wahaReminderEN || null,
+        whatsapp_waha_confirmed_reply_pt: wahaConfirmedPT || null,
+        whatsapp_waha_confirmed_reply_en: wahaConfirmedEN || null,
+        whatsapp_waha_reschedule_reply_pt: wahaReschedulePT || null,
+        whatsapp_waha_reschedule_reply_en: wahaRescheduleEN || null,
+      })
+    });
     setSaving(false);
     setSaved(true);
     onSaved({ whatsapp_template_pt: templatePT, whatsapp_template_en: templateEN });
     setTimeout(() => setSaved(false), 2000);
   }
+
+  // Greyed-out, non-editable preview of the locked reply-instruction suffix
+  // the worker always appends after the editable body at send time.
+  const LockedSuffix = ({ text }) => (
+    <div aria-disabled="true" style={{marginTop:6,padding:"10px 14px",borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1px dashed rgba(255,255,255,0.12)",color:"#6b7a82",fontSize:12.5,lineHeight:1.55,display:"flex",gap:8,alignItems:"flex-start",userSelect:"none",cursor:"not-allowed"}}>
+      <span style={{flexShrink:0,fontSize:13}}>🔒</span>
+      <div>
+        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"9.5px",letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:4,opacity:0.8}}>
+          {lang === "PT" ? "Sempre adicionado no final (nao editavel)" : "Always appended at the end (not editable)"}
+        </div>
+        <span style={{fontStyle:"italic"}}>{text}</span>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}
@@ -1476,16 +1562,87 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
               style={{resize:"vertical",lineHeight:1.6}}/>
           </div>
 
-          {/* ── Scheduling invite + reminder templates (schedule columns only) ── */}
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:24,display:"flex",flexDirection:"column",gap:24}}>
+          {/* ── PRIMARY: WAHA automated-send templates (whatsapp_waha_* columns).
+               Editable body only — the locked reply-instruction suffix is
+               appended by the worker at send time and previewed greyed-out. ── */}
+          <div style={{borderTop:"1px solid rgba(94,234,212,0.15)",paddingTop:24,display:"flex",flexDirection:"column",gap:24}}>
             <div>
-              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#e6f1f0",marginBottom:4}}>
-                {lang === "PT" ? "Mensagens de Escala (WhatsApp)" : "Scheduling Messages (WhatsApp)"}
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#5eead4",marginBottom:4}}>
+                {lang === "PT" ? "Principal — Mensagens Automaticas de WhatsApp" : "Primary — Automated WhatsApp Messages"}
               </div>
               <div style={{fontSize:12,color:"#6b7a82",lineHeight:1.5}}>
                 {lang === "PT"
-                  ? "Convite e lembrete enviados manualmente pelo lider via WhatsApp."
-                  : "Invite and reminder sent manually by the leader via WhatsApp."}
+                  ? "Enviadas automaticamente pelo sistema (convite, lembrete e respostas de confirmacao). A instrucao de resposta (SIM / OUTRO DIA) e fixa e sempre adicionada ao final."
+                  : "Sent automatically by the system (invite, reminder and confirmation replies). The reply instruction (YES / DIFFERENT DAY) is fixed and always appended at the end."}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10}}>
+              <span style={{fontSize:20,flexShrink:0}}>✨</span>
+              <div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:6}}>{t.availableVars}</div>
+                <div style={{fontSize:13,color:"#aebac0",display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {["{nome}","{ministerio}","{posicao}","{data}","{servico}"].map(v=>(
+                    <code key={v} style={{padding:"3px 8px",borderRadius:5,background:"rgba(94,234,212,0.08)",border:"1px solid rgba(94,234,212,0.15)",color:"#5eead4",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{v}</code>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Convite Automatico (PT)" : "Automated Invite (PT)"}</div>
+              <textarea value={wahaInvitePT} onChange={e => setWahaInvitePT(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+              <LockedSuffix text={WAHA_LOCKED_SUFFIX.invite.pt} />
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Convite Automatico (EN)" : "Automated Invite (EN)"}</div>
+              <textarea value={wahaInviteEN} onChange={e => setWahaInviteEN(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+              <LockedSuffix text={WAHA_LOCKED_SUFFIX.invite.en} />
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Lembrete Automatico (PT)" : "Automated Reminder (PT)"}</div>
+              <textarea value={wahaReminderPT} onChange={e => setWahaReminderPT(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+              <LockedSuffix text={WAHA_LOCKED_SUFFIX.reminder.pt} />
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Lembrete Automatico (EN)" : "Automated Reminder (EN)"}</div>
+              <textarea value={wahaReminderEN} onChange={e => setWahaReminderEN(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+              <LockedSuffix text={WAHA_LOCKED_SUFFIX.reminder.en} />
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Resposta apos Confirmar (PT)" : "Reply after Confirming (PT)"}</div>
+              <textarea value={wahaConfirmedPT} onChange={e => setWahaConfirmedPT(e.target.value)} rows={3}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Resposta apos Confirmar (EN)" : "Reply after Confirming (EN)"}</div>
+              <textarea value={wahaConfirmedEN} onChange={e => setWahaConfirmedEN(e.target.value)} rows={3}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Resposta para Outro Dia (PT)" : "Reply for Different Day (PT)"}</div>
+              <textarea value={wahaReschedulePT} onChange={e => setWahaReschedulePT(e.target.value)} rows={3}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Resposta para Outro Dia (EN)" : "Reply for Different Day (EN)"}</div>
+              <textarea value={wahaRescheduleEN} onChange={e => setWahaRescheduleEN(e.target.value)} rows={3}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+          </div>
+
+          {/* ── FALLBACK ONLY: manual-link scheduling templates (schedule columns only) ── */}
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:24,display:"flex",flexDirection:"column",gap:24}}>
+            <div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:"#e6f1f0",marginBottom:4}}>
+                {lang === "PT" ? "Somente Reserva — Mensagens Manuais de Escala" : "Fallback Only — Manual Scheduling Messages"}
+              </div>
+              <div style={{fontSize:12,color:"#6b7a82",lineHeight:1.5}}>
+                {lang === "PT"
+                  ? "Usadas somente se o envio automatico falhar: o lider envia manualmente pelo WhatsApp com link de confirmacao."
+                  : "Used only if automated sending fails: the leader sends manually via WhatsApp with a confirmation link."}
               </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:"rgba(94,234,212,0.04)",border:"1px solid rgba(94,234,212,0.1)",borderRadius:10}}>
@@ -8847,7 +9004,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                         const asgnColor = asgn.status === "confirmed" ? "#22c55e" : asgn.status === "declined" ? "#ef4444" : "#eab308";
                         const asgnDeleting = deletingId === (asgn.assignment_id || asgn.id);
                         return (
-                          <div key={asgn.assignment_id || asgn.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                          <div key={asgn.assignment_id || asgn.id} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                             {asgn.position_name && (
                               <span style={{fontSize:10,color:"#6b7f8a",fontStyle:"italic"}}>{asgn.position_name}</span>
                             )}

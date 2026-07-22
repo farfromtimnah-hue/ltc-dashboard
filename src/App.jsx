@@ -8396,6 +8396,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     tabScheduling:    lang === "PT" ? "Agendamento" : "Scheduling",
     tabTeam:          lang === "PT" ? "Equipe" : "Team",
     tabStats:         lang === "PT" ? "Estatisticas" : "Stats",
+    pcRefresh:        lang === "PT" ? "Atualizar do Planning Center" : "Refresh from Planning Center",
   };
 
   useEffect(() => {
@@ -8451,6 +8452,22 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     'Link': '1635885',
   };
   const pcoSyncedRef = useRef({});
+  const [pcoManualSyncing, setPcoManualSyncing] = useState(null); // ministry name currently refreshing, or null
+
+  function doManualPcoSync(ministry) {
+    const serviceTypeId = PCO_SERVICE_TYPE_IDS[groupName];
+    if (!serviceTypeId || !ministry || pcoManualSyncing) return;
+    setPcoManualSyncing(ministry);
+    fetch(`${API}/schedule/planning-center/sync-ministry`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ service_type_id: serviceTypeId, service_date: schedDate, ministry }),
+    })
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => { setPcoManualSyncing(null); refreshSchedule(); }, 4000);
+      });
+  }
 
   useEffect(() => {
     if (!token || !groupName || !schedDate) return;
@@ -9135,6 +9152,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
 
           const renderPositionArea = (area) => {
             const areaKey = area?.area_name || area?.name || "";
+            const isLockedPosArea = area?.is_locked_external === 1;
             const positions = area?.positions || [];
             // A single-position area named after its position (e.g. area
             // "Prayer" -> Service Leaders / Prayer) needs no separate header.
@@ -9146,7 +9164,16 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             return (
               <div key={areaKey || String(area?.display_order)}>
                 {!skipHeader && (
-                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#e6f1f0",padding:"12px 0 2px"}}>{areaKey}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"12px 0 2px"}}>
+                    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#e6f1f0"}}>{areaKey}</div>
+                    {isLockedPosArea && (
+                      <button onClick={()=>doManualPcoSync(areaKey)} disabled={pcoManualSyncing === areaKey}
+                        title={tx.pcRefresh}
+                        style={{fontSize:12,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"2px 6px",cursor:pcoManualSyncing===areaKey?"default":"pointer",opacity:pcoManualSyncing===areaKey?0.5:1,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>
+                        {pcoManualSyncing === areaKey ? "⟳" : "↻"}
+                      </button>
+                    )}
+                  </div>
                 )}
                 {positions.map(pos => renderPositionRow(area, pos))}
                 {unmatchedAssignments.map(asgn => renderUnmatchedRow(asgn))}
@@ -9250,6 +9277,15 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
                   </div>
                 )}
               </div>
+
+              {/* Manual Planning Center refresh — force a re-sync for just this ministry */}
+              {isLocked && (
+                <button onClick={()=>doManualPcoSync(areaKey)} disabled={pcoManualSyncing === areaKey}
+                  title={tx.pcRefresh}
+                  style={{fontSize:13,color:"#5eead4",background:"none",border:"1px solid rgba(94,234,212,0.25)",borderRadius:5,padding:"3px 7px",cursor:pcoManualSyncing===areaKey?"default":"pointer",flexShrink:0,opacity:pcoManualSyncing===areaKey?0.5:1,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>
+                  {pcoManualSyncing === areaKey ? "⟳" : "↻"}
+                </button>
+              )}
 
               {/* Not-needed toggle */}
               {!isLocked && !isNotNeeded && (

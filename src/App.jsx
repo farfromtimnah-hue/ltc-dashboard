@@ -8325,6 +8325,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [glTab, setGlTab] = useState("attending");
+  const [glMainTab, setGlMainTab] = useState("scheduling");
   const [sundayOpen, setSundayOpen] = useState(false);
   const [expandedMinistry, setExpandedMinistry] = useState(null);
   const [alsoServingOpen, setAlsoServingOpen] = useState(false);
@@ -8392,6 +8393,9 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     guestRemove:      lang === "PT" ? "Remover convidado" : "Remove Guest",
     confirmBtn:       lang === "PT" ? "Confirmar" : "Confirm",
     unmatched:        lang === "PT" ? "Nao Correspondido" : "Unmatched",
+    tabScheduling:    lang === "PT" ? "Agendamento" : "Scheduling",
+    tabTeam:          lang === "PT" ? "Equipe" : "Team",
+    tabStats:         lang === "PT" ? "Estatisticas" : "Stats",
   };
 
   useEffect(() => {
@@ -8738,7 +8742,28 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         <h1 style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:28,color:"#e6f1f0",margin:0}}>{groupName}</h1>
       </div>
 
-      {/* Section A */}
+      {/* Main section tabs — Scheduling first, since it's the primary task */}
+      <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+        {[
+          { id: "scheduling", label: tx.tabScheduling },
+          { id: "team", label: tx.tabTeam },
+          { id: "stats", label: tx.tabStats },
+        ].map(t => {
+          const active = glMainTab === t.id;
+          return (
+            <button key={t.id} onClick={() => setGlMainTab(t.id)}
+              style={{padding:"8px 18px",borderRadius:999,fontSize:12,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.1em",cursor:"pointer",transition:"all 0.18s",
+                background:active?"linear-gradient(180deg,rgba(94,234,212,0.18),rgba(94,234,212,0.08))":"transparent",
+                border:active?"1px solid rgba(94,234,212,0.35)":"1px solid rgba(255,255,255,0.06)",
+                color:active?"#5eead4":"#6b7a82"}}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Section A — Team */}
+      {glMainTab === "team" && (
       <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
         <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:14,fontWeight:500}}>{tx.ourTeam}</div>
         <div style={{display:"flex",gap:8,marginBottom:18}}>
@@ -8790,8 +8815,11 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
             )
         )}
       </div>
+      )}
 
       {/* Section B — Group Health Analytics (4C) */}
+      {glMainTab === "stats" && (
+      <>
       <GroupHealthBox attending={attending} serving={serving} lang={lang} groupName={groupName} />
 
       {/* Section C — Service Attendance */}
@@ -8891,8 +8919,12 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
           })()}
         </div>
       )}
+      </>
+      )}
 
       {/* Section D — Service Scheduler */}
+      {glMainTab === "scheduling" && (
+      <>
       <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
         <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500,marginBottom:16}}>{tx.scheduling}</div>
 
@@ -9397,6 +9429,8 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
           );
         })()}
       </div>
+      </>
+      )}
     </div>
   );
 }

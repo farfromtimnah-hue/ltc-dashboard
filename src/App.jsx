@@ -8552,7 +8552,16 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         const file = new File([blob], filename, { type: "application/pdf" });
         // Primary path: OS-level share sheet (mobile browsers that support
         // sharing files) — a true one-tap share directly into WhatsApp.
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        let canShareFiles = false;
+        try {
+          canShareFiles = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+        } catch (canShareErr) {
+          // Some mobile browsers throw here instead of returning false —
+          // treat that the same as false and fall through to the download
+          // fallback below.
+          canShareFiles = false;
+        }
+        if (canShareFiles) {
           try {
             await navigator.share({ files: [file], title: filename, text: tx.oosWhatsAppNudge });
             setOosSending(false);

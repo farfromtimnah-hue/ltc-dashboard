@@ -8335,6 +8335,10 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   const [schedData, setSchedData] = useState(null);
   const [schedLoading, setSchedLoading] = useState(false);
   const [schedError, setSchedError] = useState(false);
+  const [oosData, setOosData] = useState(null);
+  const [oosLoading, setOosLoading] = useState(false);
+  const [oosError, setOosError] = useState(false);
+  const [oosSending, setOosSending] = useState(false);
   const [assignPickerArea, setAssignPickerArea] = useState(null);
   const [assignPickerSearch, setAssignPickerSearch] = useState("");
   const [conflictInfo, setConflictInfo] = useState(null);
@@ -8396,7 +8400,12 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
     tabScheduling:    lang === "PT" ? "Agendamento" : "Scheduling",
     tabTeam:          lang === "PT" ? "Equipe" : "Team",
     tabStats:         lang === "PT" ? "Estatisticas" : "Stats",
+    tabOrderOfService: lang === "PT" ? "Ordem do Culto" : "Order of Service",
     pcRefresh:        lang === "PT" ? "Atualizar do Planning Center" : "Refresh from Planning Center",
+    oosNoPlan:        lang === "PT" ? "Nenhum plano encontrado no Planning Center para esta data." : "No plan found in Planning Center for this date.",
+    oosSendPdf:       lang === "PT" ? "Enviar como PDF" : "Send as PDF",
+    oosSending:       lang === "PT" ? "Gerando PDF..." : "Generating PDF...",
+    oosWhatsAppNudge: lang === "PT" ? "Ordem do Culto — toque no arquivo abaixo para anexar" : "Order of Service — tap the file below to attach",
   };
 
   useEffect(() => {
@@ -8498,6 +8507,79 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
   }, [token, groupName, schedDate, schedRefresh]);
 
   function refreshSchedule() { setSchedRefresh(c => c + 1); }
+
+  // Order of Service tab: always refetches live from Planning Center on
+  // mount / date / group change — never reused across changes, since this
+  // must reflect current PC data, not stale D1 state (there's no D1 cache
+  // for this at all — the Worker fetches PC directly on every call).
+  useEffect(() => {
+    const serviceTypeId = PCO_SERVICE_TYPE_IDS[groupName];
+    if (!token || !serviceTypeId || !schedDate) { setOosData(null); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(schedDate)) return;
+    setOosLoading(true);
+    setOosError(false);
+    fetch(`${API}/schedule/planning-center/order-of-service?service_type_id=${encodeURIComponent(serviceTypeId)}&service_date=${encodeURIComponent(schedDate)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => { setOosData(data); setOosLoading(false); })
+      .catch(() => { setOosError(true); setOosLoading(false); });
+  }, [token, groupName, schedDate]);
+
+  // "Send as PDF": generates the PDF server-side, triggers a browser download
+  // of it, then opens a wa.me link with a pre-filled text nudge so the leader
+  // can manually attach the just-downloaded file in WhatsApp's own UI.
+  // LIMITATION: a browser can't silently attach a file to a wa.me link (wa.me
+  // only supports pre-filled text, not attachments) — true one-tap
+  // "download AND send as attachment" isn't possible from a web page without
+  // the OS-level share sheet, which only navigator.share({ files }) can
+  // trigger (and only on browsers that support file-sharing, mostly mobile).
+  // We try navigator.share({ files }) first when supported; otherwise we fall
+  // back to download-then-manual-attach.
+  const oosAnchorRef = useRef(null);
+  function doSendOosPdf() {
+    const serviceTypeId = PCO_SERVICE_TYPE_IDS[groupName];
+    if (!serviceTypeId || !schedDate || oosSending) return;
+    setOosSending(true);
+    fetch(`${API}/schedule/planning-center/order-of-service/pdf`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ service_type_id: serviceTypeId, service_date: schedDate }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(async (blob) => {
+        const filename = `order-of-service-${schedDate}.pdf`;
+        const file = new File([blob], filename, { type: "application/pdf" });
+        // Primary path: OS-level share sheet (mobile browsers that support
+        // sharing files) — a true one-tap share directly into WhatsApp.
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: filename, text: tx.oosWhatsAppNudge });
+            setOosSending(false);
+            return;
+          } catch (shareErr) {
+            // User cancelled the share sheet, or share failed — fall through
+            // to the download-then-manual-attach fallback below.
+          }
+        }
+        // Fallback: download the PDF, then open wa.me with a text nudge so
+        // the leader attaches the file manually from WhatsApp's own UI.
+        const blobUrl = URL.createObjectURL(blob);
+        const dlAnchor = document.createElement("a");
+        dlAnchor.href = blobUrl;
+        dlAnchor.download = filename;
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        document.body.removeChild(dlAnchor);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        if (oosAnchorRef.current) {
+          oosAnchorRef.current.href = `https://wa.me/?text=${encodeURIComponent(tx.oosWhatsAppNudge)}`;
+          oosAnchorRef.current.click();
+        }
+        setOosSending(false);
+      })
+      .catch(() => { setOosSending(false); });
+  }
 
   useEffect(() => {
     if (!token || !groupName || !PCO_SERVICE_TYPE_IDS[groupName]) return;
@@ -8765,6 +8847,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
           { id: "scheduling", label: tx.tabScheduling },
           { id: "team", label: tx.tabTeam },
           { id: "stats", label: tx.tabStats },
+          { id: "order_of_service", label: tx.tabOrderOfService },
         ].map(t => {
           const active = glMainTab === t.id;
           return (
@@ -8937,6 +9020,79 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         </div>
       )}
       </>
+      )}
+
+      {/* Section C.5 — Order of Service (live from Planning Center, never cached) */}
+      {glMainTab === "order_of_service" && (
+      <div className="glass" style={{borderRadius:16,padding:24,marginBottom:20}}>
+        <a ref={oosAnchorRef} href="#" target="_blank" rel="noopener noreferrer" style={{ display: "none" }} aria-hidden="true" tabIndex={-1} />
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",fontWeight:500}}>{tx.tabOrderOfService}</div>
+          {oosData && oosData.found && (
+            <button onClick={doSendOosPdf} disabled={oosSending}
+              style={{fontSize:12,color:"#5eead4",background:"rgba(94,234,212,0.08)",border:"1px solid rgba(94,234,212,0.3)",borderRadius:8,padding:"6px 14px",cursor:oosSending?"default":"pointer",opacity:oosSending?0.5:1,fontFamily:"'JetBrains Mono',monospace",fontWeight:600,letterSpacing:"0.05em"}}>
+              {oosSending ? tx.oosSending : tx.oosSendPdf}
+            </button>
+          )}
+        </div>
+
+        {oosLoading && (
+          <div style={{color:"#475a64",fontSize:12,padding:"12px 0",fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.12em"}}>...</div>
+        )}
+        {oosError && (
+          <div style={{color:"#e07070",fontSize:13,padding:"12px 0"}}>{tx.schedErr}</div>
+        )}
+        {!oosLoading && !oosError && oosData && !oosData.configured && (
+          <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.noScheduleData}</div>
+        )}
+        {!oosLoading && !oosError && oosData && oosData.configured && !oosData.found && (
+          <div style={{color:"#475a64",fontSize:13,padding:"12px 0"}}>{tx.oosNoPlan}</div>
+        )}
+        {!oosLoading && !oosError && oosData && oosData.found && (
+          <div>
+            {(oosData.items || []).map((item, idx) => {
+              const key = `oos-${idx}`;
+              if (item.item_type === "header") {
+                const barColors = ["rgba(23,23,28,0.9)", "rgba(13,112,107,0.85)"];
+                return (
+                  <div key={key} style={{
+                    background: barColors[idx % 2], borderRadius: 8, padding: "10px 14px",
+                    margin: "14px 0 8px", color: "#e6f1f0",
+                    fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13.5,
+                  }}>
+                    {item.title || tx.unmatched}
+                  </div>
+                );
+              }
+              if (item.item_type === "song") {
+                return (
+                  <div key={key} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontStyle:"italic",fontWeight:600,fontSize:13,color:"#5eead4"}}>
+                      {item.title || "(untitled)"}
+                      {item.length ? <span style={{fontSize:11,color:"#475a64",fontStyle:"normal",marginLeft:8}}>{Math.round(item.length/60)} min</span> : null}
+                    </div>
+                    {item.description && (
+                      <div style={{fontSize:11.5,color:"#6b7a82",marginTop:3}}>{item.description}</div>
+                    )}
+                  </div>
+                );
+              }
+              // 'item' and 'media' both render plain.
+              return (
+                <div key={key} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,color:"#e6f1f0"}}>
+                    {item.title || "(untitled)"}
+                    {item.length ? <span style={{fontSize:11,color:"#475a64",fontWeight:400,marginLeft:8}}>{Math.round(item.length/60)} min</span> : null}
+                  </div>
+                  {item.description && (
+                    <div style={{fontSize:11.5,color:"#6b7a82",marginTop:3}}>{item.description}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
       )}
 
       {/* Section D — Service Scheduler */}

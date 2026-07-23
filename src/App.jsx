@@ -8563,7 +8563,7 @@ function GroupLeaderView({ token, lang, groupName, scheduledBy }) {
         }
         if (canShareFiles) {
           try {
-            await navigator.share({ files: [file], title: filename, text: tx.oosWhatsAppNudge });
+            await navigator.share({ files: [file] });
             setOosSending(false);
             return;
           } catch (shareErr) {

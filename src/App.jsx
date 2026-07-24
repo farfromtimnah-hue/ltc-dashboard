@@ -1408,6 +1408,12 @@ const WAHA_DEFAULT_BODY = {
   reminder: {
     en: 'Hi {nome}! Just following up on your schedule for {ministerio} as {posicao} at the {servico} service on {data}.',
     pt: 'Oi {nome}! Passando para lembrar da sua escala em {ministerio} na posicao {posicao} no culto {servico} no dia {data}.'
+  },
+  // Day-before thank-you for CONFIRMED volunteers — plain one-way text, no
+  // locked suffix (nothing to reply to).
+  service_reminder: {
+    en: 'Thank you for serving, {nome}! Just a reminder that tomorrow, {data}, you are serving with the {ministerio} ministry as {posicao} at the {servico} service. See you there!',
+    pt: 'Obrigado por servir, {nome}! Lembrando que amanha, dia {data}, voce serve no ministerio {ministerio} na posicao {posicao} no culto {servico}. Ate la!'
   }
 };
 const WAHA_DEFAULT_REPLY = {
@@ -1436,6 +1442,8 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
   const [wahaInviteEN, setWahaInviteEN] = useState("");
   const [wahaReminderPT, setWahaReminderPT] = useState("");
   const [wahaReminderEN, setWahaReminderEN] = useState("");
+  const [wahaServiceReminderPT, setWahaServiceReminderPT] = useState("");
+  const [wahaServiceReminderEN, setWahaServiceReminderEN] = useState("");
   const [wahaConfirmedPT, setWahaConfirmedPT] = useState("");
   const [wahaConfirmedEN, setWahaConfirmedEN] = useState("");
   const [wahaReschedulePT, setWahaReschedulePT] = useState("");
@@ -1459,6 +1467,8 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
         setWahaInviteEN(d.whatsapp_waha_invite_en || WAHA_DEFAULT_BODY.invite.en);
         setWahaReminderPT(d.whatsapp_waha_reminder_pt || WAHA_DEFAULT_BODY.reminder.pt);
         setWahaReminderEN(d.whatsapp_waha_reminder_en || WAHA_DEFAULT_BODY.reminder.en);
+        setWahaServiceReminderPT(d.whatsapp_waha_service_reminder_pt || WAHA_DEFAULT_BODY.service_reminder.pt);
+        setWahaServiceReminderEN(d.whatsapp_waha_service_reminder_en || WAHA_DEFAULT_BODY.service_reminder.en);
         setWahaConfirmedPT(d.whatsapp_waha_confirmed_reply_pt || WAHA_DEFAULT_REPLY.confirmed.pt);
         setWahaConfirmedEN(d.whatsapp_waha_confirmed_reply_en || WAHA_DEFAULT_REPLY.confirmed.en);
         setWahaReschedulePT(d.whatsapp_waha_reschedule_reply_pt || WAHA_DEFAULT_REPLY.reschedule.pt);
@@ -1499,6 +1509,8 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
         whatsapp_waha_invite_en: wahaInviteEN || null,
         whatsapp_waha_reminder_pt: wahaReminderPT || null,
         whatsapp_waha_reminder_en: wahaReminderEN || null,
+        whatsapp_waha_service_reminder_pt: wahaServiceReminderPT || null,
+        whatsapp_waha_service_reminder_en: wahaServiceReminderEN || null,
         whatsapp_waha_confirmed_reply_pt: wahaConfirmedPT || null,
         whatsapp_waha_confirmed_reply_en: wahaConfirmedEN || null,
         whatsapp_waha_reschedule_reply_pt: wahaReschedulePT || null,
@@ -1610,6 +1622,18 @@ function SettingsModal({ token, t, onClose, onSaved, lang }) {
               <textarea value={wahaReminderEN} onChange={e => setWahaReminderEN(e.target.value)} rows={4}
                 style={{resize:"vertical",lineHeight:1.6}}/>
               <LockedSuffix text={WAHA_LOCKED_SUFFIX.reminder.en} />
+            </div>
+            {/* Day-before thank-you for confirmed volunteers — one-way text,
+                 no locked suffix (nothing to reply to). */}
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Lembrete de Agradecimento (Confirmados) (PT)" : "Thank-You Reminder (Confirmed) (PT)"}</div>
+              <textarea value={wahaServiceReminderPT} onChange={e => setWahaServiceReminderPT(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
+            </div>
+            <div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇺🇸 {lang === "PT" ? "Lembrete de Agradecimento (Confirmados) (EN)" : "Thank-You Reminder (Confirmed) (EN)"}</div>
+              <textarea value={wahaServiceReminderEN} onChange={e => setWahaServiceReminderEN(e.target.value)} rows={4}
+                style={{resize:"vertical",lineHeight:1.6}}/>
             </div>
             <div>
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>🇧🇷 {lang === "PT" ? "Resposta apos Confirmar (PT)" : "Reply after Confirming (PT)"}</div>
@@ -7539,7 +7563,12 @@ function AgendaTab({ ministry, token, lang }) {
 
   function loadSchedule() {
     if (!ministry || !token || !selService) return;
-    setSchedLoading(true);
+    // Only show the full loading placeholder on the initial load (no
+    // assignments yet) - a refresh after a send-invite tap must keep the
+    // list mounted, or the InviteSendButton whose sentOk confirmation was
+    // just set gets unmounted before it can render, and the section
+    // collapsing to a 40px placeholder snaps the page scroll to the top.
+    if (assignments.length === 0) setSchedLoading(true);
     var url = API + '/schedule?ministry=' + encodeURIComponent(ministry) + '&start=' + dateStr + '&end=' + dateStr + '&service_name=' + encodeURIComponent(selService);
     fetch(url, { headers: { Authorization: 'Bearer ' + token } })
       .then(function(r) { return r.json(); }).catch(function() { return {}; })

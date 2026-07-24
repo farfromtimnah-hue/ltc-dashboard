@@ -188,8 +188,8 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
       )}
       {wahaFail && (
         <>
-          <span title={wahaFail} style={{ fontSize: 9.5, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontStyle: "italic" }}>
-            {tx.autoFailed}
+          <span style={{ fontSize: 9.5, color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontStyle: "italic" }}>
+            {tx.autoFailed} ({wahaFail})
           </span>
           <button onClick={e => { e.stopPropagation(); handleManual(); }} aria-busy={busy} style={{
             padding: "2px 8px", borderRadius: 999, fontSize: 10, fontFamily: "'JetBrains Mono',monospace",

@@ -227,6 +227,13 @@ export function InviteSendButton({ assignmentId, status, inviteSentAt, person, t
 }
 
 // Needs-attention indicators for one assignment row:
+//   poll_vote_failed - red "Vote failed - resend" chip. The volunteer DID
+//     tap a poll option (confirmed via WAHA's poll.vote.failed webhook event
+//     - a real vote WAHA received but could not decrypt, a documented WAHA
+//     limitation usually tied to a session restart losing poll-key state).
+//     Distinct from "hasn't answered yet" - use the existing Send
+//     invite/Resend button on this row to resend, which is the documented
+//     WAHA-side fix (fresh poll = fresh decryptable key).
 //   reschedule_requested - prominent violet chip, dashboard-only alert, the
 //     leader arranges a new day outside this system for now. No WhatsApp button.
 //   reminder - amber clock with tooltip + one-tap wa.me reminder send using
@@ -241,14 +248,27 @@ export function NeedsAttentionBadges({ item, lang }) {
     remindTip:    lang === "PT" ? "Sem resposta ha mais de 24 horas" : "No response for over 24 hours",
     remindBtn:    lang === "PT" ? "Lembrar" : "Remind",
     escalateTip:  lang === "PT" ? "Sem resposta ha mais de 48 horas" : "No response for over 48 hours",
+    pollFailed:   lang === "PT" ? "Voto falhou - reenviar" : "Vote failed - resend",
+    pollFailedTip: lang === "PT"
+      ? "A pessoa votou, mas o WhatsApp nao conseguiu confirmar o voto. Use Reenviar para gerar uma nova enquete."
+      : "This person tapped their answer, but WhatsApp couldn't confirm the vote on our end. Use Resend to generate a fresh poll.",
   };
 
+  const hasPollFailed = item.flags.indexOf("poll_vote_failed") !== -1;
   const hasResched = item.flags.indexOf("reschedule_requested") !== -1;
   const hasReminder = item.flags.indexOf("reminder") !== -1;
   const hasEscalation = item.flags.indexOf("escalation") !== -1;
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      {hasPollFailed && (
+        <span title={tx.pollFailedTip} style={{
+          fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+          background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.5)",
+          color: "#f87171", fontFamily: "'JetBrains Mono',monospace", whiteSpace: "nowrap",
+          boxShadow: "0 0 8px rgba(248,113,113,0.35)",
+        }}>{tx.pollFailed}</span>
+      )}
       {hasResched && (
         <span title={tx.reschedTip} style={{
           fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,

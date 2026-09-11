@@ -1,8 +1,8 @@
 {
   "name": "LTC Ministry Dashboard",
   "short_name": "LTC",
-  "start_url": "/ltc-dashboard/",
-  "scope": "/ltc-dashboard/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#2ABFBF",
   "theme_color": "#2ABFBF",

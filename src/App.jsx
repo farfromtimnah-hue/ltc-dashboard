@@ -3086,7 +3086,9 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
     updateConnection({ current_ministries: ministries.filter(x=>x!==m) });
   }
 
-  const sortedScores = Object.entries(scores).map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
+  // _meta carries assessment diagnostics (top-box confirm/decline counts, item
+  // count), not a gifting score — exclude it or it renders as a bogus row.
+  const sortedScores = Object.entries(scores).filter(([k])=>k!=='_meta').map(([k,v])=>[SHORT_TO_FULL[k]||k,Math.min(Number(v),100)]).sort((a,b)=>b[1]-a[1]);
 
   // Canonical Carisma options. Legacy stored values: "1 Ano" maps to "1st Year", "Level 5" maps to "Masters"
   const CARISMA_OPTIONS = [

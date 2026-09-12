@@ -156,6 +156,30 @@ const DISC_COLORS = { D:"#f87171", I:"#f59e0b", S:"#34d399", C:"#60a5fa" };
 // other the person is genuinely both, so the combination is named as its own
 // profile rather than one being picked as the "winner". Keys are the two
 // letters in alphabetical order.
+// Reads DISC scale and blend off a person record. Module scope on purpose: it
+// is needed in more than one component, and defining it inside one of them is
+// exactly the mistake that crashed every profile on 2026-09-12.
+//
+// Two scales exist in the data. Records before 2026-09-12 have 3 items per
+// dimension (range 3-15); records after have 6 (range 6-30). Any score above 15
+// can only come from the longer version, so detect it from the data rather than
+// assuming — old profiles must keep rendering correctly.
+function discShape(person) {
+  var pairs = [
+    {k:'D', v:person && person.disc_d}, {k:'I', v:person && person.disc_i},
+    {k:'S', v:person && person.disc_s}, {k:'C', v:person && person.disc_c}
+  ].filter(function(x){ return typeof x.v === 'number'; });
+  var isLong = pairs.some(function(x){ return x.v > 15; });
+  var out = { max: isLong ? 30 : 15, blend: null };
+  if (pairs.length === 4) {
+    var sorted = pairs.slice().sort(function(a,b){ return b.v - a.v; });
+    if ((sorted[0].v - sorted[1].v) <= (isLong ? 2 : 1)) {
+      out.blend = { key: [sorted[0].k, sorted[1].k].sort().join('') };
+    }
+  }
+  return out;
+}
+
 const DISC_BLEND_NAME = {
   PT: {
     DI:"Executor Comunicador", CD:"Executor Analitico", DS:"Executor Firme",
@@ -1061,28 +1085,6 @@ function getMinistryRecommendations(person, lang) {
 
   var discPrimary = person.disc_primary || '';
 
-  // DISC blends. When the top two scores land within one item's worth of each
-  // other, neither one alone describes the person — they are genuinely both, so
-  // name that combination rather than picking a winner by sort order.
-  //
-  // Two scales exist in the data. Records before 2026-09-12 have 3 items per
-  // dimension (range 3-15); records after have 6 (range 6-30). Any score above
-  // 15 can only come from the longer version, so detect it from the data rather
-  // than assuming — old profiles must keep rendering correctly.
-  var discPairs = [
-    {k:'D', v:person.disc_d}, {k:'I', v:person.disc_i},
-    {k:'S', v:person.disc_s}, {k:'C', v:person.disc_c}
-  ].filter(function(x){ return typeof x.v === 'number'; });
-  var discIsLongForm = discPairs.some(function(x){ return x.v > 15; });
-  var discMax = discIsLongForm ? 30 : 15;
-  var discBlendGap = discIsLongForm ? 2 : 1;
-  var discBlend = null;
-  if (discPairs.length === 4) {
-    var sortedPairs = discPairs.slice().sort(function(a,b){ return b.v - a.v; });
-    if ((sortedPairs[0].v - sortedPairs[1].v) <= discBlendGap) {
-      discBlend = { key: [sortedPairs[0].k, sortedPairs[1].k].sort().join('') };
-    }
-  }
   var discSecondary = person.disc_secondary || '';
   var discTypes = [discPrimary, discSecondary].filter(Boolean);
 
@@ -2989,6 +2991,9 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
   const langs = parseJSON(person.languages_spoken);
   const groups = parseJSON(person.special_groups);
   const scores = parseJSON(person.scores, {});
+  const discInfo = discShape(person);
+  const discMax = discInfo.max;
+  const discBlend = discInfo.blend;
   const badge = ministryBadge(person.ministry_count || 0);
   const carisma = parseCarisma(person.carisma_completed);
   // PersonPanel WhatsApp: same as PersonCard — uses template

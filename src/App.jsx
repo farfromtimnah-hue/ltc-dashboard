@@ -1061,18 +1061,25 @@ function getMinistryRecommendations(person, lang) {
 
   var discPrimary = person.disc_primary || '';
 
-  // DISC blends. Each dimension is 3 items on a 1-5 scale (range 3-15), so when
-  // the top two land within a point neither one alone describes the person —
-  // they are genuinely both. Name that combination as its own profile rather
-  // than picking a winner by sort order.
+  // DISC blends. When the top two scores land within one item's worth of each
+  // other, neither one alone describes the person — they are genuinely both, so
+  // name that combination rather than picking a winner by sort order.
+  //
+  // Two scales exist in the data. Records before 2026-09-12 have 3 items per
+  // dimension (range 3-15); records after have 6 (range 6-30). Any score above
+  // 15 can only come from the longer version, so detect it from the data rather
+  // than assuming — old profiles must keep rendering correctly.
   var discPairs = [
     {k:'D', v:person.disc_d}, {k:'I', v:person.disc_i},
     {k:'S', v:person.disc_s}, {k:'C', v:person.disc_c}
   ].filter(function(x){ return typeof x.v === 'number'; });
+  var discIsLongForm = discPairs.some(function(x){ return x.v > 15; });
+  var discMax = discIsLongForm ? 30 : 15;
+  var discBlendGap = discIsLongForm ? 2 : 1;
   var discBlend = null;
   if (discPairs.length === 4) {
     var sortedPairs = discPairs.slice().sort(function(a,b){ return b.v - a.v; });
-    if ((sortedPairs[0].v - sortedPairs[1].v) <= 1) {
+    if ((sortedPairs[0].v - sortedPairs[1].v) <= discBlendGap) {
       discBlend = { key: [sortedPairs[0].k, sortedPairs[1].k].sort().join('') };
     }
   }
@@ -3750,7 +3757,7 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
               {discBars.length > 0 && (
                 <div style={{marginTop:12,marginBottom:4}}>
                   {discBars.map(function(bar) {
-                    var pct = Math.round((bar.field / 15) * 100);
+                    var pct = Math.round((bar.field / discMax) * 100);
                     var color = DISC_COLORS[bar.key] || '#2ABFBF';
                     return (
                       <div key={bar.key} style={{marginBottom:6}}>
@@ -3759,7 +3766,7 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                             <span style={{color:color,fontWeight:700,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>{bar.key}</span>
                             <span style={{color:'#6b7a82',fontSize:11}}>{lang==='PT' ? bar.ptLabel : bar.enLabel}</span>
                           </div>
-                          <span style={{color:'#6b7a82',fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{bar.field}/15</span>
+                          <span style={{color:'#6b7a82',fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{bar.field}/{discMax}</span>
                         </div>
                         <div style={{background:'rgba(255,255,255,0.06)',height:4,borderRadius:2}}>
                           <div style={{width:`${pct}%`,background:color,height:'100%',borderRadius:2}}/>

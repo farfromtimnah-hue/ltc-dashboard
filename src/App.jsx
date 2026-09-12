@@ -1027,6 +1027,16 @@ function getMinistryRecommendations(person, lang) {
   } catch(e) { allScores = {}; }
 
   var discPrimary = person.disc_primary || '';
+
+  // DISC confidence. Each dimension is 3 items on a 1-5 scale (range 3-15), so
+  // adjacent scores are frequently noise. When the top two are within a point
+  // the "#1" badge reflects sort order, not the person's answers — say so
+  // rather than letting a leader place someone on a coin flip.
+  var discSorted = [person.disc_d, person.disc_i, person.disc_s, person.disc_c]
+    .filter(function(v){ return typeof v === 'number'; })
+    .sort(function(a,b){ return b-a; });
+  var discBlended = discSorted.length === 4 && (discSorted[0] - discSorted[1]) <= 1;
+  var discFlat    = discSorted.length === 4 && (discSorted[0] - discSorted[3]) <= 3;
   var discSecondary = person.disc_secondary || '';
   var discTypes = [discPrimary, discSecondary].filter(Boolean);
 
@@ -3685,6 +3695,25 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                         : t.pastoralAlert}
                     </span>
                   )}
+                  {discBlended && (
+                    <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
+                      background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
+                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                      {lang==="PT" ? "⚖ Empate — #1 nao e confiavel" : "⚖ Tie — #1 not reliable"}
+                    </span>
+                  )}
+                </div>
+              )}
+              {(discBlended || discFlat) && (
+                <div style={{fontSize:11.5,lineHeight:1.5,color:"#8d9aa2",
+                  borderLeft:"2px solid rgba(245,158,11,0.35)",paddingLeft:10,marginBottom:14}}>
+                  {discBlended
+                    ? (lang==="PT"
+                      ? "Os dois primeiros tipos ficaram a 1 ponto ou menos de distancia, entao o #1 foi definido pela ordem de classificacao e nao pelas respostas. Trate os dois como igualmente provaveis e confirme conversando antes de usar isso para escalar."
+                      : "The top two types came out within 1 point, so #1 was decided by sort order rather than by the answers. Treat both as equally likely and confirm in conversation before using this to schedule.")
+                    : (lang==="PT"
+                      ? "Os quatro resultados ficaram proximos. Sao apenas 3 perguntas por tipo, curto demais para apontar um perfil com seguranca. Use como ponto de partida para conversa."
+                      : "All four results came out close together. This is only 3 questions per type, too short to identify a profile confidently. Use as a starting point for conversation.")}
                 </div>
               )}
               {discBars.length > 0 && (

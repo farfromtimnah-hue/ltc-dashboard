@@ -3706,6 +3706,40 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
           {showBehavioralProfile && (
             <div style={{paddingTop:22,paddingBottom:22,borderTop:"1px solid rgba(255,255,255,0.04)"}}>
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:"10.5px",letterSpacing:"0.18em",textTransform:"uppercase",color:"#6b7a82",marginBottom:12,fontWeight:500}}>{t.discProfile}</div>
+              {/* Verification report — read it first, then send it to them.
+                  The link carries a per-person token so they need no login. */}
+              <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                <button onClick={async function(){
+                  try{
+                    var r=await fetch(`${API}/report-link/${person.id}`,{headers:{Authorization:`Bearer ${token}`}});
+                    var d=await r.json();
+                    if(d&&d.url) window.open(d.url,"_blank");
+                    else alert(lang==="PT"?"Nao foi possivel gerar o relatorio.":"Could not generate the report.");
+                  }catch(e){ alert(String(e.message||e)); }
+                }} style={{fontSize:11.5,padding:"7px 13px",borderRadius:8,cursor:"pointer",
+                  background:"rgba(42,191,191,0.12)",border:"1px solid rgba(42,191,191,0.35)",
+                  color:"#2ABFBF",fontWeight:700}}>
+                  {lang==="PT"?"Ver relatorio":"View report"}
+                </button>
+                <button onClick={async function(){
+                  try{
+                    var r=await fetch(`${API}/report-link/${person.id}`,{headers:{Authorization:`Bearer ${token}`}});
+                    var d=await r.json();
+                    if(!d||!d.url){ alert(lang==="PT"?"Nao foi possivel gerar o link.":"Could not generate the link."); return; }
+                    var num=String(person.whatsapp||"").replace(/\D/g,"");
+                    if(!num){ alert(lang==="PT"?"Sem numero de WhatsApp.":"No WhatsApp number on file."); return; }
+                    var first=(person.preferred_name||person.name||"").split(" ")[0];
+                    var msg=(String(person.language||"PT").toUpperCase()==="PT")
+                      ? `Oi ${first}! Da uma olhada no resultado da sua avaliacao e me diz se combina com voce: ${d.url}`
+                      : `Hi ${first}! Take a look at your assessment results and tell me if this sounds like you: ${d.url}`;
+                    window.open("https://wa.me/"+num+"?text="+encodeURIComponent(msg),"_blank");
+                  }catch(e){ alert(String(e.message||e)); }
+                }} style={{fontSize:11.5,padding:"7px 13px",borderRadius:8,cursor:"pointer",
+                  background:"rgba(37,211,102,0.12)",border:"1px solid rgba(37,211,102,0.35)",
+                  color:"#25D366",fontWeight:700}}>
+                  {lang==="PT"?"Enviar no WhatsApp":"Send via WhatsApp"}
+                </button>
+              </div>
               {/* DISC type badges — tap to open description popup */}
               {person.disc_primary && (
                 <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>

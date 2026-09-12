@@ -152,6 +152,39 @@ const DISC_TYPE = {
 };
 const DISC_COLORS = { D:"#f87171", I:"#f59e0b", S:"#34d399", C:"#60a5fa" };
 
+// Blended profiles. When the top two DISC scores land within a point of each
+// other the person is genuinely both, so the combination is named as its own
+// profile rather than one being picked as the "winner". Keys are the two
+// letters in alphabetical order.
+const DISC_BLEND_NAME = {
+  PT: {
+    DI:"Executor Comunicador", CD:"Executor Analitico", DS:"Executor Firme",
+    IS:"Comunicador Acolhedor", CI:"Comunicador Preciso", CS:"Planejador Analitico"
+  },
+  EN: {
+    DI:"Driving Communicator", CD:"Analytical Driver", DS:"Grounded Driver",
+    IS:"Welcoming Communicator", CI:"Precise Communicator", CS:"Analytical Planner"
+  }
+};
+const DISC_BLEND_DESC = {
+  PT: {
+    DI:"Decide rapido e leva as pessoas junto. Assume a frente sem perder o calor da equipe, e costuma abrir caminho onde ainda nao ha estrutura.",
+    CD:"Decide com criterio. Quer agir logo, mas quer estar certo antes, e resolve bem o que exige rapidez e precisao ao mesmo tempo.",
+    DS:"Firme e constante. Toma a frente quando precisa, mas sustenta o que comeca, sem pressa de mudar o que ja esta funcionando.",
+    IS:"Aproxima e sustenta. Cria vinculo com facilidade e permanece perto ao longo do tempo, servindo bem onde as pessoas precisam ser cuidadas.",
+    CI:"Comunica com cuidado. Gosta de gente e de fazer bem feito, e costuma explicar as coisas de um jeito claro e acolhedor.",
+    CS:"Constroi para durar. Prefere ordem e consistencia, e faz bem o trabalho que precisa ser confiavel toda semana, sem improviso."
+  },
+  EN: {
+    DI:"Decides quickly and brings people along. Steps out front without losing the warmth of the team, and tends to open the way where structure does not exist yet.",
+    CD:"Decides with care. Wants to move, but wants to be right first, and handles work that needs both speed and precision.",
+    DS:"Firm and consistent. Takes the lead when needed but sustains what they start, without rushing to change what already works.",
+    IS:"Draws people in and stays. Builds connection easily and remains close over time, serving well where people need to be cared for.",
+    CI:"Communicates with care. Enjoys people and doing things well, and tends to explain things clearly and warmly.",
+    CS:"Builds things that last. Prefers order and consistency, and does well the work that has to be dependable every week."
+  }
+};
+
 const LANGUAGE_DISPLAY = {
   PT: { "Portugues":"🇧🇷 Portugues", "English":"🇺🇸 Ingles", "Espanol":"🌎 Espanol", "Português":"🇧🇷 Portugues", "Both":"🌐 Ambos" },
   EN: { "Portugues":"🇧🇷 Portugues", "English":"🇺🇸 English", "Espanol":"🌎 Espanol", "Português":"🇧🇷 Portugues", "Both":"🌐 Both" }
@@ -1028,15 +1061,21 @@ function getMinistryRecommendations(person, lang) {
 
   var discPrimary = person.disc_primary || '';
 
-  // DISC confidence. Each dimension is 3 items on a 1-5 scale (range 3-15), so
-  // adjacent scores are frequently noise. When the top two are within a point
-  // the "#1" badge reflects sort order, not the person's answers — say so
-  // rather than letting a leader place someone on a coin flip.
-  var discSorted = [person.disc_d, person.disc_i, person.disc_s, person.disc_c]
-    .filter(function(v){ return typeof v === 'number'; })
-    .sort(function(a,b){ return b-a; });
-  var discBlended = discSorted.length === 4 && (discSorted[0] - discSorted[1]) <= 1;
-  var discFlat    = discSorted.length === 4 && (discSorted[0] - discSorted[3]) <= 3;
+  // DISC blends. Each dimension is 3 items on a 1-5 scale (range 3-15), so when
+  // the top two land within a point neither one alone describes the person —
+  // they are genuinely both. Name that combination as its own profile rather
+  // than picking a winner by sort order.
+  var discPairs = [
+    {k:'D', v:person.disc_d}, {k:'I', v:person.disc_i},
+    {k:'S', v:person.disc_s}, {k:'C', v:person.disc_c}
+  ].filter(function(x){ return typeof x.v === 'number'; });
+  var discBlend = null;
+  if (discPairs.length === 4) {
+    var sortedPairs = discPairs.slice().sort(function(a,b){ return b.v - a.v; });
+    if ((sortedPairs[0].v - sortedPairs[1].v) <= 1) {
+      discBlend = { key: [sortedPairs[0].k, sortedPairs[1].k].sort().join('') };
+    }
+  }
   var discSecondary = person.disc_secondary || '';
   var discTypes = [discPrimary, discSecondary].filter(Boolean);
 
@@ -3695,25 +3734,17 @@ function PersonPanel({ personId, token, role, onClose, onUpdated, t, lang, templ
                         : t.pastoralAlert}
                     </span>
                   )}
-                  {discBlended && (
-                    <span style={{fontSize:10,padding:"4px 10px",borderRadius:6,
-                      background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",
-                      color:"#fbd590",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
-                      {lang==="PT" ? "⚖ Empate — #1 nao e confiavel" : "⚖ Tie — #1 not reliable"}
-                    </span>
-                  )}
                 </div>
               )}
-              {(discBlended || discFlat) && (
-                <div style={{fontSize:11.5,lineHeight:1.5,color:"#8d9aa2",
-                  borderLeft:"2px solid rgba(245,158,11,0.35)",paddingLeft:10,marginBottom:14}}>
-                  {discBlended
-                    ? (lang==="PT"
-                      ? "Os dois primeiros tipos ficaram a 1 ponto ou menos de distancia, entao o #1 foi definido pela ordem de classificacao e nao pelas respostas. Trate os dois como igualmente provaveis e confirme conversando antes de usar isso para escalar."
-                      : "The top two types came out within 1 point, so #1 was decided by sort order rather than by the answers. Treat both as equally likely and confirm in conversation before using this to schedule.")
-                    : (lang==="PT"
-                      ? "Os quatro resultados ficaram proximos. Sao apenas 3 perguntas por tipo, curto demais para apontar um perfil com seguranca. Use como ponto de partida para conversa."
-                      : "All four results came out close together. This is only 3 questions per type, too short to identify a profile confidently. Use as a starting point for conversation.")}
+              {discBlend && (
+                <div style={{fontSize:12,lineHeight:1.55,color:"#a9b6bd",marginBottom:14,
+                  background:"rgba(42,191,191,0.06)",border:"1px solid rgba(42,191,191,0.2)",
+                  borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:"0.14em",
+                    textTransform:"uppercase",color:"#2ABFBF",fontWeight:700,marginBottom:5}}>
+                    {(DISC_BLEND_NAME[lang||"PT"]||DISC_BLEND_NAME.PT)[discBlend.key]}
+                  </div>
+                  {(DISC_BLEND_DESC[lang||"PT"]||DISC_BLEND_DESC.PT)[discBlend.key]}
                 </div>
               )}
               {discBars.length > 0 && (
